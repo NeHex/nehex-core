@@ -7,8 +7,12 @@ from typing import Optional
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.core.simple_cache import cache
 from app.models.setting import Setting, SettingType
 from app.schemas.setting import SettingItem
+
+SETTINGS_CACHE_KEY = "settings:list"
+SETTINGS_CACHE_TTL_SECONDS = 60
 
 
 def parse_setting_content(setting_type: SettingType, raw_content: Optional[str]) -> Any:
@@ -34,11 +38,15 @@ def parse_setting_content(setting_type: SettingType, raw_content: Optional[str])
 
 
 def list_settings(session: Session) -> list[SettingItem]:
+    cached = cache.get(SETTINGS_CACHE_KEY)
+    if cached is not None:
+        return [item.model_copy(deep=True) for item in cached]
+
     stmt = select(Setting).order_by(Setting.setting_key.asc())
     result = session.execute(stmt)
     rows = result.scalars().all()
 
-    return [
+    mapped = [
         SettingItem(
             setting_key=row.setting_key,
             setting_type=row.setting_type,
@@ -49,3 +57,5 @@ def list_settings(session: Session) -> list[SettingItem]:
         )
         for row in rows
     ]
+    cache.set(SETTINGS_CACHE_KEY, mapped, SETTINGS_CACHE_TTL_SECONDS)
+    return [item.model_copy(deep=True) for item in mapped]

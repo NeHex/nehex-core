@@ -5,12 +5,21 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.router import api_router
 from app.core.config import settings
-from app.core.database import check_database_connection, close_database
+from app.core.database import (
+    check_database_connection,
+    close_database,
+    ensure_performance_indexes,
+)
 
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     check_database_connection()
+    try:
+        ensure_performance_indexes()
+    except Exception as error:
+        # Do not block API startup when DB account lacks index privileges.
+        print(f"[startup] skip ensure_performance_indexes: {error}")
     yield
     close_database()
 

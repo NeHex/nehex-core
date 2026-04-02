@@ -17,6 +17,9 @@ class Settings(BaseSettings):
     db_max_overflow: int = 20
     db_pool_recycle: int = 1800
     db_pool_timeout: int = 30
+    db_connect_timeout: int = 5
+    db_read_timeout: int = 15
+    db_write_timeout: int = 15
 
     model_config = SettingsConfigDict(
         env_file=".env",

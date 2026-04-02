@@ -3,8 +3,12 @@ from __future__ import annotations
 from sqlalchemy import desc, select
 from sqlalchemy.orm import Session
 
+from app.core.simple_cache import cache
 from app.models.article import Article
 from app.schemas.article import ArticleItem
+
+ARTICLES_CACHE_KEY = "articles:list"
+ARTICLES_CACHE_TTL_SECONDS = 20
 
 
 def _map_article_item(row: Article) -> ArticleItem:
@@ -22,6 +26,10 @@ def _map_article_item(row: Article) -> ArticleItem:
 
 
 def list_articles(session: Session) -> list[ArticleItem]:
+    cached = cache.get(ARTICLES_CACHE_KEY)
+    if cached is not None:
+        return [item.model_copy(deep=True) for item in cached]
+
     stmt = select(Article).order_by(
         desc(Article.top),
         desc(Article.last_edit_time),
@@ -30,7 +38,9 @@ def list_articles(session: Session) -> list[ArticleItem]:
     result = session.execute(stmt)
     rows = result.scalars().all()
 
-    return [_map_article_item(row) for row in rows]
+    mapped = [_map_article_item(row) for row in rows]
+    cache.set(ARTICLES_CACHE_KEY, mapped, ARTICLES_CACHE_TTL_SECONDS)
+    return [item.model_copy(deep=True) for item in mapped]
 
 
 def get_article_by_id(session: Session, article_id: int) -> ArticleItem | None:
