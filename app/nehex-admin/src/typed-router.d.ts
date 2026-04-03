@@ -29,6 +29,7 @@ declare module 'vue-router/auto-routes' {
     '/dailies': RouteRecordInfo<'/dailies', '/dailies', Record<never, never>, Record<never, never>, '/dailies/edit/[id]' | '/dailies/new'>,
     '/dailies/edit/[id]': RouteRecordInfo<'/dailies/edit/[id]', '/dailies/edit/:id', { id: ParamValue<true> }, { id: ParamValue<false> }>,
     '/dailies/new': RouteRecordInfo<'/dailies/new', '/dailies/new', Record<never, never>, Record<never, never>>,
+    '/friends': RouteRecordInfo<'/friends', '/friends', Record<never, never>, Record<never, never>>,
     '/login': RouteRecordInfo<'/login', '/login', Record<never, never>, Record<never, never>>,
     '/pages': RouteRecordInfo<'/pages', '/pages', Record<never, never>, Record<never, never>, '/pages/edit/[id]' | '/pages/new'>,
     '/pages/edit/[id]': RouteRecordInfo<'/pages/edit/[id]', '/pages/edit/:id', { id: ParamValue<true> }, { id: ParamValue<false> }>,
@@ -92,6 +93,10 @@ declare module 'vue-router/auto-routes' {
     }
     'src/pages/dailies/new.vue': {
       routes: '/dailies/new'
+      views: never
+    }
+    'src/pages/friends.vue': {
+      routes: '/friends'
       views: never
     }
     'src/pages/login.vue': {

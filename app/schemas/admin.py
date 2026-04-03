@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from urllib.parse import urlparse
 from typing import Any
 from typing import Optional
 
@@ -10,6 +11,7 @@ from app.schemas.album import AlbumItem
 from app.schemas.article import ArticleItem
 from app.schemas.comment import CommentItem
 from app.schemas.daily import DailyItem
+from app.schemas.friend import FriendApplyItem, FriendApplyStatus, FriendItem, FriendStatus
 from app.schemas.page import PageItem
 from app.schemas.project import ProjectItem
 from app.schemas.setting import SettingItem
@@ -333,6 +335,126 @@ class AdminProjectUpdateRequest(BaseModel):
         return normalized or None
 
 
+class AdminFriendCreateRequest(BaseModel):
+    title: str = Field(min_length=1, max_length=255)
+    description: Optional[str] = Field(default=None, max_length=500)
+    category: str = Field(default="default", min_length=1, max_length=100)
+    favicon: Optional[str] = Field(default=None, max_length=500)
+    url: str = Field(min_length=1, max_length=500)
+    status: FriendStatus = "ok"
+
+    @field_validator("title", "category")
+    @classmethod
+    def normalize_required_fields(cls, value: str) -> str:
+        normalized = value.strip()
+        if not normalized:
+            raise ValueError("Field is required")
+        return normalized
+
+    @field_validator("url")
+    @classmethod
+    def normalize_url(cls, value: str) -> str:
+        normalized = value.strip()
+        if not normalized:
+            raise ValueError("url is required")
+
+        parsed = urlparse(normalized)
+        if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+            raise ValueError("URL must start with http:// or https://")
+        return normalized
+
+    @field_validator("favicon")
+    @classmethod
+    def normalize_favicon(cls, value: Optional[str]) -> Optional[str]:
+        if value is None:
+            return None
+        normalized = value.strip()
+        if not normalized:
+            return None
+
+        parsed = urlparse(normalized)
+        if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+            raise ValueError("URL must start with http:// or https://")
+        return normalized
+
+    @field_validator("description")
+    @classmethod
+    def normalize_optional_fields(cls, value: Optional[str]) -> Optional[str]:
+        if value is None:
+            return None
+        normalized = value.strip()
+        return normalized or None
+
+
+class AdminFriendUpdateRequest(BaseModel):
+    title: Optional[str] = Field(default=None, min_length=1, max_length=255)
+    description: Optional[str] = Field(default=None, max_length=500)
+    category: Optional[str] = Field(default=None, min_length=1, max_length=100)
+    favicon: Optional[str] = Field(default=None, max_length=500)
+    url: Optional[str] = Field(default=None, min_length=1, max_length=500)
+    status: Optional[FriendStatus] = None
+
+    @field_validator("title", "category")
+    @classmethod
+    def normalize_optional_required_fields(cls, value: Optional[str]) -> Optional[str]:
+        if value is None:
+            return None
+        normalized = value.strip()
+        if not normalized:
+            raise ValueError("Field cannot be empty")
+        return normalized
+
+    @field_validator("url")
+    @classmethod
+    def normalize_optional_url(cls, value: Optional[str]) -> Optional[str]:
+        if value is None:
+            return None
+        normalized = value.strip()
+        if not normalized:
+            raise ValueError("url cannot be empty")
+
+        parsed = urlparse(normalized)
+        if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+            raise ValueError("URL must start with http:// or https://")
+        return normalized
+
+    @field_validator("favicon")
+    @classmethod
+    def normalize_optional_favicon(cls, value: Optional[str]) -> Optional[str]:
+        if value is None:
+            return None
+        normalized = value.strip()
+        if not normalized:
+            return None
+
+        parsed = urlparse(normalized)
+        if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+            raise ValueError("URL must start with http:// or https://")
+        return normalized
+
+    @field_validator("description")
+    @classmethod
+    def normalize_optional_fields(cls, value: Optional[str]) -> Optional[str]:
+        if value is None:
+            return None
+        normalized = value.strip()
+        return normalized or None
+
+
+class AdminFriendApplyStatusUpdateRequest(BaseModel):
+    status: FriendApplyStatus
+    create_friend: bool = False
+    friend_category: Optional[str] = Field(default=None, max_length=100)
+
+    @field_validator("friend_category")
+    @classmethod
+    def normalize_friend_category(cls, value: Optional[str]) -> Optional[str]:
+        if value is None:
+            return None
+        normalized = value.strip()
+        return normalized or None
+
+
 class AdminDailyCreateRequest(BaseModel):
     title: str = Field(min_length=1, max_length=255)
     content: Optional[str] = None
@@ -537,3 +659,19 @@ class AdminProjectListResponse(BaseModel):
 
 class AdminSettingListResponse(BaseModel):
     data: list[SettingItem]
+
+
+class AdminFriendDetailResponse(BaseModel):
+    data: FriendItem
+
+
+class AdminFriendListResponse(BaseModel):
+    data: list[FriendItem]
+
+
+class AdminFriendApplyDetailResponse(BaseModel):
+    data: FriendApplyItem
+
+
+class AdminFriendApplyListResponse(BaseModel):
+    data: list[FriendApplyItem]

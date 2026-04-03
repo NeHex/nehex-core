@@ -7,6 +7,7 @@ from typing import Literal, Optional
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 FriendStatus = Literal["ok", "missing", "blocked"]
+FriendApplyStatus = Literal["pending", "approved", "rejected", "blocked"]
 
 
 class FriendItem(BaseModel):
@@ -81,3 +82,17 @@ class FriendApplyResponse(BaseModel):
     success: bool = True
     message: str
     application_id: int
+
+
+class FriendApplyItem(BaseModel):
+    id: int
+    site_title: str
+    site_url: str
+    site_description: Optional[str] = None
+    site_icon: Optional[str] = None
+    contact: Optional[str] = None
+    status: FriendApplyStatus
+    ip: Optional[str] = None
+    user_agent: Optional[str] = None
+    create_time: datetime
+    update_time: datetime

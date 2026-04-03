@@ -114,6 +114,7 @@ const menuItems: MenuItem[] = [
     ],
   },
   { icon: 'mdi-comment-multiple-outline', label: '评论管理', to: '/comments' },
+  { icon: 'mdi-link-variant', label: '友链管理', to: '/friends' },
   {
     icon: 'mdi-briefcase-outline',
     label: '项目管理',
