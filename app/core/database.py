@@ -48,6 +48,8 @@ def ensure_performance_indexes() -> None:
         ("comment", "idx_comment_ip_time", "ip,create_time"),
         ("album", "idx_album_update_time", "update_time,id"),
         ("daily", "idx_daily_create_time", "create_time,id"),
+        ("singlepage", "idx_singlepage_status_sort", "status,sort,id"),
+        ("project", "idx_project_status_sort", "status,sort,id"),
         ("friends", "idx_friends_status_time", "status,create_time,id"),
     ]
 

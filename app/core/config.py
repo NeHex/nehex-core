@@ -5,6 +5,10 @@ class Settings(BaseSettings):
     app_name: str = "NeHex Core API"
     app_env: str = "dev"
     app_port: int = 7878
+    admin_manager_web: str = "/nehex-admin"
+    admin_api_secret: str = "please-change-me"
+    admin_api_client_id: str = "nehex-vuetify-admin"
+    admin_api_token_ttl_seconds: int = 43200
 
     db_host: str = "127.0.0.1"
     db_port: int = 3306
@@ -34,6 +38,19 @@ class Settings(BaseSettings):
             f"@{self.db_host}:{self.db_port}/{self.db_name}"
             f"?charset={self.db_charset}"
         )
+
+    @property
+    def admin_manager_web_path(self) -> str:
+        value = (self.admin_manager_web or "/nehex-admin").strip()
+        if not value:
+            value = "/nehex-admin"
+        if not value.startswith("/"):
+            value = f"/{value}"
+        if value != "/":
+            value = value.rstrip("/")
+        if value == "/":
+            value = "/nehex-admin"
+        return value
 
 
 settings = Settings()
