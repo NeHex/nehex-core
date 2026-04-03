@@ -59,6 +59,7 @@
 <script lang="ts" setup>
 import { computed, onMounted, ref, useSlots } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { adminLogout } from '@/services/admin-api'
 import { fetchAdminTitle, getDefaultAdminTitle } from '@/services/settings'
 import { clearAuthSession, getAuthenticatedAccount } from '@/utils/auth'
 
@@ -145,6 +146,7 @@ onMounted(async () => {
 
 async function handleLogout(): Promise<void> {
   clearAuthSession()
+  await adminLogout().catch(() => undefined)
   await router.replace('/login')
 }
 

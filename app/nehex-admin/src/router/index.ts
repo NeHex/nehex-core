@@ -9,8 +9,10 @@ import { createRouter, createWebHistory } from 'vue-router'
 import { routes } from 'vue-router/auto-routes'
 import { isAuthenticated } from '@/utils/auth'
 import { getAdminBasePath, toRouterBase } from '@/utils/path'
+import { fetchInstallStatus } from '@/services/install'
 
 const LOGIN_PATH = '/login'
+const INSTALL_PATH = '/install'
 const HOME_PATH = '/'
 
 const router = createRouter({
@@ -18,7 +20,27 @@ const router = createRouter({
   routes,
 })
 
-router.beforeEach((to) => {
+router.beforeEach(async (to) => {
+  const installStatus = await fetchInstallStatus().catch(() => ({
+    installed: true,
+    schema_ready: true,
+    table_count: 0,
+    admin_manager_web: getAdminBasePath(),
+  }))
+
+  if (!installStatus.installed) {
+    if (to.path !== INSTALL_PATH) {
+      return {
+        path: INSTALL_PATH,
+      }
+    }
+    return true
+  }
+
+  if (to.path === INSTALL_PATH) {
+    return isAuthenticated() ? HOME_PATH : LOGIN_PATH
+  }
+
   const authed = isAuthenticated()
 
   if (to.path === LOGIN_PATH) {

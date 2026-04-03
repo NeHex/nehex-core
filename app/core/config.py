@@ -1,4 +1,27 @@
+from typing import Optional
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+def normalize_admin_manager_web_path(value: Optional[str], fallback: str = "/nehex-admin") -> str:
+    normalized_fallback = (fallback or "/nehex-admin").strip() or "/nehex-admin"
+    if not normalized_fallback.startswith("/"):
+        normalized_fallback = f"/{normalized_fallback}"
+    if normalized_fallback != "/":
+        normalized_fallback = normalized_fallback.rstrip("/")
+    if normalized_fallback == "/":
+        normalized_fallback = "/nehex-admin"
+
+    text = (value or "").strip()
+    if not text:
+        return normalized_fallback
+    if not text.startswith("/"):
+        text = f"/{text}"
+    if text != "/":
+        text = text.rstrip("/")
+    if text == "/":
+        return normalized_fallback
+    return text
 
 
 class Settings(BaseSettings):
@@ -9,6 +32,7 @@ class Settings(BaseSettings):
     admin_api_secret: str = "please-change-me"
     admin_api_client_id: str = "nehex-vuetify-admin"
     admin_api_token_ttl_seconds: int = 43200
+    admin_manager_build_on_startup: bool = True
 
     db_host: str = "127.0.0.1"
     db_port: int = 3306
@@ -24,6 +48,8 @@ class Settings(BaseSettings):
     db_connect_timeout: int = 5
     db_read_timeout: int = 15
     db_write_timeout: int = 15
+    db_startup_max_retries: int = 30
+    db_startup_retry_interval_seconds: int = 2
 
     model_config = SettingsConfigDict(
         env_file=".env",
@@ -41,16 +67,7 @@ class Settings(BaseSettings):
 
     @property
     def admin_manager_web_path(self) -> str:
-        value = (self.admin_manager_web or "/nehex-admin").strip()
-        if not value:
-            value = "/nehex-admin"
-        if not value.startswith("/"):
-            value = f"/{value}"
-        if value != "/":
-            value = value.rstrip("/")
-        if value == "/":
-            value = "/nehex-admin"
-        return value
+        return normalize_admin_manager_web_path(self.admin_manager_web)
 
 
 settings = Settings()

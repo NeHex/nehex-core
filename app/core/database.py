@@ -1,12 +1,13 @@
 from collections.abc import Generator
 
-from sqlalchemy import text
+from sqlalchemy import inspect, text
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy import create_engine
 
 from app.core.config import settings
 from app.models.base import Base
 from app.models.friend_apply import FriendApply
+import app.models  # noqa: F401
 
 
 engine = create_engine(
@@ -48,6 +49,20 @@ def ensure_system_tables() -> None:
     Base.metadata.create_all(bind=engine, tables=[FriendApply.__table__], checkfirst=True)
 
 
+def ensure_all_tables() -> None:
+    Base.metadata.create_all(bind=engine, checkfirst=True)
+
+
+def list_database_tables() -> set[str]:
+    inspector = inspect(engine)
+    return set(inspector.get_table_names())
+
+
+def database_table_exists(table_name: str) -> bool:
+    inspector = inspect(engine)
+    return inspector.has_table(table_name)
+
+
 def ensure_performance_indexes() -> None:
     index_specs = [
         ("comment", "idx_comment_target_status_time", "target_type,target_id,status,create_time,id"),
@@ -61,6 +76,15 @@ def ensure_performance_indexes() -> None:
         ("friend_apply", "idx_friend_apply_url_time", "site_url,create_time,id"),
     ]
 
+    check_table_sql = text(
+        """
+        SELECT COUNT(1)
+        FROM information_schema.tables
+        WHERE table_schema = :schema_name
+          AND table_name = :table_name
+        """.strip(),
+    )
+
     check_exists_sql = text(
         """
         SELECT COUNT(1)
@@ -73,6 +97,19 @@ def ensure_performance_indexes() -> None:
 
     with engine.begin() as conn:
         for table_name, index_name, columns_sql in index_specs:
+            table_exists = int(
+                conn.execute(
+                    check_table_sql,
+                    {
+                        "schema_name": settings.db_name,
+                        "table_name": table_name,
+                    },
+                ).scalar()
+                or 0,
+            )
+            if table_exists <= 0:
+                continue
+
             exists = int(
                 conn.execute(
                     check_exists_sql,

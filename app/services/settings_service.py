@@ -6,8 +6,10 @@ from typing import Any
 from typing import Optional
 
 from sqlalchemy import select
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
+from app.core.database import database_table_exists
 from app.core.simple_cache import cache
 from app.models.setting import Setting, SettingType
 from app.schemas.setting import SettingItem
@@ -60,10 +62,20 @@ def list_settings(session: Session) -> list[SettingItem]:
             if item.setting_key not in PUBLIC_HIDDEN_SETTING_KEYS
         ]
 
-    stmt = select(Setting).order_by(Setting.setting_key.asc())
-    result = session.execute(stmt)
-    rows = result.scalars().all()
-    rows = [row for row in rows if row.setting_key not in PUBLIC_HIDDEN_SETTING_KEYS]
+    try:
+        if not database_table_exists("settings"):
+            mapped = _with_compatibility_keys([])
+            cache.set(SETTINGS_CACHE_KEY, mapped, SETTINGS_CACHE_TTL_SECONDS)
+            return [item.model_copy(deep=True) for item in mapped]
+
+        stmt = select(Setting).order_by(Setting.setting_key.asc())
+        result = session.execute(stmt)
+        rows = result.scalars().all()
+        rows = [row for row in rows if row.setting_key not in PUBLIC_HIDDEN_SETTING_KEYS]
+    except SQLAlchemyError:
+        mapped = _with_compatibility_keys([])
+        cache.set(SETTINGS_CACHE_KEY, mapped, SETTINGS_CACHE_TTL_SECONDS)
+        return [item.model_copy(deep=True) for item in mapped]
 
     mapped = [
         SettingItem(

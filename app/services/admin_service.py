@@ -494,10 +494,13 @@ def update_admin_settings(
     session: Session,
     items: list[dict[str, Any]],
 ) -> list[SettingItem]:
+    should_invalidate_admin_path = False
     for item in items:
         setting_key = str(item.get("setting_key") or "").strip()
         if not setting_key:
             continue
+        if setting_key == "admin_manager_web":
+            should_invalidate_admin_path = True
 
         existing = session.get(Setting, setting_key)
         incoming_type = item.get("setting_type")
@@ -523,6 +526,8 @@ def update_admin_settings(
 
     session.commit()
     _invalidate_settings_cache()
+    if should_invalidate_admin_path:
+        cache.delete("admin:manager:web:path")
     return list_admin_settings(session)
 
 

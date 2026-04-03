@@ -59,3 +59,9 @@ export async function adminLogin(account: string, password: string): Promise<str
 
   return normalizedAccount || account.trim()
 }
+
+export async function adminLogout(): Promise<void> {
+  await adminFetch('/admin-api/auth/logout', {
+    method: 'POST',
+  })
+}

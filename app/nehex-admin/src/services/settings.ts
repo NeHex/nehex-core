@@ -25,6 +25,10 @@ const DEFAULT_ARTICLE_CLASS_OPTIONS: ArticleClassOption[] = [
 
 let settingsMapPromise: Promise<Map<string, unknown>> | null = null
 
+export function resetSettingsCache(): void {
+  settingsMapPromise = null
+}
+
 async function requestSettingsMap(): Promise<Map<string, unknown>> {
   const response = await fetch('/setting', {
     method: 'GET',

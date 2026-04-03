@@ -25,10 +25,31 @@ function setCookie(name: string, value: string, maxAgeSeconds: number): void {
   document.cookie = `${name}=${encodeURIComponent(value)}; Max-Age=${maxAgeSeconds}; Expires=${expires}; Path=${path}; SameSite=Lax${secure}`
 }
 
-function clearCookie(name: string): void {
+function normalizeCookiePath(path: string): string {
+  const text = path.trim()
+  if (!text) {
+    return '/'
+  }
+  return text.startsWith('/') ? text : `/${text}`
+}
+
+function clearCookie(name: string, additionalPaths: string[] = []): void {
   const secure = window.location.protocol === 'https:' ? '; Secure' : ''
-  const path = getAdminBasePath()
-  document.cookie = `${name}=; Max-Age=0; Expires=Thu, 01 Jan 1970 00:00:00 GMT; Path=${path}; SameSite=Lax${secure}`
+  const defaultPath = normalizeCookiePath(getAdminBasePath())
+  const paths = Array.from(
+    new Set(
+      [
+        defaultPath,
+        '/',
+        '/nehex-admin',
+        ...additionalPaths.map((item) => normalizeCookiePath(item)),
+      ],
+    ),
+  )
+
+  paths.forEach((path) => {
+    document.cookie = `${name}=; Max-Age=0; Expires=Thu, 01 Jan 1970 00:00:00 GMT; Path=${path}; SameSite=Lax${secure}`
+  })
 }
 
 export function setAuthSession(account: string): void {
