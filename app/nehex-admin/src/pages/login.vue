@@ -91,7 +91,7 @@
 import { nextTick, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { adminLogin } from '@/services/admin-api'
-import { fetchAdminCredentials, fetchThemeBackgroundUrl } from '@/services/settings'
+import { fetchThemeBackgroundUrl } from '@/services/settings'
 import { isAuthenticated, setAuthSession } from '@/utils/auth'
 
 const route = useRoute()
@@ -197,27 +197,6 @@ function refreshCaptcha(): void {
   })
 }
 
-function bufferToHex(buffer: ArrayBuffer): string {
-  return Array.from(new Uint8Array(buffer))
-    .map((byte) => byte.toString(16).padStart(2, '0'))
-    .join('')
-}
-
-async function sha256Hex(value: string): Promise<string> {
-  if (!window.crypto?.subtle) {
-    throw new Error('当前环境不支持 Web Crypto，请使用 HTTPS 或 localhost。')
-  }
-
-  const data = new TextEncoder().encode(value)
-  const hash = await window.crypto.subtle.digest('SHA-256', data)
-  return bufferToHex(hash)
-}
-
-async function doubleSha256(value: string): Promise<string> {
-  const first = await sha256Hex(value)
-  return sha256Hex(first)
-}
-
 async function handleLogin(): Promise<void> {
   errorMessage.value = ''
 
@@ -240,23 +219,8 @@ async function handleLogin(): Promise<void> {
 
   loading.value = true
   try {
-    const { account: expectedAccount, passwordHash } = await fetchAdminCredentials()
-    if (!expectedAccount || !passwordHash) {
-      throw new Error('setting 中缺少 user_account 或 user_account_password')
-    }
-
-    const accountMatches = account.value.trim() === expectedAccount
-    const passwordMatches = (await doubleSha256(password.value)).toLowerCase() === passwordHash.toLowerCase()
-
-    if (!accountMatches || !passwordMatches) {
-      errorMessage.value = '用户名或密码错误'
-      captchaInput.value = ''
-      refreshCaptcha()
-      return
-    }
-
-    await adminLogin(account.value.trim(), password.value)
-    setAuthSession(account.value.trim())
+    const normalizedAccount = await adminLogin(account.value.trim(), password.value)
+    setAuthSession(normalizedAccount)
     await router.replace(getRedirectPath())
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : '登录失败，请稍后重试'

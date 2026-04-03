@@ -33,7 +33,9 @@ declare module 'vue-router/auto-routes' {
     '/pages': RouteRecordInfo<'/pages', '/pages', Record<never, never>, Record<never, never>, '/pages/edit/[id]' | '/pages/new'>,
     '/pages/edit/[id]': RouteRecordInfo<'/pages/edit/[id]', '/pages/edit/:id', { id: ParamValue<true> }, { id: ParamValue<false> }>,
     '/pages/new': RouteRecordInfo<'/pages/new', '/pages/new', Record<never, never>, Record<never, never>>,
-    '/projects': RouteRecordInfo<'/projects', '/projects', Record<never, never>, Record<never, never>>,
+    '/projects': RouteRecordInfo<'/projects', '/projects', Record<never, never>, Record<never, never>, '/projects/edit/[id]' | '/projects/new'>,
+    '/projects/edit/[id]': RouteRecordInfo<'/projects/edit/[id]', '/projects/edit/:id', { id: ParamValue<true> }, { id: ParamValue<false> }>,
+    '/projects/new': RouteRecordInfo<'/projects/new', '/projects/new', Record<never, never>, Record<never, never>>,
     '/settings': RouteRecordInfo<'/settings', '/settings', Record<never, never>, Record<never, never>>,
   }
 
@@ -109,7 +111,15 @@ declare module 'vue-router/auto-routes' {
       views: never
     }
     'src/pages/projects.vue': {
-      routes: '/projects'
+      routes: '/projects' | '/projects/edit/[id]' | '/projects/edit' | '/projects/new'
+      views: 'default'
+    }
+    'src/pages/projects/edit/[id].vue': {
+      routes: '/projects/edit/[id]'
+      views: never
+    }
+    'src/pages/projects/new.vue': {
+      routes: '/projects/new'
       views: never
     }
     'src/pages/settings.vue': {

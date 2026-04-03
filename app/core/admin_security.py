@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import base64
 import hashlib
+import hmac
 import json
+import re
 import secrets
 import time
 from dataclasses import dataclass
@@ -14,6 +16,9 @@ from fastapi import Header, HTTPException, Request, status
 from app.core.config import settings
 
 ADMIN_TOKEN_COOKIE_KEY = "nehex_admin_token"
+ADMIN_PASSWORD_SCHEME = "pbkdf2_sha256"
+ADMIN_PASSWORD_ITERATIONS = 390000
+_LEGACY_SHA256_HEX_PATTERN = re.compile(r"^[0-9a-f]{64}$")
 
 
 def _build_fernet(secret: str) -> Fernet:
@@ -35,6 +40,72 @@ class AdminPrincipal:
 def double_sha256(value: str) -> str:
     first = hashlib.sha256(value.encode("utf-8")).hexdigest()
     return hashlib.sha256(first.encode("utf-8")).hexdigest()
+
+
+def hash_admin_password(password: str, *, iterations: int = ADMIN_PASSWORD_ITERATIONS) -> str:
+    normalized = password.strip()
+    if not normalized:
+        raise ValueError("Password cannot be empty")
+
+    salt_bytes = secrets.token_bytes(16)
+    digest_bytes = hashlib.pbkdf2_hmac(
+        "sha256",
+        normalized.encode("utf-8"),
+        salt_bytes,
+        max(100_000, int(iterations)),
+    )
+    return (
+        f"{ADMIN_PASSWORD_SCHEME}$"
+        f"{max(100_000, int(iterations))}$"
+        f"{salt_bytes.hex()}$"
+        f"{digest_bytes.hex()}"
+    )
+
+
+def verify_admin_password(password: str, stored_password_hash: str) -> tuple[bool, bool]:
+    raw = (stored_password_hash or "").strip()
+    if not raw:
+        return False, False
+
+    normalized_password = password.strip()
+    if not normalized_password:
+        return False, False
+
+    if raw.startswith(f"{ADMIN_PASSWORD_SCHEME}$"):
+        parts = raw.split("$")
+        if len(parts) != 4:
+            return False, False
+
+        _, raw_iterations, raw_salt, raw_digest = parts
+        if (
+            not raw_iterations.isdigit()
+            or not raw_salt
+            or not raw_digest
+        ):
+            return False, False
+
+        try:
+            iterations = max(100_000, int(raw_iterations))
+            salt_bytes = bytes.fromhex(raw_salt)
+            expected_digest = bytes.fromhex(raw_digest)
+        except ValueError:
+            return False, False
+
+        calculated_digest = hashlib.pbkdf2_hmac(
+            "sha256",
+            normalized_password.encode("utf-8"),
+            salt_bytes,
+            iterations,
+            dklen=len(expected_digest),
+        )
+        return hmac.compare_digest(calculated_digest, expected_digest), False
+
+    legacy_hash = raw.lower()
+    if _LEGACY_SHA256_HEX_PATTERN.fullmatch(legacy_hash):
+        matched = double_sha256(normalized_password).lower() == legacy_hash
+        return matched, matched
+
+    return False, False
 
 
 def create_admin_token(account: str) -> tuple[str, int]:

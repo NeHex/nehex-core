@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Any
 from typing import Optional
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from app.schemas.album import AlbumItem
 from app.schemas.article import ArticleItem
@@ -11,6 +12,8 @@ from app.schemas.comment import CommentItem
 from app.schemas.daily import DailyItem
 from app.schemas.page import PageItem
 from app.schemas.project import ProjectItem
+from app.schemas.setting import SettingItem
+from app.models.setting import SettingType
 
 
 class AdminLoginRequest(BaseModel):
@@ -39,6 +42,59 @@ class AdminLoginResponse(BaseModel):
 class AdminActionResponse(BaseModel):
     success: bool = True
     message: str
+
+
+class AdminSettingUpdateItem(BaseModel):
+    setting_key: str = Field(min_length=1, max_length=100)
+    setting_content: Any = None
+    setting_type: Optional[SettingType] = None
+    description: Optional[str] = Field(default=None, max_length=255)
+
+    @field_validator("setting_key")
+    @classmethod
+    def normalize_setting_key(cls, value: str) -> str:
+        normalized = value.strip()
+        if not normalized:
+            raise ValueError("setting_key is required")
+        return normalized
+
+    @field_validator("description")
+    @classmethod
+    def normalize_description(cls, value: Optional[str]) -> Optional[str]:
+        if value is None:
+            return None
+        normalized = value.strip()
+        return normalized or None
+
+
+class AdminSettingsUpdateRequest(BaseModel):
+    items: list[AdminSettingUpdateItem] = Field(min_length=1, max_length=200)
+
+
+class AdminAccountSettingsUpdateRequest(BaseModel):
+    account: Optional[str] = Field(default=None, min_length=1, max_length=100)
+    new_password: Optional[str] = Field(default=None, min_length=1, max_length=300)
+    confirm_password: Optional[str] = Field(default=None, min_length=1, max_length=300)
+
+    @field_validator("account", "new_password", "confirm_password")
+    @classmethod
+    def normalize_optional_text_fields(cls, value: Optional[str]) -> Optional[str]:
+        if value is None:
+            return None
+        normalized = value.strip()
+        return normalized or None
+
+    @model_validator(mode="after")
+    def validate_password_update(self) -> "AdminAccountSettingsUpdateRequest":
+        if self.new_password is None:
+            return self
+
+        if self.confirm_password is None:
+            raise ValueError("confirm_password is required when new_password is provided")
+
+        if self.new_password != self.confirm_password:
+            raise ValueError("new_password and confirm_password do not match")
+        return self
 
 
 class AdminArticleCreateRequest(BaseModel):
@@ -477,3 +533,7 @@ class AdminProjectDetailResponse(BaseModel):
 
 class AdminProjectListResponse(BaseModel):
     data: list[ProjectItem]
+
+
+class AdminSettingListResponse(BaseModel):
+    data: list[SettingItem]

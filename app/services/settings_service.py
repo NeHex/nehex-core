@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from datetime import datetime
 from typing import Any
 from typing import Optional
 
@@ -13,6 +14,19 @@ from app.schemas.setting import SettingItem
 
 SETTINGS_CACHE_KEY = "settings:list"
 SETTINGS_CACHE_TTL_SECONDS = 60
+PUBLIC_HIDDEN_SETTING_KEYS = {"user_account", "user_account_password"}
+COMPAT_SETTING_DEFAULTS: dict[str, tuple[SettingType, Any]] = {
+    "site_title": (SettingType.string, ""),
+    "site_desc": (SettingType.string, ""),
+    "site_favicon": (SettingType.string, "/favicon.ico"),
+    "site_url": (SettingType.string, ""),
+    "theme_background": (SettingType.string, ""),
+    "theme_nav": (SettingType.json, {}),
+    "user_social_link": (SettingType.json, []),
+}
+COMPAT_SETTING_ALIASES: dict[str, str] = {
+    "site_desc": "site_description",
+}
 
 
 def parse_setting_content(setting_type: SettingType, raw_content: Optional[str]) -> Any:
@@ -40,11 +54,16 @@ def parse_setting_content(setting_type: SettingType, raw_content: Optional[str])
 def list_settings(session: Session) -> list[SettingItem]:
     cached = cache.get(SETTINGS_CACHE_KEY)
     if cached is not None:
-        return [item.model_copy(deep=True) for item in cached]
+        return [
+            item.model_copy(deep=True)
+            for item in cached
+            if item.setting_key not in PUBLIC_HIDDEN_SETTING_KEYS
+        ]
 
     stmt = select(Setting).order_by(Setting.setting_key.asc())
     result = session.execute(stmt)
     rows = result.scalars().all()
+    rows = [row for row in rows if row.setting_key not in PUBLIC_HIDDEN_SETTING_KEYS]
 
     mapped = [
         SettingItem(
@@ -57,5 +76,43 @@ def list_settings(session: Session) -> list[SettingItem]:
         )
         for row in rows
     ]
+    mapped = _with_compatibility_keys(mapped)
     cache.set(SETTINGS_CACHE_KEY, mapped, SETTINGS_CACHE_TTL_SECONDS)
     return [item.model_copy(deep=True) for item in mapped]
+
+
+def _with_compatibility_keys(items: list[SettingItem]) -> list[SettingItem]:
+    if not items:
+        now = datetime.utcnow()
+        return [
+            SettingItem(
+                setting_key=key,
+                setting_type=setting_type,
+                setting_content=default_content,
+                description="compat default",
+                updated_at=now,
+                created_at=now,
+            )
+            for key, (setting_type, default_content) in COMPAT_SETTING_DEFAULTS.items()
+        ]
+
+    item_map: dict[str, SettingItem] = {item.setting_key: item for item in items}
+    latest_updated_at = max((item.updated_at for item in items), default=datetime.utcnow())
+    latest_created_at = min((item.created_at for item in items), default=latest_updated_at)
+
+    for setting_key, (setting_type, default_content) in COMPAT_SETTING_DEFAULTS.items():
+        if setting_key in item_map:
+            continue
+
+        alias_key = COMPAT_SETTING_ALIASES.get(setting_key)
+        aliased_value = item_map.get(alias_key).setting_content if alias_key and alias_key in item_map else default_content
+        item_map[setting_key] = SettingItem(
+            setting_key=setting_key,
+            setting_type=setting_type,
+            setting_content=aliased_value,
+            description="compat default",
+            updated_at=latest_updated_at,
+            created_at=latest_created_at,
+        )
+
+    return sorted(item_map.values(), key=lambda item: item.setting_key)

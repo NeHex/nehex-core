@@ -7,11 +7,6 @@ type SettingsResponse = {
   data: SettingItem[]
 }
 
-export type AdminCredentials = {
-  account: string
-  passwordHash: string
-}
-
 export type ArticleClassOption = {
   value: string
   label: string
@@ -157,15 +152,4 @@ export async function fetchArticleClassOptions(): Promise<ArticleClassOption[]> 
   }
 
   return options
-}
-
-export async function fetchAdminCredentials(): Promise<AdminCredentials> {
-  const settingsMap = await fetchSettingsMap()
-  const account = String(settingsMap.get('user_account') ?? '').trim()
-  const passwordHash = String(settingsMap.get('user_account_password') ?? '').trim().toLowerCase()
-
-  return {
-    account,
-    passwordHash,
-  }
 }

@@ -5,6 +5,8 @@ from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy import create_engine
 
 from app.core.config import settings
+from app.models.base import Base
+from app.models.friend_apply import FriendApply
 
 
 engine = create_engine(
@@ -42,6 +44,10 @@ def check_database_connection() -> None:
         conn.execute(text("SELECT 1"))
 
 
+def ensure_system_tables() -> None:
+    Base.metadata.create_all(bind=engine, tables=[FriendApply.__table__], checkfirst=True)
+
+
 def ensure_performance_indexes() -> None:
     index_specs = [
         ("comment", "idx_comment_target_status_time", "target_type,target_id,status,create_time,id"),
@@ -51,6 +57,8 @@ def ensure_performance_indexes() -> None:
         ("singlepage", "idx_singlepage_status_sort", "status,sort,id"),
         ("project", "idx_project_status_sort", "status,sort,id"),
         ("friends", "idx_friends_status_time", "status,create_time,id"),
+        ("friend_apply", "idx_friend_apply_status_time", "status,create_time,id"),
+        ("friend_apply", "idx_friend_apply_url_time", "site_url,create_time,id"),
     ]
 
     check_exists_sql = text(

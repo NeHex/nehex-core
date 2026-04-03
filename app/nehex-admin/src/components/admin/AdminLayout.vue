@@ -1,5 +1,5 @@
 <template>
-  <div class="admin-layout">
+  <div class="admin-layout" :class="{ 'admin-layout--with-subnav': hasSecondaryNav }">
     <aside class="sidebar">
       <div class="sidebar-header">
         <div class="site-name">{{ adminTitle }}</div>
@@ -46,6 +46,10 @@
       </div>
     </aside>
 
+    <aside v-if="hasSecondaryNav" class="sub-sidebar">
+      <slot name="secondary-nav" />
+    </aside>
+
     <main class="content-wrap">
       <slot />
     </main>
@@ -53,7 +57,7 @@
 </template>
 
 <script lang="ts" setup>
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref, useSlots } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { fetchAdminTitle, getDefaultAdminTitle } from '@/services/settings'
 import { clearAuthSession, getAuthenticatedAccount } from '@/utils/auth'
@@ -110,7 +114,15 @@ const menuItems: MenuItem[] = [
     ],
   },
   { icon: 'mdi-comment-multiple-outline', label: '评论管理', to: '/comments' },
-  { icon: 'mdi-briefcase-outline', label: '项目管理', to: '/projects' },
+  {
+    icon: 'mdi-briefcase-outline',
+    label: '项目管理',
+    to: '/projects',
+    children: [
+      { label: '管理', to: '/projects', parentTo: '/projects' },
+      { label: '新增', to: '/projects/new' },
+    ],
+  },
   { icon: 'mdi-cog-outline', label: '站点设置', to: '/settings' },
 ]
 
@@ -119,6 +131,8 @@ const route = useRoute()
 const accountName = ref(getAuthenticatedAccount())
 const adminTitle = ref(getDefaultAdminTitle())
 const expandedMenuKey = ref<string | null>(getDefaultExpandedMenuKey())
+const slots = useSlots()
+const hasSecondaryNav = computed(() => Boolean(slots['secondary-nav']))
 
 onMounted(async () => {
   try {
@@ -197,6 +211,10 @@ function getDefaultExpandedMenuKey(): string | null {
   background: #0d1118;
 }
 
+.admin-layout--with-subnav {
+  grid-template-columns: 244px 224px minmax(0, 1fr);
+}
+
 .sidebar {
   display: flex;
   flex-direction: column;
@@ -204,6 +222,12 @@ function getDefaultExpandedMenuKey(): string | null {
   padding: 18px 14px 14px;
   border-right: 1px solid rgba(255, 255, 255, 0.08);
   background: linear-gradient(180deg, #161b24 0%, #131821 100%);
+}
+
+.sub-sidebar {
+  padding: 18px 14px 14px;
+  border-right: 1px solid rgba(255, 255, 255, 0.08);
+  background: linear-gradient(180deg, #141a24 0%, #111722 100%);
 }
 
 .sidebar-header {
@@ -320,7 +344,8 @@ function getDefaultExpandedMenuKey(): string | null {
 }
 
 @media (max-width: 980px) {
-  .admin-layout {
+  .admin-layout,
+  .admin-layout--with-subnav {
     grid-template-columns: 1fr;
   }
 
@@ -330,6 +355,13 @@ function getDefaultExpandedMenuKey(): string | null {
     z-index: 6;
     border-right: 0;
     border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  }
+
+  .sub-sidebar {
+    position: static;
+    border-right: 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    padding: 12px 14px;
   }
 
   .menu-list {

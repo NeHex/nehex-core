@@ -10,7 +10,7 @@ from app.core.simple_cache import cache
 from app.models.comment import Comment
 from app.schemas.comment import CommentCreateRequest, CommentItem
 
-SUPPORTED_TARGET_TYPES = {"article", "album", "singlepage"}
+SUPPORTED_TARGET_TYPES = {"article", "album", "singlepage", "friend_page"}
 
 COMMENT_CACHE_TTL_SECONDS = 8
 COMMENT_RATE_LIMIT_WINDOW_SECONDS = 45

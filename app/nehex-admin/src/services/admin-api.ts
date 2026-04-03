@@ -1,5 +1,11 @@
 const ADMIN_API_CLIENT_ID = 'nehex-vuetify-admin'
 
+type AdminLoginResponse = {
+  data?: {
+    account?: unknown
+  }
+}
+
 type ApiErrorPayload = {
   detail?: unknown
   message?: unknown
@@ -40,9 +46,16 @@ export async function adminFetch(path: string, init: RequestInit = {}): Promise<
   throw new Error(normalizeApiError(response, payload))
 }
 
-export async function adminLogin(account: string, password: string): Promise<void> {
-  await adminFetch('/admin-api/auth/login', {
+export async function adminLogin(account: string, password: string): Promise<string> {
+  const response = await adminFetch('/admin-api/auth/login', {
     method: 'POST',
     body: JSON.stringify({ account, password }),
   })
+
+  const payload = await response.json() as AdminLoginResponse
+  const normalizedAccount = typeof payload?.data?.account === 'string'
+    ? payload.data.account.trim()
+    : ''
+
+  return normalizedAccount || account.trim()
 }

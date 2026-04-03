@@ -13,6 +13,7 @@ from app.core.config import settings
 from app.core.database import (
     check_database_connection,
     close_database,
+    ensure_system_tables,
     ensure_performance_indexes,
 )
 
@@ -49,6 +50,11 @@ def _build_admin_frontend() -> None:
 async def lifespan(_: FastAPI):
     _build_admin_frontend()
     check_database_connection()
+    try:
+        ensure_system_tables()
+    except Exception as error:
+        # Do not block API startup when DB account lacks DDL privileges.
+        print(f"[startup] skip ensure_system_tables: {error}")
     try:
         ensure_performance_indexes()
     except Exception as error:

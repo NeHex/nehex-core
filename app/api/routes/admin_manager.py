@@ -10,11 +10,12 @@ from app.core.admin_security import (
     ADMIN_TOKEN_COOKIE_KEY,
     AdminPrincipal,
     create_admin_token,
-    double_sha256,
     require_admin_principal,
+    verify_admin_password,
 )
 from app.core.database import get_db_session
 from app.schemas.admin import (
+    AdminAccountSettingsUpdateRequest,
     AdminActionResponse,
     AdminAlbumCreateRequest,
     AdminAlbumDetailResponse,
@@ -41,6 +42,8 @@ from app.schemas.admin import (
     AdminProjectDetailResponse,
     AdminProjectListResponse,
     AdminProjectUpdateRequest,
+    AdminSettingListResponse,
+    AdminSettingsUpdateRequest,
 )
 from app.services.admin_service import (
     create_admin_comment,
@@ -57,14 +60,18 @@ from app.services.admin_service import (
     delete_project,
     get_admin_credentials,
     list_admin_comments,
+    list_admin_settings,
     list_pages,
     list_projects,
+    SENSITIVE_ADMIN_SETTING_KEYS,
+    update_admin_account_settings,
     update_admin_comment,
     update_album,
     update_article,
     update_daily,
     update_page,
     update_project,
+    update_admin_settings,
 )
 
 router = APIRouter(prefix="/admin-api", tags=["admin"])
@@ -91,9 +98,18 @@ def admin_login(
         )
 
     account_matches = payload.account.strip() == expected_account
-    password_matches = double_sha256(payload.password.strip()).lower() == expected_password_hash
+    password_matches, should_upgrade_hash = verify_admin_password(
+        payload.password.strip(),
+        expected_password_hash,
+    )
     if not account_matches or not password_matches:
         raise _invalid_admin_credentials()
+
+    if should_upgrade_hash:
+        update_admin_account_settings(
+            session=session,
+            new_password=payload.password.strip(),
+        )
 
     token, expires_at = create_admin_token(expected_account)
     max_age = max(60, expires_at - int(datetime.utcnow().timestamp()))
@@ -123,6 +139,76 @@ def admin_me(principal: AdminPrincipal = Depends(require_admin_principal)) -> Ad
             expires_at=datetime.utcfromtimestamp(principal.expires_at),
         ),
     )
+
+
+@router.get("/settings", response_model=AdminSettingListResponse, summary="List settings")
+def admin_list_settings_api(
+    _: AdminPrincipal = Depends(require_admin_principal),
+    session: Session = Depends(get_db_session),
+) -> AdminSettingListResponse:
+    data = list_admin_settings(session=session)
+    return AdminSettingListResponse(data=data)
+
+
+@router.put("/settings", response_model=AdminSettingListResponse, summary="Update settings")
+def admin_update_settings_api(
+    payload: AdminSettingsUpdateRequest,
+    _: AdminPrincipal = Depends(require_admin_principal),
+    session: Session = Depends(get_db_session),
+) -> AdminSettingListResponse:
+    items_payload: list[dict] = []
+    for item in payload.items:
+        if item.setting_key in SENSITIVE_ADMIN_SETTING_KEYS:
+            raise HTTPException(
+                status_code=422,
+                detail=f"Setting {item.setting_key} must be updated via /admin-api/settings/account",
+            )
+        items_payload.append(
+            {
+                "setting_key": item.setting_key,
+                "setting_content": item.setting_content,
+                "setting_type": item.setting_type,
+                "description": item.description,
+                "has_description": "description" in item.model_fields_set,
+            },
+        )
+
+    try:
+        data = update_admin_settings(session=session, items=items_payload)
+    except (ValueError, TypeError) as error:
+        session.rollback()
+        raise HTTPException(status_code=422, detail=str(error)) from error
+
+    return AdminSettingListResponse(data=data)
+
+
+@router.put(
+    "/settings/account",
+    response_model=AdminSettingListResponse,
+    summary="Update account settings",
+)
+def admin_update_account_settings_api(
+    payload: AdminAccountSettingsUpdateRequest,
+    _: AdminPrincipal = Depends(require_admin_principal),
+    session: Session = Depends(get_db_session),
+) -> AdminSettingListResponse:
+    has_account = "account" in payload.model_fields_set
+    has_new_password = "new_password" in payload.model_fields_set
+
+    if not has_account and not has_new_password:
+        raise HTTPException(status_code=422, detail="No account settings fields to update")
+
+    try:
+        data = update_admin_account_settings(
+            session=session,
+            account=payload.account if has_account else None,
+            new_password=payload.new_password if has_new_password else None,
+        )
+    except (ValueError, TypeError) as error:
+        session.rollback()
+        raise HTTPException(status_code=422, detail=str(error)) from error
+
+    return AdminSettingListResponse(data=data)
 
 
 @router.post("/articles", response_model=AdminArticleDetailResponse, summary="Create article")

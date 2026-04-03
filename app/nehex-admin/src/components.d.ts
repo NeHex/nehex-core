@@ -18,6 +18,7 @@ declare module 'vue' {
     DailyEditorWorkspace: typeof import('./components/admin/DailyEditorWorkspace.vue')['default']
     HelloWorld: typeof import('./components/HelloWorld.vue')['default']
     PageEditorWorkspace: typeof import('./components/admin/PageEditorWorkspace.vue')['default']
+    ProjectEditorWorkspace: typeof import('./components/admin/ProjectEditorWorkspace.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
   }
