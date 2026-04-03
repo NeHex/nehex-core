@@ -459,6 +459,10 @@ class AdminCommentDetailResponse(BaseModel):
     data: CommentItem
 
 
+class AdminCommentListResponse(BaseModel):
+    data: list[CommentItem]
+
+
 class AdminPageDetailResponse(BaseModel):
     data: PageItem
 

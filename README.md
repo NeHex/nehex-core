@@ -34,6 +34,15 @@ pip install -r requirements.txt
 uvicorn app.main:app --host 0.0.0.0 --port 7878 --reload
 ```
 
+每次启动后端时，会自动在 `app/nehex-admin` 下依次执行：
+
+```powershell
+npm install
+npm run build
+```
+
+因此请确保本机已安装 Node.js/npm。
+
 启动后请用以下地址访问（不要用 `0.0.0.0` 作为浏览器地址）：
 
 - 本机访问：`http://127.0.0.1:7878/setting`

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Optional
 
-from sqlalchemy import delete, desc, select
+from sqlalchemy import String, cast, delete, desc, or_, select
 from sqlalchemy.orm import Session
 
 from app.core.simple_cache import cache
@@ -554,6 +554,26 @@ def delete_album(session: Session, album_id: int) -> bool:
     session.commit()
     _invalidate_album_cache()
     return True
+
+
+def list_admin_comments(session: Session, keyword: Optional[str] = None) -> list[CommentItem]:
+    stmt = select(Comment)
+
+    normalized_keyword = (keyword or "").strip()
+    if normalized_keyword:
+        like_pattern = f"%{normalized_keyword}%"
+        stmt = stmt.where(
+            or_(
+                Comment.content.like(like_pattern),
+                Comment.nickname.like(like_pattern),
+                Comment.target_type.like(like_pattern),
+                cast(Comment.target_id, String).like(like_pattern),
+            ),
+        )
+
+    stmt = stmt.order_by(desc(Comment.create_time), desc(Comment.id))
+    rows = session.execute(stmt).scalars().all()
+    return [_map_comment_item(row) for row in rows]
 
 
 def create_admin_comment(

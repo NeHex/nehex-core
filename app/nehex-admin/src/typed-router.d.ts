@@ -19,12 +19,20 @@ declare module 'vue-router/auto-routes' {
    */
   export interface RouteNamedMap {
     '/': RouteRecordInfo<'/', '/', Record<never, never>, Record<never, never>>,
-    '/albums': RouteRecordInfo<'/albums', '/albums', Record<never, never>, Record<never, never>>,
-    '/articles': RouteRecordInfo<'/articles', '/articles', Record<never, never>, Record<never, never>>,
+    '/albums': RouteRecordInfo<'/albums', '/albums', Record<never, never>, Record<never, never>, '/albums/edit/[id]' | '/albums/new'>,
+    '/albums/edit/[id]': RouteRecordInfo<'/albums/edit/[id]', '/albums/edit/:id', { id: ParamValue<true> }, { id: ParamValue<false> }>,
+    '/albums/new': RouteRecordInfo<'/albums/new', '/albums/new', Record<never, never>, Record<never, never>>,
+    '/articles': RouteRecordInfo<'/articles', '/articles', Record<never, never>, Record<never, never>, '/articles/edit/[id]' | '/articles/new'>,
+    '/articles/edit/[id]': RouteRecordInfo<'/articles/edit/[id]', '/articles/edit/:id', { id: ParamValue<true> }, { id: ParamValue<false> }>,
+    '/articles/new': RouteRecordInfo<'/articles/new', '/articles/new', Record<never, never>, Record<never, never>>,
     '/comments': RouteRecordInfo<'/comments', '/comments', Record<never, never>, Record<never, never>>,
-    '/dailies': RouteRecordInfo<'/dailies', '/dailies', Record<never, never>, Record<never, never>>,
+    '/dailies': RouteRecordInfo<'/dailies', '/dailies', Record<never, never>, Record<never, never>, '/dailies/edit/[id]' | '/dailies/new'>,
+    '/dailies/edit/[id]': RouteRecordInfo<'/dailies/edit/[id]', '/dailies/edit/:id', { id: ParamValue<true> }, { id: ParamValue<false> }>,
+    '/dailies/new': RouteRecordInfo<'/dailies/new', '/dailies/new', Record<never, never>, Record<never, never>>,
     '/login': RouteRecordInfo<'/login', '/login', Record<never, never>, Record<never, never>>,
-    '/pages': RouteRecordInfo<'/pages', '/pages', Record<never, never>, Record<never, never>>,
+    '/pages': RouteRecordInfo<'/pages', '/pages', Record<never, never>, Record<never, never>, '/pages/edit/[id]' | '/pages/new'>,
+    '/pages/edit/[id]': RouteRecordInfo<'/pages/edit/[id]', '/pages/edit/:id', { id: ParamValue<true> }, { id: ParamValue<false> }>,
+    '/pages/new': RouteRecordInfo<'/pages/new', '/pages/new', Record<never, never>, Record<never, never>>,
     '/projects': RouteRecordInfo<'/projects', '/projects', Record<never, never>, Record<never, never>>,
     '/settings': RouteRecordInfo<'/settings', '/settings', Record<never, never>, Record<never, never>>,
   }
@@ -45,11 +53,27 @@ declare module 'vue-router/auto-routes' {
       views: never
     }
     'src/pages/albums.vue': {
-      routes: '/albums'
+      routes: '/albums' | '/albums/edit/[id]' | '/albums/edit' | '/albums/new'
+      views: 'default'
+    }
+    'src/pages/albums/edit/[id].vue': {
+      routes: '/albums/edit/[id]'
+      views: never
+    }
+    'src/pages/albums/new.vue': {
+      routes: '/albums/new'
       views: never
     }
     'src/pages/articles.vue': {
-      routes: '/articles'
+      routes: '/articles' | '/articles/edit/[id]' | '/articles/edit' | '/articles/new'
+      views: 'default'
+    }
+    'src/pages/articles/edit/[id].vue': {
+      routes: '/articles/edit/[id]'
+      views: never
+    }
+    'src/pages/articles/new.vue': {
+      routes: '/articles/new'
       views: never
     }
     'src/pages/comments.vue': {
@@ -57,7 +81,15 @@ declare module 'vue-router/auto-routes' {
       views: never
     }
     'src/pages/dailies.vue': {
-      routes: '/dailies'
+      routes: '/dailies' | '/dailies/edit/[id]' | '/dailies/edit' | '/dailies/new'
+      views: 'default'
+    }
+    'src/pages/dailies/edit/[id].vue': {
+      routes: '/dailies/edit/[id]'
+      views: never
+    }
+    'src/pages/dailies/new.vue': {
+      routes: '/dailies/new'
       views: never
     }
     'src/pages/login.vue': {
@@ -65,7 +97,15 @@ declare module 'vue-router/auto-routes' {
       views: never
     }
     'src/pages/pages.vue': {
-      routes: '/pages'
+      routes: '/pages' | '/pages/edit/[id]' | '/pages/edit' | '/pages/new'
+      views: 'default'
+    }
+    'src/pages/pages/edit/[id].vue': {
+      routes: '/pages/edit/[id]'
+      views: never
+    }
+    'src/pages/pages/new.vue': {
+      routes: '/pages/new'
       views: never
     }
     'src/pages/projects.vue': {

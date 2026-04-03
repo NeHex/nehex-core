@@ -13,7 +13,11 @@ declare module 'vue' {
   export interface GlobalComponents {
     AdminLayout: typeof import('./components/admin/AdminLayout.vue')['default']
     AdminSection: typeof import('./components/admin/AdminSection.vue')['default']
+    AlbumEditorWorkspace: typeof import('./components/admin/AlbumEditorWorkspace.vue')['default']
+    ArticleEditorWorkspace: typeof import('./components/admin/ArticleEditorWorkspace.vue')['default']
+    DailyEditorWorkspace: typeof import('./components/admin/DailyEditorWorkspace.vue')['default']
     HelloWorld: typeof import('./components/HelloWorld.vue')['default']
+    PageEditorWorkspace: typeof import('./components/admin/PageEditorWorkspace.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
   }

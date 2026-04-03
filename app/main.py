@@ -1,5 +1,7 @@
 from contextlib import asynccontextmanager
 from pathlib import Path
+import shutil
+import subprocess
 from typing import Optional
 
 from fastapi import FastAPI, HTTPException
@@ -15,14 +17,37 @@ from app.core.database import (
 )
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-ADMIN_DIST_DIR = PROJECT_ROOT / "app" / "nehex-admin" / "dist"
+ADMIN_PROJECT_DIR = PROJECT_ROOT / "app" / "nehex-admin"
+ADMIN_DIST_DIR = ADMIN_PROJECT_DIR / "dist"
 ADMIN_DIST_DIR_RESOLVED = ADMIN_DIST_DIR.resolve()
 ADMIN_INDEX_FILE = ADMIN_DIST_DIR / "index.html"
 ADMIN_BASE_PLACEHOLDER = "__ADMIN_MANAGER_WEB__"
 
 
+def _run_startup_command(command: list[str], cwd: Path) -> None:
+    cmd_display = " ".join(command)
+    print(f"[startup] running `{cmd_display}` in {cwd}")
+    completed = subprocess.run(command, cwd=str(cwd), check=False)
+    if completed.returncode != 0:
+        raise RuntimeError(
+            f"Admin frontend build failed: `{cmd_display}` exited with code {completed.returncode}."
+        )
+
+
+def _build_admin_frontend() -> None:
+    npm_executable = shutil.which("npm")
+    if npm_executable is None:
+        raise RuntimeError(
+            "Admin frontend build failed: `npm` not found in PATH. Please install Node.js/npm first."
+        )
+
+    _run_startup_command([npm_executable, "install"], ADMIN_PROJECT_DIR)
+    _run_startup_command([npm_executable, "run", "build"], ADMIN_PROJECT_DIR)
+
+
 @asynccontextmanager
 async def lifespan(_: FastAPI):
+    _build_admin_frontend()
     check_database_connection()
     try:
         ensure_performance_indexes()
@@ -55,7 +80,14 @@ def _admin_base_with_slash() -> str:
 
 def _render_admin_index() -> str:
     index_html = ADMIN_INDEX_FILE.read_text(encoding="utf-8")
-    return index_html.replace(ADMIN_BASE_PLACEHOLDER, _admin_base_with_slash())
+    admin_base = _admin_base_with_slash()
+    rendered = index_html.replace(ADMIN_BASE_PLACEHOLDER, admin_base)
+
+    base_tag = f'<base href="{admin_base}">'
+    if "<base " not in rendered:
+        rendered = rendered.replace("<head>", f"<head>\n    {base_tag}", 1)
+
+    return rendered
 
 
 def _resolve_admin_file(full_path: str) -> Optional[Path]:

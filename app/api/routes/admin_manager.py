@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, HTTPException, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -25,6 +25,7 @@ from app.schemas.admin import (
     AdminArticleUpdateRequest,
     AdminCommentCreateRequest,
     AdminCommentDetailResponse,
+    AdminCommentListResponse,
     AdminCommentUpdateRequest,
     AdminDailyCreateRequest,
     AdminDailyDetailResponse,
@@ -55,6 +56,7 @@ from app.services.admin_service import (
     delete_page,
     delete_project,
     get_admin_credentials,
+    list_admin_comments,
     list_pages,
     list_projects,
     update_admin_comment,
@@ -434,6 +436,16 @@ def admin_create_comment(
         status=payload.status,
     )
     return AdminCommentDetailResponse(data=item)
+
+
+@router.get("/comments", response_model=AdminCommentListResponse, summary="List comments")
+def admin_list_comments_api(
+    keyword: str = Query(default="", max_length=200),
+    _: AdminPrincipal = Depends(require_admin_principal),
+    session: Session = Depends(get_db_session),
+) -> AdminCommentListResponse:
+    data = list_admin_comments(session=session, keyword=keyword)
+    return AdminCommentListResponse(data=data)
 
 
 @router.put("/comments/{comment_id}", response_model=AdminCommentDetailResponse, summary="Update comment")

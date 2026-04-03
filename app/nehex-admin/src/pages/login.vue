@@ -1,8 +1,5 @@
 <template>
-  <div class="login-page">
-    <div class="bg-glow bg-glow-top" />
-    <div class="bg-glow bg-glow-bottom" />
-
+  <div class="login-page" :style="loginPageStyle">
     <v-card class="login-card" elevation="16" rounded="xl">
       <div class="welcome-wrap">
         <img alt="welcome" class="welcome-image" src="/welcome_zip.png">
@@ -66,8 +63,8 @@
             <canvas
               ref="captchaCanvas"
               class="captcha-canvas"
-              height="56"
-              width="168"
+              height="50"
+              width="152"
               @click="refreshCaptcha"
             />
           </div>
@@ -93,7 +90,8 @@
 <script setup lang="ts">
 import { nextTick, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { fetchAdminCredentials } from '@/services/settings'
+import { adminLogin } from '@/services/admin-api'
+import { fetchAdminCredentials, fetchThemeBackgroundUrl } from '@/services/settings'
 import { isAuthenticated, setAuthSession } from '@/utils/auth'
 
 const route = useRoute()
@@ -106,6 +104,7 @@ const captchaCode = ref('')
 const captchaCanvas = ref<HTMLCanvasElement | null>(null)
 const loading = ref(false)
 const errorMessage = ref('')
+const loginPageStyle = ref<Record<string, string>>({})
 
 function getRedirectPath(): string {
   const redirect = typeof route.query.redirect === 'string' ? route.query.redirect : '/'
@@ -174,10 +173,10 @@ function drawCaptcha(): void {
   const chars = captchaCode.value.split('')
   const step = width / (chars.length + 1)
   chars.forEach((char, index) => {
-    const fontSize = randomInt(30, 36)
+    const fontSize = randomInt(24, 30)
     const angle = (randomInt(-24, 24) * Math.PI) / 180
     const x = step * (index + 1)
-    const y = randomInt(35, 44)
+    const y = randomInt(28, 36)
 
     ctx.save()
     ctx.translate(x, y)
@@ -256,6 +255,7 @@ async function handleLogin(): Promise<void> {
       return
     }
 
+    await adminLogin(account.value.trim(), password.value)
     setAuthSession(account.value.trim())
     await router.replace(getRedirectPath())
   } catch (error) {
@@ -273,6 +273,21 @@ if (isAuthenticated()) {
 
 onMounted(() => {
   refreshCaptcha()
+  void fetchThemeBackgroundUrl()
+    .then((url) => {
+      if (!url) {
+        return
+      }
+      loginPageStyle.value = {
+        backgroundImage: `linear-gradient(rgba(7, 10, 18, 0.66), rgba(7, 10, 18, 0.66)), url("${url}")`,
+        backgroundPosition: 'center',
+        backgroundRepeat: 'no-repeat',
+        backgroundSize: 'cover',
+      }
+    })
+    .catch((error) => {
+      console.warn('Failed to load login background from /setting', error)
+    })
 })
 </script>
 
@@ -280,57 +295,31 @@ onMounted(() => {
 .login-page {
   position: relative;
   min-height: 100vh;
-  padding: 20px;
+  padding: 16px;
   display: grid;
   place-items: center;
-  background:
-    radial-gradient(1200px 500px at 85% -100px, rgba(232, 104, 179, 0.18), transparent 60%),
-    radial-gradient(900px 400px at 0% 120%, rgba(80, 107, 255, 0.16), transparent 60%),
-    #0a0b10;
-}
-
-.bg-glow {
-  position: absolute;
-  pointer-events: none;
-  filter: blur(40px);
-  z-index: 0;
-}
-
-.bg-glow-top {
-  width: 280px;
-  height: 280px;
-  right: 10%;
-  top: 8%;
-  background: rgba(233, 111, 183, 0.22);
-}
-
-.bg-glow-bottom {
-  width: 260px;
-  height: 260px;
-  left: 8%;
-  bottom: 6%;
-  background: rgba(81, 125, 255, 0.2);
+  background: #0a0b10;
 }
 
 .login-card {
   position: relative;
   z-index: 1;
-  width: min(100%, 540px);
-  padding: 34px 36px 32px;
+  width: min(100%, 460px);
+  padding: 24px 26px 24px;
   color: #f6f7fb;
   border: 1px solid rgba(255, 255, 255, 0.08);
   background: linear-gradient(145deg, rgba(25, 25, 29, 0.96), rgba(18, 18, 22, 0.96));
-  box-shadow: 0 28px 70px rgba(0, 0, 0, 0.58);
+  box-shadow: 0 18px 46px rgba(0, 0, 0, 0.52);
 }
 
 .welcome-wrap {
   display: flex;
   justify-content: center;
-  margin-bottom: 12px;
+  margin-bottom: 10px;
 }
 
 .welcome-image {
-  width: 220px;
+  width: 172px;
   height: auto;
   user-select: none;
   -webkit-user-drag: none;
@@ -342,15 +331,15 @@ onMounted(() => {
 }
 
 .field-group {
-  margin-top: 14px;
+  margin-top: 12px;
 }
 
 .field-label {
   display: flex;
   align-items: center;
-  gap: 10px;
-  margin-bottom: 10px;
-  font-size: 30px;
+  gap: 8px;
+  margin-bottom: 8px;
+  font-size: 22px;
   font-weight: 600;
   color: #ffffff;
 }
@@ -366,7 +355,7 @@ onMounted(() => {
 }
 
 :deep(.login-input .v-field__input) {
-  min-height: 56px;
+  min-height: 50px;
   color: #f5f5f8;
 }
 
@@ -377,7 +366,7 @@ onMounted(() => {
 
 .captcha-row {
   display: flex;
-  gap: 14px;
+  gap: 12px;
   align-items: stretch;
 }
 
@@ -386,9 +375,9 @@ onMounted(() => {
 }
 
 .captcha-canvas {
-  width: 168px;
-  min-width: 168px;
-  height: 56px;
+  width: 152px;
+  min-width: 152px;
+  height: 50px;
   border-radius: 12px;
   cursor: pointer;
   border: 1px solid rgba(255, 255, 255, 0.22);
@@ -405,11 +394,11 @@ onMounted(() => {
 }
 
 .login-btn {
-  height: 56px !important;
+  height: 50px !important;
   color: #ffffff;
-  font-size: 28px;
+  font-size: 22px;
   font-weight: 700;
-  letter-spacing: 2px;
+  letter-spacing: 1px;
   border-radius: 12px !important;
   background: linear-gradient(90deg, #f06da7, #f58ab8) !important;
 }
@@ -420,11 +409,11 @@ onMounted(() => {
 
 @media (max-width: 680px) {
   .login-card {
-    padding: 26px 20px 24px;
+    padding: 22px 16px 20px;
   }
 
   .welcome-image {
-    width: 188px;
+    width: 152px;
   }
 
   .captcha-row {
