@@ -36,7 +36,7 @@ uvicorn app.main:app --host 0.0.0.0 --port 7878 --reload
 ```
 
 默认会在启动时自动构建管理端前端（`npm install && npm run build`）。
-可通过 `ADMIN_MANAGER_BUILD_ON_STARTUP=false` 关闭自动构建。
+可通过 `ADMIN_MANAGER_BUILD_ON_STARTUP=false` 关闭自动构建（适合 Docker 使用预构建产物）。
 
 ## Docker 部署（推荐）
 
@@ -51,6 +51,9 @@ Copy-Item .env.example .env
 - `DB_PASSWORD`
 - `MYSQL_ROOT_PASSWORD`
 - `ADMIN_API_SECRET`
+
+说明：Docker 镜像会在构建阶段预编译管理端前端，运行时建议保持
+`ADMIN_MANAGER_BUILD_ON_STARTUP=false`（默认即为 `false`）。
 
 ### 2. 构建并启动
 

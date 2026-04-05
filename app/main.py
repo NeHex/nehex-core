@@ -40,8 +40,16 @@ def _run_startup_command(command: list[str], cwd: Path) -> None:
 def _build_admin_frontend() -> None:
     npm_executable = shutil.which("npm")
     if npm_executable is None:
+        if ADMIN_INDEX_FILE.exists():
+            print(
+                "[startup] `npm` not found in PATH, skip admin frontend build "
+                "and use prebuilt dist files.",
+            )
+            return
         raise RuntimeError(
-            "Admin frontend build failed: `npm` not found in PATH. Please install Node.js/npm first."
+            "Admin frontend build failed: `npm` not found in PATH and no prebuilt "
+            "admin dist found. Install Node.js/npm or set "
+            "ADMIN_MANAGER_BUILD_ON_STARTUP=false with prebuilt app/nehex-admin/dist."
         )
 
     _run_startup_command([npm_executable, "install"], ADMIN_PROJECT_DIR)
@@ -79,7 +87,7 @@ def _wait_for_database_ready() -> None:
 async def lifespan(_: FastAPI):
     if settings.admin_manager_build_on_startup:
         _build_admin_frontend()
-    elif not ADMIN_INDEX_FILE.exists():
+    if not ADMIN_INDEX_FILE.exists():
         raise RuntimeError(
             "Admin manager frontend dist not found. Set ADMIN_MANAGER_BUILD_ON_STARTUP=true or build app/nehex-admin first.",
         )
