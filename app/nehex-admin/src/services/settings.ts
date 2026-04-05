@@ -7,6 +7,16 @@ type SettingsResponse = {
   data: SettingItem[]
 }
 
+type ThemeSettingData = {
+  active_profile: string
+  profiles: Record<string, Record<string, unknown>>
+  current: Record<string, unknown>
+}
+
+type ThemeSettingsResponse = {
+  data: ThemeSettingData
+}
+
 export type ArticleClassOption = {
   value: string
   label: string
@@ -24,9 +34,11 @@ const DEFAULT_ARTICLE_CLASS_OPTIONS: ArticleClassOption[] = [
 ]
 
 let settingsMapPromise: Promise<Map<string, unknown>> | null = null
+let themeSettingsPromise: Promise<ThemeSettingData> | null = null
 
 export function resetSettingsCache(): void {
   settingsMapPromise = null
+  themeSettingsPromise = null
 }
 
 async function requestSettingsMap(): Promise<Map<string, unknown>> {
@@ -61,6 +73,37 @@ export async function fetchSettingsMap(): Promise<Map<string, unknown>> {
   }
 }
 
+async function requestThemeSettings(): Promise<ThemeSettingData> {
+  const response = await fetch('/setting/theme', {
+    method: 'GET',
+    credentials: 'same-origin',
+  })
+
+  if (!response.ok) {
+    throw new Error(`Failed to request theme setting: ${response.status}`)
+  }
+
+  const payload = await response.json() as ThemeSettingsResponse
+  if (!payload?.data || typeof payload.data !== 'object') {
+    throw new Error('Unexpected theme setting response format')
+  }
+
+  return payload.data
+}
+
+async function fetchThemeSettings(): Promise<ThemeSettingData> {
+  if (!themeSettingsPromise) {
+    themeSettingsPromise = requestThemeSettings()
+  }
+
+  try {
+    return await themeSettingsPromise
+  } catch (error) {
+    themeSettingsPromise = null
+    throw error
+  }
+}
+
 export async function fetchAdminTitle(): Promise<string> {
   const settingsMap = await fetchSettingsMap()
   const siteTitle = String(settingsMap.get('site_title') ?? '').trim()
@@ -74,7 +117,37 @@ export function getDefaultAdminTitle(): string {
   return DEFAULT_ADMIN_TITLE
 }
 
+function pickThemeBackground(value: unknown): string {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return ''
+  }
+
+  const source = value as Record<string, unknown>
+  const backgroundImages = String(source.background_images ?? '').trim()
+  if (backgroundImages) {
+    return backgroundImages
+  }
+
+  return String(source.background ?? '').trim()
+}
+
 export async function fetchThemeBackgroundUrl(): Promise<string> {
+  try {
+    const themeSettings = await fetchThemeSettings()
+    const currentBackground = pickThemeBackground(themeSettings.current)
+    if (currentBackground) {
+      return currentBackground
+    }
+
+    const activeProfile = themeSettings.profiles?.[themeSettings.active_profile]
+    const activeBackground = pickThemeBackground(activeProfile)
+    if (activeBackground) {
+      return activeBackground
+    }
+  } catch {
+    // Fallback to legacy /setting API.
+  }
+
   const settingsMap = await fetchSettingsMap()
   return String(settingsMap.get(THEME_BACKGROUND_KEY) ?? '').trim()
 }

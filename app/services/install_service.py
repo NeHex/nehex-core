@@ -77,19 +77,19 @@ def _parse_boolean(raw: object) -> bool:
     return text in {"1", "true", "yes", "on"}
 
 
-def _build_default_theme_profiles() -> dict[str, dict[str, str]]:
+def _build_default_theme_profiles() -> dict[str, dict[str, object]]:
     return {
-        "default.json": {
-            "background": "",
-            "primary": "#3a7afe",
-            "banner": "",
-            "card_style": "glass",
-        },
-        "sunset.json": {
-            "background": "",
-            "primary": "#f97316",
-            "banner": "",
-            "card_style": "warm",
+        "rei.json": {
+            "background_images": "/images/background-2k.png",
+            "headmsg": "hi",
+            "social_link": {
+                "github": "https://github.com/nehex",
+                "bilibili": "https://space.bilibili.com",
+                "steam": "https://steampowered.com",
+                "music": "https://music.163.com",
+                "mail": "mailto:i@uegee.com",
+                "feed": True,
+            },
         },
     }
 
@@ -291,7 +291,7 @@ def bootstrap_installation(
 
     nehex_article_class = {"class": class_map}
     default_theme_profiles = _build_default_theme_profiles()
-    default_theme = default_theme_profiles["default.json"]
+    default_theme = default_theme_profiles["rei.json"]
     normalized_site_title = _normalize_optional_text(site_title) or "NeHex"
     primary_article_class = next(iter(class_map.keys()))
 
@@ -320,11 +320,11 @@ def bootstrap_installation(
             _normalize_optional_text(site_notice) or "站点初始化完成，欢迎使用 NeHex。",
             "站点公告",
         ),
-        ("theme_background", SettingType.string, default_theme["background"], "主题背景"),
-        ("theme_primary", SettingType.string, default_theme["primary"], "主题主色"),
-        ("theme_banner", SettingType.string, default_theme["banner"], "主题横幅"),
-        ("theme_card_style", SettingType.string, default_theme["card_style"], "主题卡片风格"),
-        ("theme_active_profile", SettingType.string, "default.json", "主题当前配置文件"),
+        ("theme_background", SettingType.string, str(default_theme.get("background_images", "")), "主题背景"),
+        ("theme_primary", SettingType.string, str(default_theme.get("primary", "")), "主题主色"),
+        ("theme_banner", SettingType.string, str(default_theme.get("banner", "")), "主题横幅"),
+        ("theme_card_style", SettingType.string, str(default_theme.get("card_style", "")), "主题卡片风格"),
+        ("theme_active_profile", SettingType.string, "rei.json", "主题当前配置文件"),
         (
             "theme_profiles",
             SettingType.json,

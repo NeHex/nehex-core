@@ -2,8 +2,8 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db_session
-from app.schemas.setting import SettingListResponse
-from app.services.settings_service import list_settings
+from app.schemas.setting import SettingListResponse, ThemeSettingResponse
+from app.services.settings_service import list_settings, list_theme_settings
 
 router = APIRouter(tags=["settings"])
 
@@ -12,3 +12,9 @@ router = APIRouter(tags=["settings"])
 def get_settings(session: Session = Depends(get_db_session)) -> SettingListResponse:
     data = list_settings(session)
     return SettingListResponse(data=data)
+
+
+@router.get("/setting/theme", response_model=ThemeSettingResponse, summary="获取主题设置")
+def get_theme_settings(session: Session = Depends(get_db_session)) -> ThemeSettingResponse:
+    data = list_theme_settings(session)
+    return ThemeSettingResponse(data=data)

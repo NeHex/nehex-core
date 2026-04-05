@@ -5,22 +5,19 @@ export type ArticleClassItem = {
   label: string
 }
 
-export type ThemeForm = {
+export type ThemeLegacyDefaults = {
   background: string
   primary: string
   banner: string
   cardStyle: string
 }
 
-export type ThemeProfile = {
+export type ThemeProfileEntry = {
   file: string
-  background: string
-  primary: string
-  banner: string
-  cardStyle: string
+  content: Record<string, unknown>
 }
 
-function toText(value: unknown): string {
+export function valueToText(value: unknown): string {
   if (value === null || value === undefined) {
     return ''
   }
@@ -54,12 +51,20 @@ function parseUnknownJson(value: unknown): unknown {
   return value
 }
 
+function cloneRecord(source: Record<string, unknown>): Record<string, unknown> {
+  try {
+    return JSON.parse(JSON.stringify(source)) as Record<string, unknown>
+  } catch {
+    return { ...source }
+  }
+}
+
 export function getSettingsMap(items: AdminSettingItem[]): Map<string, unknown> {
   return new Map(items.map((item) => [item.setting_key, item.setting_content]))
 }
 
 export function readSetting(map: Map<string, unknown>, key: string): string {
-  return toText(map.get(key)).trim()
+  return valueToText(map.get(key)).trim()
 }
 
 export function normalizeThemeFileName(raw: string): string {
@@ -104,7 +109,7 @@ export function parseArticleClassPayload(raw: unknown): {
 
         items.push({
           value: normalizedValue,
-          label: toText(label).trim() || normalizedValue,
+          label: valueToText(label).trim() || normalizedValue,
         })
       })
     }
@@ -128,7 +133,7 @@ export function parseArticleClassPayload(raw: unknown): {
   }
 }
 
-export function parseThemeProfiles(raw: unknown, legacy: ThemeForm): ThemeProfile[] {
+export function parseThemeProfileMap(raw: unknown, legacy: ThemeLegacyDefaults): ThemeProfileEntry[] {
   const parsed = parseUnknownJson(raw)
 
   if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
@@ -143,7 +148,6 @@ export function parseThemeProfiles(raw: unknown, legacy: ThemeForm): ThemeProfil
           return null
         }
 
-        const typed = config as Record<string, unknown>
         const normalizedFile = normalizeThemeFileName(file)
         if (!normalizedFile) {
           return null
@@ -151,13 +155,10 @@ export function parseThemeProfiles(raw: unknown, legacy: ThemeForm): ThemeProfil
 
         return {
           file: normalizedFile,
-          background: toText(typed.background).trim(),
-          primary: toText(typed.primary).trim(),
-          banner: toText(typed.banner).trim(),
-          cardStyle: toText(typed.card_style ?? typed.cardStyle).trim(),
-        } satisfies ThemeProfile
+          content: cloneRecord(config as Record<string, unknown>),
+        } satisfies ThemeProfileEntry
       })
-      .filter((item): item is ThemeProfile => item !== null)
+      .filter((item): item is ThemeProfileEntry => item !== null)
 
     if (profiles.length > 0) {
       return profiles
@@ -166,11 +167,14 @@ export function parseThemeProfiles(raw: unknown, legacy: ThemeForm): ThemeProfil
 
   return [
     {
-      file: 'default.json',
-      background: legacy.background,
-      primary: legacy.primary,
-      banner: legacy.banner,
-      cardStyle: legacy.cardStyle,
+      file: 'rei.json',
+      content: {
+        background_images: legacy.background,
+        background: legacy.background,
+        primary: legacy.primary,
+        banner: legacy.banner,
+        card_style: legacy.cardStyle,
+      },
     },
   ]
 }

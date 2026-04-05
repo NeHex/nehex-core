@@ -1,4 +1,4 @@
-import { computed, onMounted, reactive, ref, watch, type CSSProperties } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import {
   fetchAdminSettings,
   updateAdminAccountSettings,
@@ -10,28 +10,29 @@ import {
   getSettingsMap,
   normalizeThemeFileName,
   parseArticleClassPayload,
-  parseThemeProfiles,
+  parseThemeProfileMap,
   readSetting,
+  valueToText,
   type ArticleClassItem,
-  type ThemeForm,
-  type ThemeProfile,
+  type ThemeLegacyDefaults,
+  type ThemeProfileEntry,
 } from '@/pages/settings/helpers'
+import { normalizeBasePath } from '@/utils/path'
 import { getAuthenticatedAccount } from '@/utils/auth'
 
-type SectionKey = 'nehex' | 'site' | 'theme' | 'account'
+type SectionKey = 'nehex' | 'site' | 'theme'
 
 type NehexForm = {
-  siteTitle: string
-  siteSubtitle: string
-  apiBase: string
+  adminManagerWeb: string
 }
 
 type SiteForm = {
+  siteTitle: string
+  siteSubtitle: string
   siteUrl: string
-  siteDescription: string
   siteKeywords: string
-  siteIcp: string
-  siteNotice: string
+  siteDescription: string
+  siteFavicon: string
 }
 
 type AccountForm = {
@@ -51,11 +52,19 @@ type NehexSnapshot = {
   form: NehexForm
   classes: ArticleClassItem[]
   extraConfig: Record<string, unknown>
+  account: string
 }
 
 type ThemeSnapshot = {
-  profiles: ThemeProfile[]
+  profiles: ThemeProfileEntry[]
   selectedFile: string
+}
+
+type LatestRelease = {
+  tagName: string
+  name: string
+  htmlUrl: string
+  publishedAt: string
 }
 
 const sections: SectionMeta[] = [
@@ -63,29 +72,178 @@ const sections: SectionMeta[] = [
     key: 'nehex',
     label: 'NeHex配置',
     icon: 'mdi-hexagon-multiple-outline',
-    description: '维护站点核心配置与内容分类结构。',
+    description: '后台地址、分类、更新检测与管理员账号设置。',
   },
   {
     key: 'site',
-    label: '站点配置',
+    label: '网站配置',
     icon: 'mdi-web',
-    description: '维护站点地址、描述、关键词与公告文案。',
+    description: '站点标题、副标题、地址、关键词、描述与 favicon。',
   },
   {
     key: 'theme',
-    label: '主题设置',
-    icon: 'mdi-palette-outline',
-    description: '按主题配置文件管理多套主题。',
-  },
-  {
-    key: 'account',
-    label: '帐号设置',
-    icon: 'mdi-account-cog-outline',
-    description: '维护后台管理员账号与密码。',
+    label: '主题配置',
+    icon: 'mdi-code-json',
+    description: '选择主题模板并直接编辑 JSON 内容。',
   },
 ]
 
 const defaultSection: SectionMeta = sections[0]!
+
+const githubLatestReleaseApi = 'https://api.github.com/repos/nehex/nehex-core/releases/latest'
+const REI_THEME_FILE = 'rei.json'
+const CREATE_THEME_OPTION_VALUE = '__create_theme_template__'
+const REI_THEME_DEFAULT_CONTENT: Record<string, unknown> = {
+  background_images: '/images/background-2k.png',
+  headmsg: 'hi',
+  social_link: {
+    github: 'https://github.com/nehex',
+    bilibili: 'https://space.bilibili.com',
+    steam: 'https://steampowered.com',
+    music: 'https://music.163.com',
+    mail: 'mailto:i@uegee.com',
+    feed: true,
+  },
+}
+
+function toComparableVersionParts(tag: string): number[] | null {
+  const text = tag.trim().replace(/^v/i, '')
+  if (!text) {
+    return null
+  }
+
+  const parts = text.split('.')
+  if (parts.length === 0) {
+    return null
+  }
+
+  const numbers: number[] = []
+  for (const part of parts) {
+    const matched = part.match(/^\d+/)
+    if (!matched) {
+      break
+    }
+    numbers.push(Number.parseInt(matched[0], 10))
+  }
+
+  if (numbers.length === 0) {
+    return null
+  }
+
+  while (numbers.length < 3) {
+    numbers.push(0)
+  }
+
+  return numbers.slice(0, 3)
+}
+
+function compareVersionTag(current: string, latest: string): number | null {
+  const currentParts = toComparableVersionParts(current)
+  const latestParts = toComparableVersionParts(latest)
+  if (!currentParts || !latestParts) {
+    return null
+  }
+
+  for (let i = 0; i < 3; i += 1) {
+    if (latestParts[i]! > currentParts[i]!) {
+      return 1
+    }
+    if (latestParts[i]! < currentParts[i]!) {
+      return -1
+    }
+  }
+
+  return 0
+}
+
+function cloneProfileEntries(entries: ThemeProfileEntry[]): ThemeProfileEntry[] {
+  return entries.map((item) => {
+    try {
+      return {
+        file: item.file,
+        content: JSON.parse(JSON.stringify(item.content)) as Record<string, unknown>,
+      }
+    } catch {
+      return {
+        file: item.file,
+        content: { ...item.content },
+      }
+    }
+  })
+}
+
+function createReiThemeContent(): Record<string, unknown> {
+  return JSON.parse(JSON.stringify(REI_THEME_DEFAULT_CONTENT)) as Record<string, unknown>
+}
+
+function mergeReiThemeContent(content: Record<string, unknown>): Record<string, unknown> {
+  const defaults = createReiThemeContent()
+  const source = { ...content }
+  const defaultSocial = defaults.social_link
+  const sourceSocial = source.social_link
+
+  if (
+    defaultSocial
+    && typeof defaultSocial === 'object'
+    && !Array.isArray(defaultSocial)
+    && sourceSocial
+    && typeof sourceSocial === 'object'
+    && !Array.isArray(sourceSocial)
+  ) {
+    source.social_link = {
+      ...(defaultSocial as Record<string, unknown>),
+      ...(sourceSocial as Record<string, unknown>),
+    }
+  }
+
+  return {
+    ...defaults,
+    ...source,
+  }
+}
+
+function mergeWithReiTemplate(profiles: ThemeProfileEntry[]): ThemeProfileEntry[] {
+  const next = cloneProfileEntries(profiles)
+  const rei = next.find((item) => item.file === REI_THEME_FILE)
+  if (!rei) {
+    next.unshift({
+      file: REI_THEME_FILE,
+      content: createReiThemeContent(),
+    })
+    return next
+  }
+
+  rei.content = mergeReiThemeContent(rei.content || {})
+  const reiIndex = next.findIndex((item) => item.file === REI_THEME_FILE)
+  if (reiIndex > 0) {
+    const [reiItem] = next.splice(reiIndex, 1)
+    next.unshift(reiItem!)
+  }
+
+  return next
+}
+
+function normalizeAdminManagerWebPath(raw: string): string {
+  const normalized = normalizeBasePath(raw || '/nehex-admin')
+  if (normalized === '/') {
+    return '/nehex-admin'
+  }
+  return normalized
+}
+
+function validateAdminManagerWebPath(raw: string): string {
+  const text = (raw || '').trim()
+  if (!text) {
+    return ''
+  }
+  if (/\s/.test(text)) {
+    return '后台地址不能包含空白字符'
+  }
+  if (text.includes('?') || text.includes('#')) {
+    return '后台地址不能包含 ? 或 #'
+  }
+  return ''
+}
 
 export function useSettingsPage() {
   const activeSectionKey = ref<SectionKey>('nehex')
@@ -95,9 +253,7 @@ export function useSettingsPage() {
   const successMessage = ref('')
 
   const nehexForm = reactive<NehexForm>({
-    siteTitle: '',
-    siteSubtitle: '',
-    apiBase: '',
+    adminManagerWeb: '/nehex-admin',
   })
 
   const nehexClasses = ref<ArticleClassItem[]>([])
@@ -106,22 +262,13 @@ export function useSettingsPage() {
   const newClassLabel = ref('')
 
   const siteForm = reactive<SiteForm>({
+    siteTitle: '',
+    siteSubtitle: '',
     siteUrl: '',
-    siteDescription: '',
     siteKeywords: '',
-    siteIcp: '',
-    siteNotice: '',
+    siteDescription: '',
+    siteFavicon: '',
   })
-
-  const themeForm = reactive<ThemeForm>({
-    background: '',
-    primary: '',
-    banner: '',
-    cardStyle: '',
-  })
-  const themeProfiles = ref<ThemeProfile[]>([])
-  const selectedThemeFile = ref('')
-  const newThemeFile = ref('')
 
   const accountForm = reactive<AccountForm>({
     account: getAuthenticatedAccount(),
@@ -129,49 +276,108 @@ export function useSettingsPage() {
     confirmPassword: '',
   })
 
+  const themeProfiles = ref<ThemeProfileEntry[]>([])
+  const selectedThemeFile = ref('')
+  const themeCreateDialog = ref(false)
+  const themeCreateName = ref('')
+  const themeCreateError = ref('')
+  const themeEditorJson = ref('{}')
+  const themeEditorError = ref('')
+
+  const updateChecking = ref(false)
+  const updateCheckError = ref('')
+  const latestRelease = ref<LatestRelease | null>(null)
+  const currentVersion = ref(
+    (
+      (import.meta as ImportMeta & { env?: Record<string, string | undefined> }).env
+        ?.VITE_NEHEX_CORE_VERSION || ''
+    ).trim(),
+  )
+
   const nehexSnapshot = ref<NehexSnapshot>(getNehexSnapshotData())
   const siteSnapshot = ref<SiteForm>(getSiteFormData())
   const themeSnapshot = ref<ThemeSnapshot>(getThemeSnapshotData())
-  const accountSnapshot = ref<AccountForm>(getAccountFormData())
 
   const activeSection = computed<SectionMeta>(() => {
     return sections.find((item) => item.key === activeSectionKey.value) || defaultSection
   })
 
   const themeFileOptions = computed(() => {
-    return themeProfiles.value.map((item) => ({
+    const base = themeProfiles.value.map((item) => ({
       label: item.file,
       value: item.file,
     }))
+    base.push({
+      label: '其他模板（新建）',
+      value: CREATE_THEME_OPTION_VALUE,
+    })
+    return base
   })
 
-  const themePreviewStyle = computed<CSSProperties>(() => {
-    const background = themeForm.background.trim()
-    if (!background) {
-      return {
-        background: 'linear-gradient(140deg, #2a3045 0%, #1a2235 100%)',
-        backgroundPosition: 'center',
-        backgroundRepeat: 'no-repeat',
-        backgroundSize: 'cover',
-      }
+  const adminManagerWebValidationMessage = computed(() => {
+    return validateAdminManagerWebPath(nehexForm.adminManagerWeb)
+  })
+
+  const adminManagerWebNormalized = computed(() => {
+    return normalizeAdminManagerWebPath(nehexForm.adminManagerWeb)
+  })
+
+  const adminManagerWebHint = computed(() => {
+    if (adminManagerWebValidationMessage.value) {
+      return ''
     }
 
-    const safeUrl = background.replace(/"/g, '\\"')
-    return {
-      backgroundImage: `linear-gradient(180deg, rgba(7, 11, 20, 0.2), rgba(7, 11, 20, 0.7)), url("${safeUrl}")`,
-      backgroundPosition: 'center',
-      backgroundRepeat: 'no-repeat',
-      backgroundSize: 'cover',
+    const input = nehexForm.adminManagerWeb.trim() || '/nehex-admin'
+    if (input !== adminManagerWebNormalized.value) {
+      return `保存时将自动规范为 ${adminManagerWebNormalized.value}`
     }
+    return `当前路径 ${adminManagerWebNormalized.value}`
+  })
+
+  const hasNewRelease = computed(() => {
+    if (!latestRelease.value || !currentVersion.value) {
+      return false
+    }
+    const result = compareVersionTag(currentVersion.value, latestRelease.value.tagName)
+    return result === 1
+  })
+
+  const releaseStatusText = computed(() => {
+    if (!latestRelease.value) {
+      return ''
+    }
+
+    if (!currentVersion.value) {
+      return `最新版本 ${latestRelease.value.tagName}，当前版本未知（可设置 VITE_NEHEX_CORE_VERSION）`
+    }
+
+    const result = compareVersionTag(currentVersion.value, latestRelease.value.tagName)
+    if (result === 1) {
+      return `发现新版本 ${latestRelease.value.tagName}（当前 ${currentVersion.value}）`
+    }
+    if (result === 0) {
+      return `当前已是最新版本 ${currentVersion.value}`
+    }
+    if (result === -1) {
+      return `当前版本 ${currentVersion.value} 高于发布版本 ${latestRelease.value.tagName}`
+    }
+    return `检测成功：最新版本 ${latestRelease.value.tagName}（当前 ${currentVersion.value}）`
+  })
+
+  const canSaveCurrentSection = computed(() => {
+    if (activeSectionKey.value === 'nehex' && !!adminManagerWebValidationMessage.value) {
+      return false
+    }
+    return true
   })
 
   watch(selectedThemeFile, (next, previous) => {
     if (previous) {
-      syncCurrentThemeFormToProfile(previous)
+      syncThemeEditorToProfile(previous, false)
     }
 
     if (next) {
-      loadThemeFormFromProfile(next)
+      loadThemeEditorFromProfile(next)
     }
   })
 
@@ -193,60 +399,101 @@ export function useSettingsPage() {
     }
   }
 
-  function findThemeProfile(file: string): ThemeProfile | undefined {
+  function findThemeProfile(file: string): ThemeProfileEntry | undefined {
     return themeProfiles.value.find((item) => item.file === file)
   }
 
-  function loadThemeFormFromProfile(file: string): void {
+  function loadThemeEditorFromProfile(file: string): void {
     const profile = findThemeProfile(file)
     if (!profile) {
+      themeEditorJson.value = '{}'
       return
     }
 
-    themeForm.background = profile.background
-    themeForm.primary = profile.primary
-    themeForm.banner = profile.banner
-    themeForm.cardStyle = profile.cardStyle
+    themeEditorError.value = ''
+    themeEditorJson.value = JSON.stringify(profile.content, null, 2)
   }
 
-  function syncCurrentThemeFormToProfile(file?: string): void {
+  function syncThemeEditorToProfile(file?: string, strict = true): boolean {
     const target = findThemeProfile(file || selectedThemeFile.value)
     if (!target) {
-      return
+      return true
     }
 
-    target.background = themeForm.background.trim()
-    target.primary = themeForm.primary.trim()
-    target.banner = themeForm.banner.trim()
-    target.cardStyle = themeForm.cardStyle.trim()
+    const text = themeEditorJson.value.trim()
+    if (!text) {
+      target.content = {}
+      themeEditorError.value = ''
+      return true
+    }
+
+    try {
+      const parsed = JSON.parse(text)
+      if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+        throw new Error('主题 JSON 必须是对象')
+      }
+      target.content = parsed as Record<string, unknown>
+      themeEditorError.value = ''
+      return true
+    } catch (error) {
+      themeEditorError.value = error instanceof Error ? error.message : '主题 JSON 格式错误'
+      if (strict) {
+        throw new Error(`主题 JSON 格式错误：${themeEditorError.value}`)
+      }
+      return false
+    }
+  }
+
+  function formatThemeEditorJson(): void {
+    syncThemeEditorToProfile(undefined, true)
+    loadThemeEditorFromProfile(selectedThemeFile.value)
+    successMessage.value = '主题 JSON 已格式化'
   }
 
   function addThemeProfile(): void {
     errorMessage.value = ''
     successMessage.value = ''
+    themeCreateError.value = ''
+    themeCreateName.value = ''
+    themeCreateDialog.value = true
+  }
 
-    const normalizedFile = normalizeThemeFileName(newThemeFile.value)
+  function cancelCreateThemeProfile(): void {
+    themeCreateDialog.value = false
+    themeCreateName.value = ''
+    themeCreateError.value = ''
+  }
+
+  function confirmCreateThemeProfile(): void {
+    themeCreateError.value = ''
+    const normalizedFile = normalizeThemeFileName(themeCreateName.value)
     if (!normalizedFile) {
-      errorMessage.value = '请输入合法的主题文件名'
+      themeCreateError.value = '请输入合法的主题模板文件名'
       return
     }
 
     if (themeProfiles.value.some((item) => item.file === normalizedFile)) {
-      errorMessage.value = '主题文件已存在'
+      themeCreateError.value = '主题模板已存在'
       return
     }
 
-    syncCurrentThemeFormToProfile()
+    syncThemeEditorToProfile(undefined, false)
     themeProfiles.value.push({
       file: normalizedFile,
-      background: '',
-      primary: '',
-      banner: '',
-      cardStyle: '',
+      content: createReiThemeContent(),
     })
     selectedThemeFile.value = normalizedFile
-    newThemeFile.value = ''
-    successMessage.value = `已新增主题配置文件 ${normalizedFile}`
+    themeCreateDialog.value = false
+    themeCreateName.value = ''
+    successMessage.value = `已新增主题模板 ${normalizedFile}`
+  }
+
+  function handleThemeTemplateSelect(nextValue: string): void {
+    if (nextValue === CREATE_THEME_OPTION_VALUE) {
+      addThemeProfile()
+      return
+    }
+    selectedThemeFile.value = nextValue
   }
 
   function removeCurrentThemeProfile(): void {
@@ -254,7 +501,7 @@ export function useSettingsPage() {
     successMessage.value = ''
 
     if (themeProfiles.value.length <= 1) {
-      errorMessage.value = '至少保留一个主题配置文件'
+      errorMessage.value = '至少保留一个主题模板'
       return
     }
 
@@ -267,8 +514,8 @@ export function useSettingsPage() {
     themeProfiles.value.splice(index, 1)
     const next = themeProfiles.value[Math.max(0, index - 1)]
     selectedThemeFile.value = next?.file || themeProfiles.value[0]!.file
-    loadThemeFormFromProfile(selectedThemeFile.value)
-    successMessage.value = `已删除主题配置文件 ${current}`
+    loadThemeEditorFromProfile(selectedThemeFile.value)
+    successMessage.value = `已删除主题模板 ${current}`
   }
 
   function addArticleClass(): void {
@@ -276,19 +523,21 @@ export function useSettingsPage() {
     successMessage.value = ''
 
     const value = newClassValue.value.trim()
+    const label = newClassLabel.value.trim()
+
     if (!value) {
-      errorMessage.value = '分类值不能为空'
+      errorMessage.value = '英文值不能为空'
       return
     }
 
     if (nehexClasses.value.some((item) => item.value.trim() === value)) {
-      errorMessage.value = '分类值已存在'
+      errorMessage.value = '英文值已存在'
       return
     }
 
     nehexClasses.value.push({
       value,
-      label: newClassLabel.value.trim() || value,
+      label: label || value,
     })
 
     newClassValue.value = ''
@@ -299,50 +548,80 @@ export function useSettingsPage() {
     nehexClasses.value.splice(index, 1)
   }
 
+  async function checkLatestRelease(): Promise<void> {
+    updateChecking.value = true
+    updateCheckError.value = ''
+
+    try {
+      const response = await fetch(githubLatestReleaseApi, {
+        method: 'GET',
+        headers: {
+          Accept: 'application/vnd.github+json',
+          'X-GitHub-Api-Version': '2022-11-28',
+        },
+      })
+
+      if (!response.ok) {
+        throw new Error(`GitHub API 请求失败 (${response.status})`)
+      }
+
+      const data = await response.json() as {
+        tag_name?: unknown
+        name?: unknown
+        html_url?: unknown
+        published_at?: unknown
+      }
+
+      latestRelease.value = {
+        tagName: String(data.tag_name || '').trim() || 'unknown',
+        name: String(data.name || '').trim() || 'Untitled Release',
+        htmlUrl: String(data.html_url || '').trim(),
+        publishedAt: String(data.published_at || '').trim(),
+      }
+    } catch (error) {
+      updateCheckError.value = error instanceof Error ? error.message : '检查更新失败'
+    } finally {
+      updateChecking.value = false
+    }
+  }
+
   function getNehexSnapshotData(): NehexSnapshot {
     return {
       form: {
-        siteTitle: nehexForm.siteTitle,
-        siteSubtitle: nehexForm.siteSubtitle,
-        apiBase: nehexForm.apiBase,
+        adminManagerWeb: nehexForm.adminManagerWeb,
       },
       classes: nehexClasses.value.map((item) => ({ ...item })),
       extraConfig: { ...nehexExtraConfig.value },
+      account: accountForm.account,
     }
   }
 
   function getSiteFormData(): SiteForm {
     return {
+      siteTitle: siteForm.siteTitle,
+      siteSubtitle: siteForm.siteSubtitle,
       siteUrl: siteForm.siteUrl,
-      siteDescription: siteForm.siteDescription,
       siteKeywords: siteForm.siteKeywords,
-      siteIcp: siteForm.siteIcp,
-      siteNotice: siteForm.siteNotice,
+      siteDescription: siteForm.siteDescription,
+      siteFavicon: siteForm.siteFavicon,
     }
   }
 
   function getThemeSnapshotData(): ThemeSnapshot {
-    syncCurrentThemeFormToProfile()
+    syncThemeEditorToProfile(undefined, false)
     return {
-      profiles: themeProfiles.value.map((item) => ({ ...item })),
+      profiles: cloneProfileEntries(themeProfiles.value),
       selectedFile: selectedThemeFile.value,
     }
   }
 
-  function getAccountFormData(): AccountForm {
-    return {
-      account: accountForm.account,
-      newPassword: accountForm.newPassword,
-      confirmPassword: accountForm.confirmPassword,
-    }
-  }
-
   function applyNehexSnapshot(snapshot: NehexSnapshot): void {
-    nehexForm.siteTitle = snapshot.form.siteTitle
-    nehexForm.siteSubtitle = snapshot.form.siteSubtitle
-    nehexForm.apiBase = snapshot.form.apiBase
+    nehexForm.adminManagerWeb = normalizeAdminManagerWebPath(snapshot.form.adminManagerWeb)
     nehexClasses.value = snapshot.classes.map((item) => ({ ...item }))
     nehexExtraConfig.value = { ...snapshot.extraConfig }
+    accountForm.account = snapshot.account
+    accountForm.newPassword = ''
+    accountForm.confirmPassword = ''
   }
 
   function applySiteFormData(data: SiteForm): void {
@@ -350,53 +629,50 @@ export function useSettingsPage() {
   }
 
   function applyThemeSnapshot(snapshot: ThemeSnapshot): void {
-    themeProfiles.value = snapshot.profiles.map((item) => ({ ...item }))
-    selectedThemeFile.value = snapshot.selectedFile || themeProfiles.value[0]?.file || 'default.json'
-    loadThemeFormFromProfile(selectedThemeFile.value)
-  }
-
-  function applyAccountFormData(data: AccountForm): void {
-    Object.assign(accountForm, data)
+    themeProfiles.value = mergeWithReiTemplate(snapshot.profiles)
+    selectedThemeFile.value = snapshot.selectedFile || themeProfiles.value[0]?.file || REI_THEME_FILE
+    if (!themeProfiles.value.some((item) => item.file === selectedThemeFile.value)) {
+      selectedThemeFile.value = themeProfiles.value[0]?.file || REI_THEME_FILE
+    }
+    loadThemeEditorFromProfile(selectedThemeFile.value)
   }
 
   function updateSnapshots(): void {
     nehexSnapshot.value = getNehexSnapshotData()
     siteSnapshot.value = getSiteFormData()
     themeSnapshot.value = getThemeSnapshotData()
-    accountSnapshot.value = getAccountFormData()
   }
 
   function applyFormsFromSettings(items: AdminSettingItem[]): void {
     const settingsMap = getSettingsMap(items)
 
-    nehexForm.siteTitle = readSetting(settingsMap, 'site_title')
-    nehexForm.siteSubtitle = readSetting(settingsMap, 'site_sub_title')
-    nehexForm.apiBase = readSetting(settingsMap, 'site_api_base')
+    nehexForm.adminManagerWeb = normalizeAdminManagerWebPath(readSetting(settingsMap, 'admin_manager_web') || '/nehex-admin')
 
     const parsedClass = parseArticleClassPayload(settingsMap.get('nehex_article_class'))
     nehexClasses.value = parsedClass.items
     nehexExtraConfig.value = parsedClass.extraConfig
 
+    siteForm.siteTitle = readSetting(settingsMap, 'site_title')
+    siteForm.siteSubtitle = readSetting(settingsMap, 'site_sub_title')
     siteForm.siteUrl = readSetting(settingsMap, 'site_url')
-    siteForm.siteDescription = readSetting(settingsMap, 'site_description')
     siteForm.siteKeywords = readSetting(settingsMap, 'site_keywords')
-    siteForm.siteIcp = readSetting(settingsMap, 'site_icp')
-    siteForm.siteNotice = readSetting(settingsMap, 'site_notice')
+    siteForm.siteDescription = readSetting(settingsMap, 'site_description')
+    siteForm.siteFavicon = readSetting(settingsMap, 'site_favicon')
 
-    const legacyTheme: ThemeForm = {
+    const legacyTheme: ThemeLegacyDefaults = {
       background: readSetting(settingsMap, 'theme_background'),
       primary: readSetting(settingsMap, 'theme_primary'),
       banner: readSetting(settingsMap, 'theme_banner'),
       cardStyle: readSetting(settingsMap, 'theme_card_style'),
     }
 
-    themeProfiles.value = parseThemeProfiles(settingsMap.get('theme_profiles'), legacyTheme)
+    themeProfiles.value = mergeWithReiTemplate(parseThemeProfileMap(settingsMap.get('theme_profiles'), legacyTheme))
     const activeThemeFile = normalizeThemeFileName(readSetting(settingsMap, 'theme_active_profile'))
-    const fallbackThemeFile = themeProfiles.value[0]?.file || 'default.json'
+    const fallbackThemeFile = themeProfiles.value[0]?.file || REI_THEME_FILE
     selectedThemeFile.value = themeProfiles.value.some((item) => item.file === activeThemeFile)
       ? activeThemeFile
       : fallbackThemeFile
-    loadThemeFormFromProfile(selectedThemeFile.value)
+    loadThemeEditorFromProfile(selectedThemeFile.value)
 
     accountForm.account = accountForm.account.trim() || getAuthenticatedAccount()
     accountForm.newPassword = ''
@@ -419,16 +695,25 @@ export function useSettingsPage() {
     }
   }
 
+  function getThemeLegacyFields(content: Record<string, unknown>): {
+    background: string
+    primary: string
+    banner: string
+    cardStyle: string
+  } {
+    return {
+      background: valueToText(content.background).trim(),
+      primary: valueToText(content.primary).trim(),
+      banner: valueToText(content.banner).trim(),
+      cardStyle: valueToText(content.card_style ?? content.cardStyle).trim(),
+    }
+  }
+
   function buildThemeProfilesPayload(): Record<string, unknown> {
     const payload: Record<string, unknown> = {}
 
     themeProfiles.value.forEach((item) => {
-      payload[item.file] = {
-        background: item.background,
-        primary: item.primary,
-        banner: item.banner,
-        card_style: item.cardStyle,
-      }
+      payload[item.file] = item.content
     })
 
     return payload
@@ -437,45 +722,34 @@ export function useSettingsPage() {
   function buildSectionItems(section: SectionKey): AdminSettingUpdateItem[] {
     if (section === 'nehex') {
       return [
-        { setting_key: 'site_title', setting_content: nehexForm.siteTitle.trim(), setting_type: 'string' },
-        { setting_key: 'site_sub_title', setting_content: nehexForm.siteSubtitle.trim(), setting_type: 'string' },
-        { setting_key: 'site_api_base', setting_content: nehexForm.apiBase.trim(), setting_type: 'string' },
+        { setting_key: 'admin_manager_web', setting_content: adminManagerWebNormalized.value, setting_type: 'string' },
         { setting_key: 'nehex_article_class', setting_content: buildArticleClassSettingContent(), setting_type: 'json' },
       ]
     }
 
     if (section === 'site') {
       return [
+        { setting_key: 'site_title', setting_content: siteForm.siteTitle.trim(), setting_type: 'string' },
+        { setting_key: 'site_sub_title', setting_content: siteForm.siteSubtitle.trim(), setting_type: 'string' },
         { setting_key: 'site_url', setting_content: siteForm.siteUrl.trim(), setting_type: 'string' },
-        { setting_key: 'site_description', setting_content: siteForm.siteDescription, setting_type: 'string' },
         { setting_key: 'site_keywords', setting_content: siteForm.siteKeywords.trim(), setting_type: 'string' },
-        { setting_key: 'site_icp', setting_content: siteForm.siteIcp.trim(), setting_type: 'string' },
-        { setting_key: 'site_notice', setting_content: siteForm.siteNotice, setting_type: 'string' },
+        { setting_key: 'site_description', setting_content: siteForm.siteDescription, setting_type: 'string' },
+        { setting_key: 'site_favicon', setting_content: siteForm.siteFavicon.trim(), setting_type: 'string' },
       ]
     }
 
-    if (section === 'theme') {
-      syncCurrentThemeFormToProfile()
+    syncThemeEditorToProfile(undefined, true)
+    const current = findThemeProfile(selectedThemeFile.value)
+    const legacy = getThemeLegacyFields(current?.content || {})
 
-      const current = findThemeProfile(selectedThemeFile.value)
-      const currentTheme = current || {
-        background: '',
-        primary: '',
-        banner: '',
-        cardStyle: '',
-      }
-
-      return [
-        { setting_key: 'theme_active_profile', setting_content: selectedThemeFile.value, setting_type: 'string' },
-        { setting_key: 'theme_profiles', setting_content: buildThemeProfilesPayload(), setting_type: 'json' },
-        { setting_key: 'theme_background', setting_content: currentTheme.background, setting_type: 'string' },
-        { setting_key: 'theme_primary', setting_content: currentTheme.primary, setting_type: 'string' },
-        { setting_key: 'theme_banner', setting_content: currentTheme.banner, setting_type: 'string' },
-        { setting_key: 'theme_card_style', setting_content: currentTheme.cardStyle, setting_type: 'string' },
-      ]
-    }
-
-    return []
+    return [
+      { setting_key: 'theme_active_profile', setting_content: selectedThemeFile.value, setting_type: 'string' },
+      { setting_key: 'theme_profiles', setting_content: buildThemeProfilesPayload(), setting_type: 'json' },
+      { setting_key: 'theme_background', setting_content: legacy.background, setting_type: 'string' },
+      { setting_key: 'theme_primary', setting_content: legacy.primary, setting_type: 'string' },
+      { setting_key: 'theme_banner', setting_content: legacy.banner, setting_type: 'string' },
+      { setting_key: 'theme_card_style', setting_content: legacy.cardStyle, setting_type: 'string' },
+    ]
   }
 
   function resetCurrentSection(): void {
@@ -489,8 +763,6 @@ export function useSettingsPage() {
       applySiteFormData(siteSnapshot.value)
     } else if (section === 'theme') {
       applyThemeSnapshot(themeSnapshot.value)
-    } else if (section === 'account') {
-      applyAccountFormData(accountSnapshot.value)
     }
 
     successMessage.value = `已重置${activeSection.value.label}`
@@ -502,44 +774,46 @@ export function useSettingsPage() {
     saving.value = true
 
     try {
-      let updatedItems: AdminSettingItem[] = []
       const section = activeSectionKey.value
 
-      if (section === 'account') {
-        const payload: Record<string, string> = {}
+      if (section === 'nehex') {
+        if (adminManagerWebValidationMessage.value) {
+          throw new Error(adminManagerWebValidationMessage.value)
+        }
+        nehexForm.adminManagerWeb = adminManagerWebNormalized.value
+        const updatedSettings = await updateAdminSettings(buildSectionItems('nehex'))
+
+        const accountPayload: Record<string, string> = {}
         const account = accountForm.account.trim()
+        const oldAccount = nehexSnapshot.value.account.trim()
         const newPassword = accountForm.newPassword.trim()
         const confirmPassword = accountForm.confirmPassword.trim()
 
-        if (account) {
-          payload.account = account
+        if (account && account !== oldAccount) {
+          accountPayload.account = account
         }
 
         if (newPassword || confirmPassword) {
           if (!newPassword || !confirmPassword) {
             throw new Error('新密码和确认密码必须同时填写')
           }
-
           if (newPassword !== confirmPassword) {
             throw new Error('两次输入的新密码不一致')
           }
-
-          payload.new_password = newPassword
-          payload.confirm_password = confirmPassword
+          accountPayload.new_password = newPassword
+          accountPayload.confirm_password = confirmPassword
         }
 
-        if (Object.keys(payload).length === 0) {
-          successMessage.value = '无变化，无需保存'
-          return
+        if (Object.keys(accountPayload).length > 0) {
+          await updateAdminAccountSettings(accountPayload)
         }
 
-        updatedItems = await updateAdminAccountSettings(payload)
+        applyFormsFromSettings(updatedSettings)
       } else {
-        const items = buildSectionItems(section)
-        updatedItems = await updateAdminSettings(items)
+        const updated = await updateAdminSettings(buildSectionItems(section))
+        applyFormsFromSettings(updated)
       }
 
-      applyFormsFromSettings(updatedItems)
       updateSnapshots()
       successMessage.value = `${activeSection.value.label}已保存`
     } catch (error) {
@@ -561,22 +835,43 @@ export function useSettingsPage() {
     saving,
     errorMessage,
     successMessage,
+    canSaveCurrentSection,
+
     nehexForm,
     nehexClasses,
     newClassValue,
     newClassLabel,
+    accountForm,
+
     siteForm,
-    themeForm,
+
     themeProfiles,
     selectedThemeFile,
-    newThemeFile,
-    accountForm,
+    themeCreateDialog,
+    themeCreateName,
+    themeCreateError,
     themeFileOptions,
-    themePreviewStyle,
+    themeEditorJson,
+    themeEditorError,
+
+    updateChecking,
+    updateCheckError,
+    latestRelease,
+    currentVersion,
+    hasNewRelease,
+    releaseStatusText,
+    adminManagerWebValidationMessage,
+    adminManagerWebHint,
+
     addThemeProfile,
+    cancelCreateThemeProfile,
+    confirmCreateThemeProfile,
+    handleThemeTemplateSelect,
     removeCurrentThemeProfile,
+    formatThemeEditorJson,
     addArticleClass,
     removeArticleClass,
+    checkLatestRelease,
     resetCurrentSection,
     saveCurrentSection,
   }

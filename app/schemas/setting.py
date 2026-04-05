@@ -20,3 +20,13 @@ class SettingItem(BaseModel):
 
 class SettingListResponse(BaseModel):
     data: list[SettingItem]
+
+
+class ThemeSettingData(BaseModel):
+    active_profile: str
+    profiles: dict[str, dict[str, Any]]
+    current: dict[str, Any]
+
+
+class ThemeSettingResponse(BaseModel):
+    data: ThemeSettingData

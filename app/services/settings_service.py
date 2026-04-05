@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 import json
 from datetime import datetime
 from typing import Any
@@ -12,7 +13,7 @@ from sqlalchemy.orm import Session
 from app.core.database import database_table_exists
 from app.core.simple_cache import cache
 from app.models.setting import Setting, SettingType
-from app.schemas.setting import SettingItem
+from app.schemas.setting import SettingItem, ThemeSettingData
 
 SETTINGS_CACHE_KEY = "settings:list"
 SETTINGS_CACHE_TTL_SECONDS = 60
@@ -49,6 +50,9 @@ COMPAT_SETTING_DEFAULTS: dict[str, tuple[SettingType, Any]] = {
 COMPAT_SETTING_ALIASES: dict[str, str] = {
     "site_desc": "site_description",
 }
+REI_THEME_FILE = "rei.json"
+THEME_ACTIVE_PROFILE_KEY = "theme_active_profile"
+THEME_PROFILES_KEY = "theme_profiles"
 
 
 def _is_public_setting_key(setting_key: str) -> bool:
@@ -111,6 +115,154 @@ def list_settings(session: Session) -> list[SettingItem]:
     mapped = _with_compatibility_keys(mapped)
     cache.set(SETTINGS_CACHE_KEY, mapped, SETTINGS_CACHE_TTL_SECONDS)
     return [item.model_copy(deep=True) for item in mapped]
+
+
+def _to_text(value: Any) -> str:
+    if value is None:
+        return ""
+    if isinstance(value, str):
+        return value.strip()
+    if isinstance(value, (int, float, bool)):
+        return str(value).strip()
+
+    try:
+        return json.dumps(value, ensure_ascii=False)
+    except (TypeError, ValueError):
+        return str(value).strip()
+
+
+def _normalize_theme_file_name(raw: str) -> str:
+    text = raw.strip()
+    if not text:
+        return ""
+    if "/" in text or "\\" in text:
+        return ""
+    if "." not in text:
+        return f"{text}.json"
+    return text
+
+
+def _parse_unknown_json(raw: Any) -> Any:
+    if isinstance(raw, str):
+        text = raw.strip()
+        if not text:
+            return None
+        try:
+            return json.loads(text)
+        except json.JSONDecodeError:
+            return raw
+    return raw
+
+
+def _clone_object(value: dict[str, Any]) -> dict[str, Any]:
+    return copy.deepcopy(value)
+
+
+def _build_rei_theme_default() -> dict[str, Any]:
+    return {
+        "background_images": "/images/background-2k.png",
+        "headmsg": "hi",
+        "social_link": {
+            "github": "https://github.com/nehex",
+            "bilibili": "https://space.bilibili.com",
+            "steam": "https://steampowered.com",
+            "music": "https://music.163.com",
+            "mail": "mailto:i@uegee.com",
+            "feed": True,
+        },
+    }
+
+
+def _read_setting_text(settings_map: dict[str, SettingItem], key: str) -> str:
+    item = settings_map.get(key)
+    if item is None:
+        return ""
+    return _to_text(item.setting_content)
+
+
+def _build_legacy_theme_default(settings_map: dict[str, SettingItem]) -> dict[str, Any]:
+    background = _read_setting_text(settings_map, "theme_background")
+    primary = _read_setting_text(settings_map, "theme_primary")
+    banner = _read_setting_text(settings_map, "theme_banner")
+    card_style = _read_setting_text(settings_map, "theme_card_style")
+
+    return {
+        "background_images": background,
+        "background": background,
+        "primary": primary,
+        "banner": banner,
+        "card_style": card_style,
+    }
+
+
+def _parse_theme_profiles(raw: Any) -> dict[str, dict[str, Any]]:
+    parsed = _parse_unknown_json(raw)
+    if not isinstance(parsed, dict):
+        return {}
+
+    root = parsed
+    themes = root.get("themes")
+    source = themes if isinstance(themes, dict) else root
+
+    result: dict[str, dict[str, Any]] = {}
+    for raw_file, raw_content in source.items():
+        normalized = _normalize_theme_file_name(str(raw_file))
+        if not normalized:
+            continue
+        if not isinstance(raw_content, dict):
+            continue
+        result[normalized] = _clone_object(raw_content)
+    return result
+
+
+def list_theme_settings(session: Session) -> ThemeSettingData:
+    items = list_settings(session)
+    settings_map = {item.setting_key: item for item in items}
+    legacy_default = _build_legacy_theme_default(settings_map)
+    rei_default = _build_rei_theme_default()
+
+    raw_profiles = settings_map.get(THEME_PROFILES_KEY)
+    profiles = _parse_theme_profiles(raw_profiles.setting_content if raw_profiles else None)
+    if not profiles:
+        profiles = {
+            REI_THEME_FILE: _clone_object(rei_default),
+        }
+    else:
+        profiles.setdefault(REI_THEME_FILE, _clone_object(rei_default))
+        merged_rei = _clone_object(rei_default)
+        merged_rei.update(profiles.get(REI_THEME_FILE, {}))
+        profiles[REI_THEME_FILE] = merged_rei
+
+    if not profiles.get(REI_THEME_FILE):
+        profiles[REI_THEME_FILE] = _clone_object(rei_default)
+
+    for profile in profiles.values():
+        if "background_images" not in profile:
+            profile_background = _to_text(profile.get("background"))
+            profile["background_images"] = profile_background or _to_text(legacy_default.get("background_images"))
+
+    active_setting = settings_map.get(THEME_ACTIVE_PROFILE_KEY)
+    active_profile = _normalize_theme_file_name(
+        _to_text(active_setting.setting_content if active_setting else REI_THEME_FILE),
+    )
+    if not active_profile or active_profile not in profiles:
+        active_profile = REI_THEME_FILE if REI_THEME_FILE in profiles else next(iter(profiles.keys()))
+
+    current = _clone_object(profiles.get(active_profile, {}))
+
+    if REI_THEME_FILE in profiles:
+        ordered_profiles = {REI_THEME_FILE: _clone_object(profiles[REI_THEME_FILE])}
+        for file, content in profiles.items():
+            if file == REI_THEME_FILE:
+                continue
+            ordered_profiles[file] = _clone_object(content)
+        profiles = ordered_profiles
+
+    return ThemeSettingData(
+        active_profile=active_profile,
+        profiles=profiles,
+        current=current,
+    )
 
 
 def _with_compatibility_keys(items: list[SettingItem]) -> list[SettingItem]:
