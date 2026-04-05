@@ -34,6 +34,10 @@
         indeterminate
       />
 
+      <div class="list-head">
+        <span>共 {{ totalArticles }} 篇文章</span>
+      </div>
+
       <div class="articles-grid">
         <v-card
           v-for="article in articles"
@@ -77,6 +81,17 @@
           <div class="add-label">新增文章</div>
         </v-card>
       </div>
+
+      <div v-if="totalPages > 1" class="pagination-row">
+        <v-pagination
+          v-model="currentPage"
+          :disabled="loading"
+          :length="totalPages"
+          density="comfortable"
+          rounded="circle"
+          :total-visible="7"
+        />
+      </div>
     </section>
 
     <v-dialog v-if="isManageRoute" v-model="deleteDialog" max-width="420">
@@ -116,6 +131,10 @@ const isManageRoute = computed(() => route.path === '/articles')
 const loading = ref(false)
 const deleting = ref(false)
 const errorMessage = ref('')
+const currentPage = ref(1)
+const pageSize = 24
+const totalArticles = ref(0)
+const totalPages = ref(0)
 
 const articles = ref<ArticleItem[]>([])
 const deleteDialog = ref(false)
@@ -142,11 +161,24 @@ function closeDeleteDialog(force = false): void {
   pendingDelete.value = null
 }
 
-async function loadArticles(): Promise<void> {
+async function loadArticles(targetPage = currentPage.value): Promise<void> {
   loading.value = true
   errorMessage.value = ''
   try {
-    articles.value = await fetchArticles()
+    const result = await fetchArticles(targetPage, pageSize)
+    articles.value = result.items
+    totalArticles.value = result.pagination.total
+    totalPages.value = result.pagination.total_pages
+    currentPage.value = result.pagination.page
+
+    if (
+      result.items.length === 0
+      && result.pagination.total_pages > 0
+      && targetPage > result.pagination.total_pages
+    ) {
+      currentPage.value = result.pagination.total_pages
+      return
+    }
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : '加载文章失败'
   } finally {
@@ -164,7 +196,7 @@ async function confirmDelete(): Promise<void> {
   try {
     await deleteArticle(pendingDelete.value.id)
     closeDeleteDialog(true)
-    await loadArticles()
+    await loadArticles(currentPage.value)
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : '删除文章失败'
   } finally {
@@ -191,14 +223,22 @@ function getArticleCardStyle(article: ArticleItem): Record<string, string> {
 
 onMounted(async () => {
   if (isManageRoute.value) {
-    await loadArticles()
+    await loadArticles(1)
   }
 })
 
 watch(isManageRoute, async (active, previous) => {
   if (active && !previous) {
-    await loadArticles()
+    currentPage.value = 1
+    await loadArticles(1)
   }
+})
+
+watch(currentPage, async (page, previous) => {
+  if (page === previous || loading.value || !isManageRoute.value) {
+    return
+  }
+  await loadArticles(page)
 })
 </script>
 
@@ -229,6 +269,11 @@ watch(isManageRoute, async (active, previous) => {
 
 .quick-create-btn {
   flex-shrink: 0;
+}
+
+.list-head {
+  color: #aeb8cc;
+  font-size: 14px;
 }
 
 .articles-grid {
@@ -293,6 +338,12 @@ watch(isManageRoute, async (active, previous) => {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.pagination-row {
+  display: flex;
+  justify-content: center;
+  padding: 4px 0 8px;
 }
 
 .add-card {

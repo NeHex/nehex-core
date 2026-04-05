@@ -178,7 +178,7 @@ import {
   submitInstall,
   type InstallArticleClassItem,
 } from '@/services/install'
-import { adminLogout } from '@/services/admin-api'
+import { adminLogout, resetAdminSessionCache } from '@/services/admin-api'
 import { resetSettingsCache } from '@/services/settings'
 import { clearAuthSession } from '@/utils/auth'
 import { getAdminBasePath, normalizeBasePath } from '@/utils/path'
@@ -348,6 +348,7 @@ async function submitInstallation(): Promise<void> {
 
     const status = await submitInstall(payload)
     clearAuthSession()
+    resetAdminSessionCache()
     await adminLogout().catch(() => undefined)
     resetInstallStatusCache()
     resetSettingsCache()

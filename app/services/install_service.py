@@ -244,7 +244,24 @@ def bootstrap_installation(
     site_icp: Optional[str],
     site_notice: Optional[str],
 ) -> InstallStatus:
-    ensure_all_tables()
+    # Installation flow should be able to bootstrap a fresh database.
+    # If CREATE TABLE privileges are missing, return a clear conflict error.
+    try:
+        ensure_all_tables()
+    except SQLAlchemyError as error:
+        raise ValueError(
+            "Database schema initialization failed during install. "
+            "Please run DB migrations first or grant CREATE TABLE privilege.",
+        ) from error
+
+    required_tables = {"settings", "article", "singlepage"}
+    existing_tables = list_database_tables()
+    missing_tables = sorted(required_tables - existing_tables)
+    if missing_tables:
+        raise ValueError(
+            "Database schema is not initialized. Missing tables: "
+            f"{', '.join(missing_tables)}. Run DB migrations first.",
+        )
 
     status = get_install_status(session)
     if status.installed:

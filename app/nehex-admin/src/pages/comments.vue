@@ -41,7 +41,7 @@
       </div>
 
       <div class="list-head">
-        <span>共 {{ comments.length }} 条评论</span>
+        <span>共 {{ totalComments }} 条评论</span>
       </div>
 
       <v-progress-linear
@@ -95,6 +95,17 @@
           暂无评论
         </v-card>
       </div>
+
+      <div v-if="totalPages > 1" class="pagination-row">
+        <v-pagination
+          v-model="currentPage"
+          :disabled="loading"
+          :length="totalPages"
+          density="comfortable"
+          rounded="circle"
+          :total-visible="7"
+        />
+      </div>
     </section>
 
     <v-dialog v-model="deleteDialog" max-width="420">
@@ -116,7 +127,7 @@
 </template>
 
 <script lang="ts" setup>
-import { onMounted, ref } from 'vue'
+import { onMounted, ref, watch } from 'vue'
 import AdminLayout from '@/components/admin/AdminLayout.vue'
 import {
   deleteAdminComment,
@@ -129,6 +140,10 @@ const deleting = ref(false)
 const errorMessage = ref('')
 const searchKeyword = ref('')
 const comments = ref<AdminCommentItem[]>([])
+const currentPage = ref(1)
+const pageSize = 20
+const totalComments = ref(0)
+const totalPages = ref(0)
 const deleteDialog = ref(false)
 const pendingDelete = ref<AdminCommentItem | null>(null)
 
@@ -140,11 +155,24 @@ function formatDateTime(value: string): string {
   return date.toLocaleString('zh-CN')
 }
 
-async function loadComments(): Promise<void> {
+async function loadComments(targetPage = currentPage.value): Promise<void> {
   loading.value = true
   errorMessage.value = ''
   try {
-    comments.value = await fetchAdminComments(searchKeyword.value)
+    const result = await fetchAdminComments(searchKeyword.value, targetPage, pageSize)
+    comments.value = result.items
+    totalComments.value = result.pagination.total
+    totalPages.value = result.pagination.total_pages
+    currentPage.value = result.pagination.page
+
+    if (
+      result.items.length === 0
+      && result.pagination.total_pages > 0
+      && targetPage > result.pagination.total_pages
+    ) {
+      currentPage.value = result.pagination.total_pages
+      return
+    }
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : '加载评论失败'
   } finally {
@@ -153,7 +181,11 @@ async function loadComments(): Promise<void> {
 }
 
 async function searchComments(): Promise<void> {
-  await loadComments()
+  if (currentPage.value !== 1) {
+    currentPage.value = 1
+    return
+  }
+  await loadComments(1)
 }
 
 function openDeleteDialog(comment: AdminCommentItem): void {
@@ -179,7 +211,7 @@ async function confirmDelete(): Promise<void> {
   try {
     await deleteAdminComment(pendingDelete.value.id)
     closeDeleteDialog(true)
-    await loadComments()
+    await loadComments(currentPage.value)
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : '删除评论失败'
   } finally {
@@ -188,7 +220,14 @@ async function confirmDelete(): Promise<void> {
 }
 
 onMounted(async () => {
-  await loadComments()
+  await loadComments(1)
+})
+
+watch(currentPage, async (page, previous) => {
+  if (page === previous || loading.value) {
+    return
+  }
+  await loadComments(page)
 })
 </script>
 
@@ -230,6 +269,12 @@ onMounted(async () => {
 .list-head {
   color: #aeb8cc;
   font-size: 14px;
+}
+
+.pagination-row {
+  display: flex;
+  justify-content: center;
+  padding: 6px 0 4px;
 }
 
 .comments-list {

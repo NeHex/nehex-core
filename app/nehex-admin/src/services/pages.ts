@@ -47,12 +47,16 @@ export async function fetchStandalonePages(): Promise<StandalonePageItem[]> {
 }
 
 export async function fetchStandalonePageById(pageId: number): Promise<StandalonePageItem> {
-  const pages = await fetchStandalonePages()
-  const matched = pages.find((item) => item.id === pageId)
-  if (!matched) {
-    throw new Error('Standalone page not found')
+  const response = await adminFetch(`/admin-api/pages/${pageId}`, {
+    method: 'GET',
+  })
+
+  const payload = await parseJson<StandalonePageDetailResponse>(response)
+  if (!payload?.data) {
+    throw new Error('Unexpected standalone page detail response format')
   }
-  return matched
+
+  return payload.data
 }
 
 export async function createStandalonePage(

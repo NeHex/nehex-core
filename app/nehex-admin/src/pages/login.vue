@@ -90,9 +90,9 @@
 <script setup lang="ts">
 import { nextTick, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { adminLogin } from '@/services/admin-api'
+import { adminLogin, fetchAdminSession } from '@/services/admin-api'
 import { fetchThemeBackgroundUrl } from '@/services/settings'
-import { isAuthenticated, setAuthSession } from '@/utils/auth'
+import { setAuthSession } from '@/utils/auth'
 
 const route = useRoute()
 const router = useRouter()
@@ -231,11 +231,14 @@ async function handleLogin(): Promise<void> {
   }
 }
 
-if (isAuthenticated()) {
-  void router.replace(getRedirectPath())
-}
-
 onMounted(() => {
+  void fetchAdminSession()
+    .then((session) => {
+      setAuthSession(session.account)
+      return router.replace(getRedirectPath())
+    })
+    .catch(() => undefined)
+
   refreshCaptcha()
   void fetchThemeBackgroundUrl()
     .then((url) => {

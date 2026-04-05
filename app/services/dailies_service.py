@@ -35,3 +35,11 @@ def list_dailies(session: Session) -> list[DailyItem]:
     mapped = [_map_daily_item(row) for row in rows]
     cache.set(DAILIES_CACHE_KEY, mapped, DAILIES_CACHE_TTL_SECONDS)
     return [item.model_copy(deep=True) for item in mapped]
+
+
+def get_daily_by_id(session: Session, daily_id: int) -> DailyItem | None:
+    stmt = select(Daily).where(Daily.id == daily_id).limit(1)
+    row = session.execute(stmt).scalars().first()
+    if row is None:
+        return None
+    return _map_daily_item(row)

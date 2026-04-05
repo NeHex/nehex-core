@@ -20,8 +20,16 @@ class ArticleItem(BaseModel):
     content: Optional[str] = None
 
 
+class ArticlePagination(BaseModel):
+    page: int = Field(ge=1)
+    size: int = Field(ge=1)
+    total: int = Field(ge=0)
+    total_pages: int = Field(ge=0)
+
+
 class ArticleListResponse(BaseModel):
     data: list[ArticleItem]
+    pagination: ArticlePagination
 
 
 class ArticleDetailResponse(BaseModel):

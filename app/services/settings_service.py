@@ -16,7 +16,27 @@ from app.schemas.setting import SettingItem
 
 SETTINGS_CACHE_KEY = "settings:list"
 SETTINGS_CACHE_TTL_SECONDS = 60
-PUBLIC_HIDDEN_SETTING_KEYS = {"user_account", "user_account_password"}
+PUBLIC_VISIBLE_SETTING_KEYS = {
+    "site_title",
+    "site_sub_title",
+    "site_api_base",
+    "site_description",
+    "site_keywords",
+    "site_icp",
+    "site_notice",
+    "site_url",
+    "site_desc",
+    "site_favicon",
+    "theme_background",
+    "theme_primary",
+    "theme_banner",
+    "theme_card_style",
+    "theme_active_profile",
+    "theme_profiles",
+    "theme_nav",
+    "nehex_article_class",
+    "user_social_link",
+}
 COMPAT_SETTING_DEFAULTS: dict[str, tuple[SettingType, Any]] = {
     "site_title": (SettingType.string, ""),
     "site_desc": (SettingType.string, ""),
@@ -29,6 +49,10 @@ COMPAT_SETTING_DEFAULTS: dict[str, tuple[SettingType, Any]] = {
 COMPAT_SETTING_ALIASES: dict[str, str] = {
     "site_desc": "site_description",
 }
+
+
+def _is_public_setting_key(setting_key: str) -> bool:
+    return setting_key in PUBLIC_VISIBLE_SETTING_KEYS
 
 
 def parse_setting_content(setting_type: SettingType, raw_content: Optional[str]) -> Any:
@@ -56,11 +80,7 @@ def parse_setting_content(setting_type: SettingType, raw_content: Optional[str])
 def list_settings(session: Session) -> list[SettingItem]:
     cached = cache.get(SETTINGS_CACHE_KEY)
     if cached is not None:
-        return [
-            item.model_copy(deep=True)
-            for item in cached
-            if item.setting_key not in PUBLIC_HIDDEN_SETTING_KEYS
-        ]
+        return [item.model_copy(deep=True) for item in cached]
 
     try:
         if not database_table_exists("settings"):
@@ -71,7 +91,7 @@ def list_settings(session: Session) -> list[SettingItem]:
         stmt = select(Setting).order_by(Setting.setting_key.asc())
         result = session.execute(stmt)
         rows = result.scalars().all()
-        rows = [row for row in rows if row.setting_key not in PUBLIC_HIDDEN_SETTING_KEYS]
+        rows = [row for row in rows if _is_public_setting_key(row.setting_key)]
     except SQLAlchemyError:
         mapped = _with_compatibility_keys([])
         cache.set(SETTINGS_CACHE_KEY, mapped, SETTINGS_CACHE_TTL_SECONDS)

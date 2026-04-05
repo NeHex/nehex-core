@@ -19,15 +19,42 @@ export type AdminCommentItem = {
 
 type AdminCommentListResponse = {
   data: AdminCommentItem[]
+  pagination?: {
+    page?: number
+    size?: number
+    total?: number
+    total_pages?: number
+  }
+}
+
+export type AdminCommentListResult = {
+  items: AdminCommentItem[]
+  pagination: {
+    page: number
+    size: number
+    total: number
+    total_pages: number
+  }
 }
 
 async function parseJson<T>(response: Response): Promise<T> {
   return await response.json() as T
 }
 
-export async function fetchAdminComments(keyword = ''): Promise<AdminCommentItem[]> {
+export async function fetchAdminComments(
+  keyword = '',
+  page = 1,
+  size = 20,
+): Promise<AdminCommentListResult> {
   const normalized = keyword.trim()
-  const query = normalized ? `?keyword=${encodeURIComponent(normalized)}` : ''
+  const params = new URLSearchParams()
+  if (normalized) {
+    params.set('keyword', normalized)
+  }
+  params.set('page', String(Math.max(1, Math.floor(page))))
+  params.set('size', String(Math.max(1, Math.floor(size))))
+  const query = params.toString() ? `?${params.toString()}` : ''
+
   const response = await adminFetch(`/admin-api/comments${query}`, {
     method: 'GET',
   })
@@ -36,7 +63,23 @@ export async function fetchAdminComments(keyword = ''): Promise<AdminCommentItem
   if (!Array.isArray(payload?.data)) {
     throw new Error('Unexpected comment list response format')
   }
-  return payload.data
+
+  const safePage = Number.isFinite(payload.pagination?.page) ? Number(payload.pagination?.page) : Math.max(1, Math.floor(page))
+  const safeSize = Number.isFinite(payload.pagination?.size) ? Number(payload.pagination?.size) : Math.max(1, Math.floor(size))
+  const safeTotal = Number.isFinite(payload.pagination?.total) ? Number(payload.pagination?.total) : payload.data.length
+  const safeTotalPages = Number.isFinite(payload.pagination?.total_pages)
+    ? Number(payload.pagination?.total_pages)
+    : Math.max(0, Math.ceil(safeTotal / safeSize))
+
+  return {
+    items: payload.data,
+    pagination: {
+      page: safePage,
+      size: safeSize,
+      total: Math.max(0, safeTotal),
+      total_pages: Math.max(0, safeTotalPages),
+    },
+  }
 }
 
 export async function deleteAdminComment(commentId: number): Promise<void> {

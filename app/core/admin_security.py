@@ -9,6 +9,7 @@ import secrets
 import time
 from dataclasses import dataclass
 from typing import Optional
+from urllib.parse import urlparse
 
 from cryptography.fernet import Fernet, InvalidToken
 from fastapi import Header, HTTPException, Request, status
@@ -178,6 +179,55 @@ def _extract_bearer_token(authorization: Optional[str]) -> Optional[str]:
     return token.strip()
 
 
+def _extract_forwarded_value(header_value: Optional[str]) -> str:
+    return str(header_value or "").split(",")[0].strip()
+
+
+def _request_origin(request: Request) -> str:
+    forwarded_proto = _extract_forwarded_value(request.headers.get("x-forwarded-proto")).lower()
+    forwarded_host = _extract_forwarded_value(request.headers.get("x-forwarded-host"))
+    host = forwarded_host or request.headers.get("host") or request.url.netloc
+    scheme = forwarded_proto or request.url.scheme
+    return f"{scheme}://{host}".lower()
+
+
+def _origin_from_header(value: str) -> str:
+    parsed = urlparse(value)
+    if not parsed.scheme or not parsed.netloc:
+        return ""
+    return f"{parsed.scheme}://{parsed.netloc}".lower()
+
+
+def _enforce_csrf_same_origin(request: Request) -> None:
+    if request.method.upper() in {"GET", "HEAD", "OPTIONS", "TRACE"}:
+        return
+
+    expected_origin = _request_origin(request)
+    origin_header = (request.headers.get("origin") or "").strip()
+    referer_header = (request.headers.get("referer") or "").strip()
+
+    if origin_header:
+        if _origin_from_header(origin_header) != expected_origin:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="CSRF origin mismatch",
+            )
+        return
+
+    if referer_header:
+        if _origin_from_header(referer_header) != expected_origin:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="CSRF referer mismatch",
+            )
+        return
+
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail="Missing CSRF origin headers",
+    )
+
+
 def require_admin_principal(
     request: Request,
     authorization: Optional[str] = Header(default=None, alias="Authorization"),
@@ -197,5 +247,8 @@ def require_admin_principal(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Missing admin token",
         )
+
+    if bearer_token is None:
+        _enforce_csrf_same_origin(request)
 
     return decode_admin_token(token)

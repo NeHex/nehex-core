@@ -65,15 +65,16 @@ def database_table_exists(table_name: str) -> bool:
 
 def ensure_performance_indexes() -> None:
     index_specs = [
-        ("comment", "idx_comment_target_status_time", "target_type,target_id,status,create_time,id"),
-        ("comment", "idx_comment_ip_time", "ip,create_time"),
-        ("album", "idx_album_update_time", "update_time,id"),
-        ("daily", "idx_daily_create_time", "create_time,id"),
-        ("singlepage", "idx_singlepage_status_sort", "status,sort,id"),
-        ("project", "idx_project_status_sort", "status,sort,id"),
-        ("friends", "idx_friends_status_time", "status,create_time,id"),
-        ("friend_apply", "idx_friend_apply_status_time", "status,create_time,id"),
-        ("friend_apply", "idx_friend_apply_url_time", "site_url,create_time,id"),
+        ("comment", "idx_comment_target_status_time", "target_type,target_id,status,create_time,id", False),
+        ("comment", "idx_comment_ip_time", "ip,create_time", False),
+        ("album", "idx_album_update_time", "update_time,id", False),
+        ("daily", "idx_daily_create_time", "create_time,id", False),
+        ("singlepage", "idx_singlepage_status_sort", "status,sort,id", False),
+        ("project", "idx_project_status_sort", "status,sort,id", False),
+        ("friends", "idx_friends_status_time", "status,create_time,id", False),
+        ("friend_apply", "idx_friend_apply_status_time", "status,create_time,id", False),
+        ("friend_apply", "idx_friend_apply_url_time", "site_url,create_time,id", False),
+        ("friends", "uq_friends_url", "url", True),
     ]
 
     check_table_sql = text(
@@ -96,7 +97,7 @@ def ensure_performance_indexes() -> None:
     )
 
     with engine.begin() as conn:
-        for table_name, index_name, columns_sql in index_specs:
+        for table_name, index_name, columns_sql, is_unique in index_specs:
             table_exists = int(
                 conn.execute(
                     check_table_sql,
@@ -124,9 +125,14 @@ def ensure_performance_indexes() -> None:
             if exists > 0:
                 continue
 
-            conn.execute(
-                text(f"CREATE INDEX {index_name} ON {table_name} ({columns_sql})"),
-            )
+            ddl_prefix = "CREATE UNIQUE INDEX" if is_unique else "CREATE INDEX"
+            try:
+                conn.execute(
+                    text(f"{ddl_prefix} {index_name} ON {table_name} ({columns_sql})"),
+                )
+            except Exception as error:
+                # Continue with remaining indexes to avoid blocking startup due to a single bad index.
+                print(f"[startup] skip index {index_name} on {table_name}: {error}")
 
 
 def close_database() -> None:

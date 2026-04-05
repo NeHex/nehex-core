@@ -17,7 +17,7 @@ class Friend(Base):
     description: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
     category: Mapped[str] = mapped_column(String(100), nullable=False)
     favicon: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
-    url: Mapped[str] = mapped_column(String(500), nullable=False)
+    url: Mapped[str] = mapped_column(String(500), nullable=False, unique=True)
     status: Mapped[str] = mapped_column(String(20), nullable=False, server_default=text("'ok'"), default="ok")
     create_time: Mapped[datetime] = mapped_column(
         DateTime,

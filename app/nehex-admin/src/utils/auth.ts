@@ -1,6 +1,5 @@
 import { getAdminBasePath } from './path'
 
-const AUTH_COOKIE_NAME = 'nehex_admin_auth'
 const ACCOUNT_COOKIE_NAME = 'nehex_admin_account'
 const AUTH_COOKIE_MAX_AGE_SECONDS = 60 * 60 * 24 * 30
 
@@ -53,17 +52,11 @@ function clearCookie(name: string, additionalPaths: string[] = []): void {
 }
 
 export function setAuthSession(account: string): void {
-  setCookie(AUTH_COOKIE_NAME, '1', AUTH_COOKIE_MAX_AGE_SECONDS)
   setCookie(ACCOUNT_COOKIE_NAME, account, AUTH_COOKIE_MAX_AGE_SECONDS)
 }
 
 export function clearAuthSession(): void {
-  clearCookie(AUTH_COOKIE_NAME)
   clearCookie(ACCOUNT_COOKIE_NAME)
-}
-
-export function isAuthenticated(): boolean {
-  return getCookie(AUTH_COOKIE_NAME) === '1'
 }
 
 export function getAuthenticatedAccount(): string {

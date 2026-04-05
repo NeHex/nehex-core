@@ -14,6 +14,12 @@ export type ArticleItem = {
 
 type ArticleListResponse = {
   data: ArticleItem[]
+  pagination?: {
+    page?: number
+    size?: number
+    total?: number
+    total_pages?: number
+  }
 }
 
 type ArticleDetailResponse = {
@@ -30,12 +36,29 @@ export type ArticleUpsertPayload = {
   content?: string | null
 }
 
+export type ArticleListResult = {
+  items: ArticleItem[]
+  pagination: {
+    page: number
+    size: number
+    total: number
+    total_pages: number
+  }
+}
+
 async function parseJson<T>(response: Response): Promise<T> {
   return await response.json() as T
 }
 
-export async function fetchArticles(): Promise<ArticleItem[]> {
-  const response = await fetch('/article', {
+export async function fetchArticles(
+  page = 1,
+  size = 24,
+): Promise<ArticleListResult> {
+  const params = new URLSearchParams()
+  params.set('page', String(Math.max(1, Math.floor(page))))
+  params.set('size', String(Math.max(1, Math.floor(size))))
+
+  const response = await fetch(`/article?${params.toString()}`, {
     method: 'GET',
     credentials: 'same-origin',
   })
@@ -49,7 +72,22 @@ export async function fetchArticles(): Promise<ArticleItem[]> {
     throw new Error('Unexpected article response format')
   }
 
-  return payload.data
+  const safePage = Number.isFinite(payload.pagination?.page) ? Number(payload.pagination?.page) : Math.max(1, Math.floor(page))
+  const safeSize = Number.isFinite(payload.pagination?.size) ? Number(payload.pagination?.size) : Math.max(1, Math.floor(size))
+  const safeTotal = Number.isFinite(payload.pagination?.total) ? Number(payload.pagination?.total) : payload.data.length
+  const safeTotalPages = Number.isFinite(payload.pagination?.total_pages)
+    ? Number(payload.pagination?.total_pages)
+    : Math.max(0, Math.ceil(safeTotal / safeSize))
+
+  return {
+    items: payload.data,
+    pagination: {
+      page: safePage,
+      size: safeSize,
+      total: Math.max(0, safeTotal),
+      total_pages: Math.max(0, safeTotalPages),
+    },
+  }
 }
 
 export async function fetchArticleById(articleId: number): Promise<ArticleItem> {

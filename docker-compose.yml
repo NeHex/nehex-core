@@ -10,6 +10,8 @@ services:
     environment:
       DB_HOST: mysql
       DB_PORT: 3306
+      REDIS_ENABLED: "true"
+      REDIS_URL: redis://redis:6379/0
       ADMIN_MANAGER_BUILD_ON_STARTUP: "false"
     depends_on:
       mysql:

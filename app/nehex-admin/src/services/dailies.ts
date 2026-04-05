@@ -45,12 +45,16 @@ export async function fetchDailies(): Promise<DailyItem[]> {
 }
 
 export async function fetchDailyById(dailyId: number): Promise<DailyItem> {
-  const dailies = await fetchDailies()
-  const matched = dailies.find((item) => item.id === dailyId)
-  if (!matched) {
-    throw new Error('Daily not found')
+  const response = await adminFetch(`/admin-api/dailies/${dailyId}`, {
+    method: 'GET',
+  })
+
+  const payload = await parseJson<DailyDetailResponse>(response)
+  if (!payload?.data) {
+    throw new Error('Unexpected daily detail response format')
   }
-  return matched
+
+  return payload.data
 }
 
 export async function createDaily(payload: DailyUpsertPayload): Promise<DailyItem> {

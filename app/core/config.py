@@ -28,11 +28,20 @@ class Settings(BaseSettings):
     app_name: str = "NeHex Core API"
     app_env: str = "dev"
     app_port: int = 7878
+    cors_allow_origins: str = "http://127.0.0.1:3000,http://localhost:3000"
+    cors_allow_credentials: bool = True
     admin_manager_web: str = "/nehex-admin"
     admin_api_secret: str = "please-change-me"
     admin_api_client_id: str = "nehex-vuetify-admin"
     admin_api_token_ttl_seconds: int = 43200
     admin_manager_build_on_startup: bool = True
+    simple_cache_max_entries: int = 1024
+    redis_enabled: bool = True
+    redis_url: str = "redis://127.0.0.1:6379/0"
+    redis_cache_prefix: str = "nehex:cache:"
+    redis_connect_retry_seconds: int = 30
+    redis_socket_connect_timeout: float = 1.0
+    redis_socket_timeout: float = 1.5
 
     db_host: str = "127.0.0.1"
     db_port: int = 3306
@@ -48,6 +57,7 @@ class Settings(BaseSettings):
     db_connect_timeout: int = 5
     db_read_timeout: int = 15
     db_write_timeout: int = 15
+    db_auto_create_tables: bool = False
     db_startup_max_retries: int = 30
     db_startup_retry_interval_seconds: int = 2
 
@@ -68,6 +78,11 @@ class Settings(BaseSettings):
     @property
     def admin_manager_web_path(self) -> str:
         return normalize_admin_manager_web_path(self.admin_manager_web)
+
+    @property
+    def cors_allow_origins_list(self) -> list[str]:
+        raw_items = [item.strip() for item in self.cors_allow_origins.split(",")]
+        return [item for item in raw_items if item]
 
 
 settings = Settings()

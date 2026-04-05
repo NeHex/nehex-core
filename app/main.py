@@ -2,6 +2,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 import shutil
 import subprocess
+import threading
 import time
 from typing import Optional
 
@@ -17,6 +18,7 @@ from app.core.database import (
     ensure_system_tables,
     ensure_performance_indexes,
 )
+from app.core.simple_cache import close_cache
 from app.services.install_service import get_admin_manager_web_path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -25,6 +27,8 @@ ADMIN_DIST_DIR = ADMIN_PROJECT_DIR / "dist"
 ADMIN_DIST_DIR_RESOLVED = ADMIN_DIST_DIR.resolve()
 ADMIN_INDEX_FILE = ADMIN_DIST_DIR / "index.html"
 ADMIN_BASE_PLACEHOLDER = "__ADMIN_MANAGER_WEB__"
+_ADMIN_INDEX_CACHE_LOCK = threading.Lock()
+_ADMIN_INDEX_TEMPLATE_CACHE: tuple[float, str] | None = None
 
 
 def _run_startup_command(command: list[str], cwd: Path) -> None:
@@ -93,17 +97,21 @@ async def lifespan(_: FastAPI):
         )
 
     _wait_for_database_ready()
-    try:
-        ensure_system_tables()
-    except Exception as error:
-        # Do not block API startup when DB account lacks DDL privileges.
-        print(f"[startup] skip ensure_system_tables: {error}")
-    try:
-        ensure_performance_indexes()
-    except Exception as error:
-        # Do not block API startup when DB account lacks index privileges.
-        print(f"[startup] skip ensure_performance_indexes: {error}")
+    if settings.db_auto_create_tables:
+        try:
+            ensure_system_tables()
+        except Exception as error:
+            # Do not block API startup when DB account lacks DDL privileges.
+            print(f"[startup] skip ensure_system_tables: {error}")
+        try:
+            ensure_performance_indexes()
+        except Exception as error:
+            # Do not block API startup when DB account lacks index privileges.
+            print(f"[startup] skip ensure_performance_indexes: {error}")
+    else:
+        print("[startup] skip schema DDL/index auto-create (DB_AUTO_CREATE_TABLES=false)")
     yield
+    close_cache()
     close_database()
 
 
@@ -112,10 +120,13 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+cors_origins = settings.cors_allow_origins_list
+allow_credentials = settings.cors_allow_credentials and "*" not in cors_origins
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
+    allow_origins=cors_origins,
+    allow_credentials=allow_credentials,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -128,7 +139,7 @@ def _admin_base_with_slash(admin_base_path: str) -> str:
 
 
 def _render_admin_index(admin_base_path: str) -> str:
-    index_html = ADMIN_INDEX_FILE.read_text(encoding="utf-8")
+    index_html = _read_admin_index_template()
     admin_base = _admin_base_with_slash(admin_base_path)
     rendered = index_html.replace(ADMIN_BASE_PLACEHOLDER, admin_base)
 
@@ -137,6 +148,20 @@ def _render_admin_index(admin_base_path: str) -> str:
         rendered = rendered.replace("<head>", f"<head>\n    {base_tag}", 1)
 
     return rendered
+
+
+def _read_admin_index_template() -> str:
+    global _ADMIN_INDEX_TEMPLATE_CACHE
+
+    mtime = ADMIN_INDEX_FILE.stat().st_mtime
+    with _ADMIN_INDEX_CACHE_LOCK:
+        cached = _ADMIN_INDEX_TEMPLATE_CACHE
+        if cached is not None and cached[0] == mtime:
+            return cached[1]
+
+        content = ADMIN_INDEX_FILE.read_text(encoding="utf-8")
+        _ADMIN_INDEX_TEMPLATE_CACHE = (mtime, content)
+        return content
 
 
 def _resolve_admin_file(full_path: str) -> Optional[Path]:

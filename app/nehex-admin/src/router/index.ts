@@ -7,9 +7,10 @@
 // Composables
 import { createRouter, createWebHistory } from 'vue-router'
 import { routes } from 'vue-router/auto-routes'
-import { isAuthenticated } from '@/utils/auth'
+import { clearAuthSession, setAuthSession } from '@/utils/auth'
 import { getAdminBasePath, toRouterBase } from '@/utils/path'
 import { fetchInstallStatus } from '@/services/install'
+import { fetchAdminSession } from '@/services/admin-api'
 
 const LOGIN_PATH = '/login'
 const INSTALL_PATH = '/install'
@@ -37,11 +38,17 @@ router.beforeEach(async (to) => {
     return true
   }
 
-  if (to.path === INSTALL_PATH) {
-    return isAuthenticated() ? HOME_PATH : LOGIN_PATH
+  const session = await fetchAdminSession().catch(() => null)
+  const authed = Boolean(session?.account)
+  if (authed && session?.account) {
+    setAuthSession(session.account)
+  } else {
+    clearAuthSession()
   }
 
-  const authed = isAuthenticated()
+  if (to.path === INSTALL_PATH) {
+    return authed ? HOME_PATH : LOGIN_PATH
+  }
 
   if (to.path === LOGIN_PATH) {
     if (authed) {
