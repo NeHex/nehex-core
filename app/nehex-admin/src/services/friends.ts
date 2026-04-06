@@ -63,18 +63,76 @@ async function parseJson<T>(response: Response): Promise<T> {
   return await response.json() as T
 }
 
+function normalizeAdminFriendItem(raw: Partial<AdminFriendItem>): AdminFriendItem | null {
+  const id = Number(raw.id)
+  const title = String(raw.title || '').trim()
+  const category = String(raw.category || 'default').trim() || 'default'
+  const url = String(raw.url || '').trim()
+  const statusRaw = String(raw.status || '').trim().toLowerCase()
+  const status: FriendStatus = statusRaw === 'missing' || statusRaw === 'blocked' ? statusRaw : 'ok'
+  const createTime = String(raw.create_time || '').trim()
+
+  if (!Number.isFinite(id) || id <= 0 || !title || !url) {
+    return null
+  }
+
+  return {
+    id,
+    title,
+    description: raw.description || null,
+    category,
+    favicon: raw.favicon || null,
+    url,
+    status,
+    create_time: createTime || new Date().toISOString(),
+  }
+}
+
+async function fetchPublicFriendsFallback(): Promise<AdminFriendItem[] | null> {
+  try {
+    const response = await fetch('/friend', {
+      method: 'GET',
+      credentials: 'same-origin',
+    })
+    if (!response.ok) {
+      return null
+    }
+
+    const payload = await parseJson<AdminFriendListResponse>(response)
+    if (!Array.isArray(payload?.data)) {
+      return null
+    }
+
+    const mapped = payload.data
+      .map((item) => normalizeAdminFriendItem(item))
+      .filter((item): item is AdminFriendItem => item !== null)
+    return mapped
+  } catch {
+    return null
+  }
+}
+
 export async function fetchAdminFriends(keyword = ''): Promise<AdminFriendItem[]> {
   const normalized = keyword.trim()
   const query = normalized ? `?keyword=${encodeURIComponent(normalized)}` : ''
-  const response = await adminFetch(`/admin-api/friends${query}`, {
-    method: 'GET',
-  })
+  try {
+    const response = await adminFetch(`/admin-api/friends${query}`, {
+      method: 'GET',
+    })
 
-  const payload = await parseJson<AdminFriendListResponse>(response)
-  if (!Array.isArray(payload?.data)) {
-    throw new Error('Unexpected friend list response format')
+    const payload = await parseJson<AdminFriendListResponse>(response)
+    if (!Array.isArray(payload?.data)) {
+      throw new Error('Unexpected friend list response format')
+    }
+    return payload.data
+  } catch (error) {
+    // Compatibility fallback for deployments where /admin-api/friends route is blocked/misrouted.
+    const fallback = await fetchPublicFriendsFallback()
+    if (fallback !== null) {
+      return fallback
+    }
+    throw error
   }
-  return payload.data
 }
 
 export async function createAdminFriend(
