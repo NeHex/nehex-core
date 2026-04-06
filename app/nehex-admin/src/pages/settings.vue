@@ -264,7 +264,7 @@
 
         <v-window-item value="storage">
           <v-card class="section-card" rounded="xl">
-            <v-card-title>对象存储</v-card-title>
+            <v-card-title>存储设置</v-card-title>
             <v-card-text>
               <div class="stack-block">
                 <div class="block-title">存储平台</div>
@@ -273,10 +273,10 @@
                   :items="storageProviderOptions"
                   item-title="label"
                   item-value="value"
-                  label="对象存储平台"
+                  label="存储平台"
                   variant="outlined"
                 />
-                <div class="block-subtitle">保存后默认启用对象存储。</div>
+                <div class="block-subtitle">保存后默认启用存储设置。</div>
               </div>
 
               <v-divider class="my-4" />
@@ -314,7 +314,7 @@
               </div>
 
               <div v-if="showR2StorageFields" class="stack-block">
-                <div class="block-title">CloudFlare R2 配置</div>
+                <div class="block-title">Cloudflare R2 配置</div>
                 <div class="form-grid">
                   <v-text-field
                     v-model="storageForm.r2Endpoint"
@@ -346,29 +346,103 @@
                 </div>
               </div>
 
-              <div v-if="showOssStorageFields" class="stack-block">
+              <div v-if="showS3StorageFields" class="stack-block">
+                <div class="block-title">S3 对象存储配置（COS/OSS/B2）</div>
+                <div class="form-grid">
+                  <v-text-field
+                    v-model="storageForm.s3Endpoint"
+                    label="Endpoint"
+                    placeholder="https://s3.ap-guangzhou.myqcloud.com"
+                    variant="outlined"
+                  />
+                  <v-text-field
+                    v-model="storageForm.s3Bucket"
+                    label="Bucket"
+                    variant="outlined"
+                  />
+                  <v-text-field
+                    v-model="storageForm.s3AccessKeyId"
+                    label="Access Key ID"
+                    variant="outlined"
+                  />
+                  <v-text-field
+                    v-model="storageForm.s3SecretAccessKey"
+                    label="Access Key Secret"
+                    type="password"
+                    variant="outlined"
+                  />
+                  <v-text-field
+                    v-model="storageForm.s3Region"
+                    label="Region（可选）"
+                    placeholder="ap-guangzhou"
+                    variant="outlined"
+                  />
+                </div>
+              </div>
+
+              <div v-if="showHi168S3StorageFields" class="stack-block">
+                <div class="block-title">HI168 S3 配置（强制路径样式）</div>
+                <div class="form-grid">
+                  <v-text-field
+                    v-model="storageForm.hi168S3Endpoint"
+                    label="Endpoint"
+                    placeholder="https://s3.hi168.com"
+                    variant="outlined"
+                  />
+                  <v-text-field
+                    v-model="storageForm.hi168S3Bucket"
+                    label="Bucket"
+                    variant="outlined"
+                  />
+                  <v-text-field
+                    v-model="storageForm.hi168S3AccessKeyId"
+                    label="Access Key ID"
+                    variant="outlined"
+                  />
+                  <v-text-field
+                    v-model="storageForm.hi168S3SecretAccessKey"
+                    label="Access Key Secret"
+                    type="password"
+                    variant="outlined"
+                  />
+                  <v-text-field
+                    v-model="storageForm.hi168S3Region"
+                    label="Region（建议填写）"
+                    placeholder="us-east-1"
+                    variant="outlined"
+                  />
+                </div>
+              </div>
+
+              <div v-if="showAliyunOssStorageFields" class="stack-block">
                 <div class="block-title">阿里云 OSS 配置</div>
                 <div class="form-grid">
                   <v-text-field
-                    v-model="storageForm.ossEndpoint"
+                    v-model="storageForm.aliyunOssEndpoint"
                     label="Endpoint"
                     placeholder="https://oss-cn-hangzhou.aliyuncs.com"
                     variant="outlined"
                   />
                   <v-text-field
-                    v-model="storageForm.ossBucket"
+                    v-model="storageForm.aliyunOssBucket"
                     label="Bucket"
                     variant="outlined"
                   />
                   <v-text-field
-                    v-model="storageForm.ossAccessKeyId"
+                    v-model="storageForm.aliyunOssAccessKeyId"
                     label="Access Key ID"
                     variant="outlined"
                   />
                   <v-text-field
-                    v-model="storageForm.ossSecretAccessKey"
+                    v-model="storageForm.aliyunOssSecretAccessKey"
                     label="Access Key Secret"
                     type="password"
+                    variant="outlined"
+                  />
+                  <v-text-field
+                    v-model="storageForm.aliyunOssRegion"
+                    label="Region（可选）"
+                    placeholder="cn-hangzhou"
                     variant="outlined"
                   />
                 </div>
@@ -497,7 +571,9 @@ const {
   storageProviderOptions,
   showLocalStorageFields,
   showR2StorageFields,
-  showOssStorageFields,
+  showS3StorageFields,
+  showHi168S3StorageFields,
+  showAliyunOssStorageFields,
 
   themeProfiles,
   selectedThemeFile,

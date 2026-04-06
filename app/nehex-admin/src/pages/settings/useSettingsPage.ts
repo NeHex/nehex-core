@@ -36,7 +36,7 @@ type SiteForm = {
   siteFavicon: string
 }
 
-type StorageProvider = 'local' | 'r2' | 'oss'
+type StorageProvider = 'local' | 'r2' | 's3' | 'aliyun_oss' | 'hi168_s3'
 
 type StorageForm = {
   provider: StorageProvider
@@ -49,10 +49,21 @@ type StorageForm = {
   r2AccessKeyId: string
   r2SecretAccessKey: string
   r2Region: string
-  ossEndpoint: string
-  ossBucket: string
-  ossAccessKeyId: string
-  ossSecretAccessKey: string
+  s3Endpoint: string
+  s3Bucket: string
+  s3AccessKeyId: string
+  s3SecretAccessKey: string
+  s3Region: string
+  hi168S3Endpoint: string
+  hi168S3Bucket: string
+  hi168S3AccessKeyId: string
+  hi168S3SecretAccessKey: string
+  hi168S3Region: string
+  aliyunOssEndpoint: string
+  aliyunOssBucket: string
+  aliyunOssAccessKeyId: string
+  aliyunOssSecretAccessKey: string
+  aliyunOssRegion: string
 }
 
 type AccountForm = {
@@ -104,9 +115,9 @@ const sections: SectionMeta[] = [
   },
   {
     key: 'storage',
-    label: '对象存储',
+    label: '存储设置',
     icon: 'mdi-cloud-upload-outline',
-    description: '配置图片上传存储平台（CloudFlare R2、阿里云 OSS、本机存储）。',
+    description: '配置图片上传存储平台（S3对象存储、HI168 S3、阿里云OSS、Cloudflare R2、本机存储）。',
   },
   {
     key: 'theme',
@@ -124,8 +135,10 @@ const CREATE_THEME_OPTION_VALUE = '__create_theme_template__'
 const DEFAULT_STORAGE_LOCAL_ROOT = 'storage'
 const DEFAULT_STORAGE_LOCAL_PATH_RULE = '/{year}-{month}/{day}/{random_name}.{file_type}'
 const storageProviderOptions: Array<{ label: string, value: StorageProvider }> = [
-  { label: 'CloudFlare R2', value: 'r2' },
-  { label: '阿里云 OSS', value: 'oss' },
+  { label: 'S3 对象存储（COS/OSS/B2）', value: 's3' },
+  { label: 'HI168 S3（强制路径样式）', value: 'hi168_s3' },
+  { label: '阿里云 OSS', value: 'aliyun_oss' },
+  { label: 'Cloudflare R2', value: 'r2' },
   { label: '本机存储', value: 'local' },
 ]
 
@@ -140,6 +153,24 @@ const STORAGE_SETTING_KEYS = {
   r2AccessKeyId: 'object_storage_r2_access_key_id',
   r2SecretAccessKey: 'object_storage_r2_secret_access_key',
   r2Region: 'object_storage_r2_region',
+  s3Endpoint: 'object_storage_s3_endpoint',
+  s3Bucket: 'object_storage_s3_bucket',
+  s3AccessKeyId: 'object_storage_s3_access_key_id',
+  s3SecretAccessKey: 'object_storage_s3_secret_access_key',
+  s3Region: 'object_storage_s3_region',
+  hi168S3Endpoint: 'object_storage_hi168_s3_endpoint',
+  hi168S3Bucket: 'object_storage_hi168_s3_bucket',
+  hi168S3AccessKeyId: 'object_storage_hi168_s3_access_key_id',
+  hi168S3SecretAccessKey: 'object_storage_hi168_s3_secret_access_key',
+  hi168S3Region: 'object_storage_hi168_s3_region',
+  aliyunOssEndpoint: 'object_storage_aliyun_oss_endpoint',
+  aliyunOssBucket: 'object_storage_aliyun_oss_bucket',
+  aliyunOssAccessKeyId: 'object_storage_aliyun_oss_access_key_id',
+  aliyunOssSecretAccessKey: 'object_storage_aliyun_oss_secret_access_key',
+  aliyunOssRegion: 'object_storage_aliyun_oss_region',
+} as const
+
+const LEGACY_STORAGE_SETTING_KEYS = {
   ossEndpoint: 'object_storage_oss_endpoint',
   ossBucket: 'object_storage_oss_bucket',
   ossAccessKeyId: 'object_storage_oss_access_key_id',
@@ -424,10 +455,27 @@ function validateAdminManagerWebPath(raw: string): string {
 
 function normalizeStorageProvider(raw: string): StorageProvider {
   const normalized = raw.trim().toLowerCase()
-  if (normalized === 'r2' || normalized === 'oss' || normalized === 'local') {
+  if (normalized === 'r2' || normalized === 's3' || normalized === 'aliyun_oss' || normalized === 'hi168_s3' || normalized === 'local') {
     return normalized
   }
+  if (normalized === 'oss') {
+    return 's3'
+  }
   return 'local'
+}
+
+function readSettingWithFallback(settingsMap: Map<string, unknown>, primary: string, ...fallbackKeys: string[]): string {
+  const value = readSetting(settingsMap, primary)
+  if (value) {
+    return value
+  }
+  for (const key of fallbackKeys) {
+    const fallback = readSetting(settingsMap, key)
+    if (fallback) {
+      return fallback
+    }
+  }
+  return ''
 }
 
 function parseBooleanSetting(raw: string, fallback = true): boolean {
@@ -474,10 +522,21 @@ export function useSettingsPage() {
     r2AccessKeyId: '',
     r2SecretAccessKey: '',
     r2Region: 'auto',
-    ossEndpoint: '',
-    ossBucket: '',
-    ossAccessKeyId: '',
-    ossSecretAccessKey: '',
+    s3Endpoint: '',
+    s3Bucket: '',
+    s3AccessKeyId: '',
+    s3SecretAccessKey: '',
+    s3Region: '',
+    hi168S3Endpoint: '',
+    hi168S3Bucket: '',
+    hi168S3AccessKeyId: '',
+    hi168S3SecretAccessKey: '',
+    hi168S3Region: '',
+    aliyunOssEndpoint: '',
+    aliyunOssBucket: '',
+    aliyunOssAccessKeyId: '',
+    aliyunOssSecretAccessKey: '',
+    aliyunOssRegion: '',
   })
 
   const accountForm = reactive<AccountForm>({
@@ -584,7 +643,9 @@ export function useSettingsPage() {
 
   const showLocalStorageFields = computed(() => storageForm.provider === 'local')
   const showR2StorageFields = computed(() => storageForm.provider === 'r2')
-  const showOssStorageFields = computed(() => storageForm.provider === 'oss')
+  const showS3StorageFields = computed(() => storageForm.provider === 's3')
+  const showHi168S3StorageFields = computed(() => storageForm.provider === 'hi168_s3')
+  const showAliyunOssStorageFields = computed(() => storageForm.provider === 'aliyun_oss')
 
   watch(selectedThemeFile, (next, previous) => {
     if (previous) {
@@ -834,10 +895,21 @@ export function useSettingsPage() {
       r2AccessKeyId: storageForm.r2AccessKeyId,
       r2SecretAccessKey: storageForm.r2SecretAccessKey,
       r2Region: storageForm.r2Region,
-      ossEndpoint: storageForm.ossEndpoint,
-      ossBucket: storageForm.ossBucket,
-      ossAccessKeyId: storageForm.ossAccessKeyId,
-      ossSecretAccessKey: storageForm.ossSecretAccessKey,
+      s3Endpoint: storageForm.s3Endpoint,
+      s3Bucket: storageForm.s3Bucket,
+      s3AccessKeyId: storageForm.s3AccessKeyId,
+      s3SecretAccessKey: storageForm.s3SecretAccessKey,
+      s3Region: storageForm.s3Region,
+      hi168S3Endpoint: storageForm.hi168S3Endpoint,
+      hi168S3Bucket: storageForm.hi168S3Bucket,
+      hi168S3AccessKeyId: storageForm.hi168S3AccessKeyId,
+      hi168S3SecretAccessKey: storageForm.hi168S3SecretAccessKey,
+      hi168S3Region: storageForm.hi168S3Region,
+      aliyunOssEndpoint: storageForm.aliyunOssEndpoint,
+      aliyunOssBucket: storageForm.aliyunOssBucket,
+      aliyunOssAccessKeyId: storageForm.aliyunOssAccessKeyId,
+      aliyunOssSecretAccessKey: storageForm.aliyunOssSecretAccessKey,
+      aliyunOssRegion: storageForm.aliyunOssRegion,
     }
   }
 
@@ -874,10 +946,21 @@ export function useSettingsPage() {
       r2AccessKeyId: data.r2AccessKeyId || '',
       r2SecretAccessKey: data.r2SecretAccessKey || '',
       r2Region: data.r2Region || 'auto',
-      ossEndpoint: data.ossEndpoint || '',
-      ossBucket: data.ossBucket || '',
-      ossAccessKeyId: data.ossAccessKeyId || '',
-      ossSecretAccessKey: data.ossSecretAccessKey || '',
+      s3Endpoint: data.s3Endpoint || '',
+      s3Bucket: data.s3Bucket || '',
+      s3AccessKeyId: data.s3AccessKeyId || '',
+      s3SecretAccessKey: data.s3SecretAccessKey || '',
+      s3Region: data.s3Region || '',
+      hi168S3Endpoint: data.hi168S3Endpoint || '',
+      hi168S3Bucket: data.hi168S3Bucket || '',
+      hi168S3AccessKeyId: data.hi168S3AccessKeyId || '',
+      hi168S3SecretAccessKey: data.hi168S3SecretAccessKey || '',
+      hi168S3Region: data.hi168S3Region || '',
+      aliyunOssEndpoint: data.aliyunOssEndpoint || '',
+      aliyunOssBucket: data.aliyunOssBucket || '',
+      aliyunOssAccessKeyId: data.aliyunOssAccessKeyId || '',
+      aliyunOssSecretAccessKey: data.aliyunOssSecretAccessKey || '',
+      aliyunOssRegion: data.aliyunOssRegion || '',
     })
   }
 
@@ -923,10 +1006,37 @@ export function useSettingsPage() {
     storageForm.r2AccessKeyId = readSetting(settingsMap, STORAGE_SETTING_KEYS.r2AccessKeyId)
     storageForm.r2SecretAccessKey = readSetting(settingsMap, STORAGE_SETTING_KEYS.r2SecretAccessKey)
     storageForm.r2Region = readSetting(settingsMap, STORAGE_SETTING_KEYS.r2Region) || 'auto'
-    storageForm.ossEndpoint = readSetting(settingsMap, STORAGE_SETTING_KEYS.ossEndpoint)
-    storageForm.ossBucket = readSetting(settingsMap, STORAGE_SETTING_KEYS.ossBucket)
-    storageForm.ossAccessKeyId = readSetting(settingsMap, STORAGE_SETTING_KEYS.ossAccessKeyId)
-    storageForm.ossSecretAccessKey = readSetting(settingsMap, STORAGE_SETTING_KEYS.ossSecretAccessKey)
+    storageForm.s3Endpoint = readSettingWithFallback(
+      settingsMap,
+      STORAGE_SETTING_KEYS.s3Endpoint,
+      LEGACY_STORAGE_SETTING_KEYS.ossEndpoint,
+    )
+    storageForm.s3Bucket = readSettingWithFallback(
+      settingsMap,
+      STORAGE_SETTING_KEYS.s3Bucket,
+      LEGACY_STORAGE_SETTING_KEYS.ossBucket,
+    )
+    storageForm.s3AccessKeyId = readSettingWithFallback(
+      settingsMap,
+      STORAGE_SETTING_KEYS.s3AccessKeyId,
+      LEGACY_STORAGE_SETTING_KEYS.ossAccessKeyId,
+    )
+    storageForm.s3SecretAccessKey = readSettingWithFallback(
+      settingsMap,
+      STORAGE_SETTING_KEYS.s3SecretAccessKey,
+      LEGACY_STORAGE_SETTING_KEYS.ossSecretAccessKey,
+    )
+    storageForm.s3Region = readSetting(settingsMap, STORAGE_SETTING_KEYS.s3Region)
+    storageForm.hi168S3Endpoint = readSetting(settingsMap, STORAGE_SETTING_KEYS.hi168S3Endpoint)
+    storageForm.hi168S3Bucket = readSetting(settingsMap, STORAGE_SETTING_KEYS.hi168S3Bucket)
+    storageForm.hi168S3AccessKeyId = readSetting(settingsMap, STORAGE_SETTING_KEYS.hi168S3AccessKeyId)
+    storageForm.hi168S3SecretAccessKey = readSetting(settingsMap, STORAGE_SETTING_KEYS.hi168S3SecretAccessKey)
+    storageForm.hi168S3Region = readSetting(settingsMap, STORAGE_SETTING_KEYS.hi168S3Region)
+    storageForm.aliyunOssEndpoint = readSetting(settingsMap, STORAGE_SETTING_KEYS.aliyunOssEndpoint)
+    storageForm.aliyunOssBucket = readSetting(settingsMap, STORAGE_SETTING_KEYS.aliyunOssBucket)
+    storageForm.aliyunOssAccessKeyId = readSetting(settingsMap, STORAGE_SETTING_KEYS.aliyunOssAccessKeyId)
+    storageForm.aliyunOssSecretAccessKey = readSetting(settingsMap, STORAGE_SETTING_KEYS.aliyunOssSecretAccessKey)
+    storageForm.aliyunOssRegion = readSetting(settingsMap, STORAGE_SETTING_KEYS.aliyunOssRegion)
 
     const legacyTheme: ThemeLegacyDefaults = {
       background: readSetting(settingsMap, 'theme_background'),
@@ -1010,19 +1120,42 @@ export function useSettingsPage() {
     const r2AccessKeyId = storageForm.r2AccessKeyId.trim()
     const r2SecretAccessKey = storageForm.r2SecretAccessKey.trim()
     const r2Region = storageForm.r2Region.trim() || 'auto'
-    const ossEndpoint = storageForm.ossEndpoint.trim()
-    const ossBucket = storageForm.ossBucket.trim()
-    const ossAccessKeyId = storageForm.ossAccessKeyId.trim()
-    const ossSecretAccessKey = storageForm.ossSecretAccessKey.trim()
+    const s3Endpoint = storageForm.s3Endpoint.trim()
+    const s3Bucket = storageForm.s3Bucket.trim()
+    const s3AccessKeyId = storageForm.s3AccessKeyId.trim()
+    const s3SecretAccessKey = storageForm.s3SecretAccessKey.trim()
+    const s3Region = storageForm.s3Region.trim()
+    const hi168S3Endpoint = storageForm.hi168S3Endpoint.trim()
+    const hi168S3Bucket = storageForm.hi168S3Bucket.trim()
+    const hi168S3AccessKeyId = storageForm.hi168S3AccessKeyId.trim()
+    const hi168S3SecretAccessKey = storageForm.hi168S3SecretAccessKey.trim()
+    const hi168S3Region = storageForm.hi168S3Region.trim()
+    const aliyunOssEndpoint = storageForm.aliyunOssEndpoint.trim()
+    const aliyunOssBucket = storageForm.aliyunOssBucket.trim()
+    const aliyunOssAccessKeyId = storageForm.aliyunOssAccessKeyId.trim()
+    const aliyunOssSecretAccessKey = storageForm.aliyunOssSecretAccessKey.trim()
+    const aliyunOssRegion = storageForm.aliyunOssRegion.trim()
 
     if (provider === 'r2') {
       if (!r2Endpoint || !r2Bucket || !r2AccessKeyId || !r2SecretAccessKey) {
-        throw new Error('CloudFlare R2 配置不完整，请填写 Endpoint、Bucket、AccessKey 和 Secret')
+        throw new Error('Cloudflare R2 配置不完整，请填写 Endpoint、Bucket、AccessKey 和 Secret')
       }
     }
 
-    if (provider === 'oss') {
-      if (!ossEndpoint || !ossBucket || !ossAccessKeyId || !ossSecretAccessKey) {
+    if (provider === 's3') {
+      if (!s3Endpoint || !s3Bucket || !s3AccessKeyId || !s3SecretAccessKey) {
+        throw new Error('S3对象存储配置不完整，请填写 Endpoint、Bucket、AccessKey 和 Secret')
+      }
+    }
+
+    if (provider === 'hi168_s3') {
+      if (!hi168S3Endpoint || !hi168S3Bucket || !hi168S3AccessKeyId || !hi168S3SecretAccessKey) {
+        throw new Error('HI168 S3 配置不完整，请填写 Endpoint、Bucket、AccessKey 和 Secret')
+      }
+    }
+
+    if (provider === 'aliyun_oss') {
+      if (!aliyunOssEndpoint || !aliyunOssBucket || !aliyunOssAccessKeyId || !aliyunOssSecretAccessKey) {
         throw new Error('阿里云 OSS 配置不完整，请填写 Endpoint、Bucket、AccessKey 和 Secret')
       }
     }
@@ -1038,10 +1171,21 @@ export function useSettingsPage() {
       { setting_key: STORAGE_SETTING_KEYS.r2AccessKeyId, setting_content: r2AccessKeyId, setting_type: 'string' },
       { setting_key: STORAGE_SETTING_KEYS.r2SecretAccessKey, setting_content: r2SecretAccessKey, setting_type: 'string' },
       { setting_key: STORAGE_SETTING_KEYS.r2Region, setting_content: r2Region, setting_type: 'string' },
-      { setting_key: STORAGE_SETTING_KEYS.ossEndpoint, setting_content: ossEndpoint, setting_type: 'string' },
-      { setting_key: STORAGE_SETTING_KEYS.ossBucket, setting_content: ossBucket, setting_type: 'string' },
-      { setting_key: STORAGE_SETTING_KEYS.ossAccessKeyId, setting_content: ossAccessKeyId, setting_type: 'string' },
-      { setting_key: STORAGE_SETTING_KEYS.ossSecretAccessKey, setting_content: ossSecretAccessKey, setting_type: 'string' },
+      { setting_key: STORAGE_SETTING_KEYS.s3Endpoint, setting_content: s3Endpoint, setting_type: 'string' },
+      { setting_key: STORAGE_SETTING_KEYS.s3Bucket, setting_content: s3Bucket, setting_type: 'string' },
+      { setting_key: STORAGE_SETTING_KEYS.s3AccessKeyId, setting_content: s3AccessKeyId, setting_type: 'string' },
+      { setting_key: STORAGE_SETTING_KEYS.s3SecretAccessKey, setting_content: s3SecretAccessKey, setting_type: 'string' },
+      { setting_key: STORAGE_SETTING_KEYS.s3Region, setting_content: s3Region, setting_type: 'string' },
+      { setting_key: STORAGE_SETTING_KEYS.hi168S3Endpoint, setting_content: hi168S3Endpoint, setting_type: 'string' },
+      { setting_key: STORAGE_SETTING_KEYS.hi168S3Bucket, setting_content: hi168S3Bucket, setting_type: 'string' },
+      { setting_key: STORAGE_SETTING_KEYS.hi168S3AccessKeyId, setting_content: hi168S3AccessKeyId, setting_type: 'string' },
+      { setting_key: STORAGE_SETTING_KEYS.hi168S3SecretAccessKey, setting_content: hi168S3SecretAccessKey, setting_type: 'string' },
+      { setting_key: STORAGE_SETTING_KEYS.hi168S3Region, setting_content: hi168S3Region, setting_type: 'string' },
+      { setting_key: STORAGE_SETTING_KEYS.aliyunOssEndpoint, setting_content: aliyunOssEndpoint, setting_type: 'string' },
+      { setting_key: STORAGE_SETTING_KEYS.aliyunOssBucket, setting_content: aliyunOssBucket, setting_type: 'string' },
+      { setting_key: STORAGE_SETTING_KEYS.aliyunOssAccessKeyId, setting_content: aliyunOssAccessKeyId, setting_type: 'string' },
+      { setting_key: STORAGE_SETTING_KEYS.aliyunOssSecretAccessKey, setting_content: aliyunOssSecretAccessKey, setting_type: 'string' },
+      { setting_key: STORAGE_SETTING_KEYS.aliyunOssRegion, setting_content: aliyunOssRegion, setting_type: 'string' },
     ]
   }
 
@@ -1183,7 +1327,9 @@ export function useSettingsPage() {
     storageProviderOptions,
     showLocalStorageFields,
     showR2StorageFields,
-    showOssStorageFields,
+    showS3StorageFields,
+    showHi168S3StorageFields,
+    showAliyunOssStorageFields,
 
     themeProfiles,
     selectedThemeFile,

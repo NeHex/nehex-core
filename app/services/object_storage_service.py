@@ -15,7 +15,7 @@ from sqlalchemy.orm import Session
 
 from app.models.setting import Setting
 
-StorageProvider = Literal["local", "r2", "oss"]
+StorageProvider = Literal["local", "r2", "s3", "aliyun_oss", "hi168_s3"]
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_LOCAL_ROOT = "storage"
@@ -33,10 +33,27 @@ STORAGE_R2_BUCKET_KEY = "object_storage_r2_bucket"
 STORAGE_R2_ACCESS_KEY_ID_KEY = "object_storage_r2_access_key_id"
 STORAGE_R2_SECRET_ACCESS_KEY_KEY = "object_storage_r2_secret_access_key"
 STORAGE_R2_REGION_KEY = "object_storage_r2_region"
-STORAGE_OSS_ENDPOINT_KEY = "object_storage_oss_endpoint"
-STORAGE_OSS_BUCKET_KEY = "object_storage_oss_bucket"
-STORAGE_OSS_ACCESS_KEY_ID_KEY = "object_storage_oss_access_key_id"
-STORAGE_OSS_SECRET_ACCESS_KEY_KEY = "object_storage_oss_secret_access_key"
+STORAGE_S3_ENDPOINT_KEY = "object_storage_s3_endpoint"
+STORAGE_S3_BUCKET_KEY = "object_storage_s3_bucket"
+STORAGE_S3_ACCESS_KEY_ID_KEY = "object_storage_s3_access_key_id"
+STORAGE_S3_SECRET_ACCESS_KEY_KEY = "object_storage_s3_secret_access_key"
+STORAGE_S3_REGION_KEY = "object_storage_s3_region"
+STORAGE_HI168_S3_ENDPOINT_KEY = "object_storage_hi168_s3_endpoint"
+STORAGE_HI168_S3_BUCKET_KEY = "object_storage_hi168_s3_bucket"
+STORAGE_HI168_S3_ACCESS_KEY_ID_KEY = "object_storage_hi168_s3_access_key_id"
+STORAGE_HI168_S3_SECRET_ACCESS_KEY_KEY = "object_storage_hi168_s3_secret_access_key"
+STORAGE_HI168_S3_REGION_KEY = "object_storage_hi168_s3_region"
+STORAGE_ALIYUN_OSS_ENDPOINT_KEY = "object_storage_aliyun_oss_endpoint"
+STORAGE_ALIYUN_OSS_BUCKET_KEY = "object_storage_aliyun_oss_bucket"
+STORAGE_ALIYUN_OSS_ACCESS_KEY_ID_KEY = "object_storage_aliyun_oss_access_key_id"
+STORAGE_ALIYUN_OSS_SECRET_ACCESS_KEY_KEY = "object_storage_aliyun_oss_secret_access_key"
+STORAGE_ALIYUN_OSS_REGION_KEY = "object_storage_aliyun_oss_region"
+
+# Backward compatibility for old "oss" provider settings.
+LEGACY_STORAGE_OSS_ENDPOINT_KEY = "object_storage_oss_endpoint"
+LEGACY_STORAGE_OSS_BUCKET_KEY = "object_storage_oss_bucket"
+LEGACY_STORAGE_OSS_ACCESS_KEY_ID_KEY = "object_storage_oss_access_key_id"
+LEGACY_STORAGE_OSS_SECRET_ACCESS_KEY_KEY = "object_storage_oss_secret_access_key"
 
 SETTINGS_KEYS = {
     STORAGE_PROVIDER_KEY,
@@ -49,10 +66,25 @@ SETTINGS_KEYS = {
     STORAGE_R2_ACCESS_KEY_ID_KEY,
     STORAGE_R2_SECRET_ACCESS_KEY_KEY,
     STORAGE_R2_REGION_KEY,
-    STORAGE_OSS_ENDPOINT_KEY,
-    STORAGE_OSS_BUCKET_KEY,
-    STORAGE_OSS_ACCESS_KEY_ID_KEY,
-    STORAGE_OSS_SECRET_ACCESS_KEY_KEY,
+    STORAGE_S3_ENDPOINT_KEY,
+    STORAGE_S3_BUCKET_KEY,
+    STORAGE_S3_ACCESS_KEY_ID_KEY,
+    STORAGE_S3_SECRET_ACCESS_KEY_KEY,
+    STORAGE_S3_REGION_KEY,
+    STORAGE_HI168_S3_ENDPOINT_KEY,
+    STORAGE_HI168_S3_BUCKET_KEY,
+    STORAGE_HI168_S3_ACCESS_KEY_ID_KEY,
+    STORAGE_HI168_S3_SECRET_ACCESS_KEY_KEY,
+    STORAGE_HI168_S3_REGION_KEY,
+    STORAGE_ALIYUN_OSS_ENDPOINT_KEY,
+    STORAGE_ALIYUN_OSS_BUCKET_KEY,
+    STORAGE_ALIYUN_OSS_ACCESS_KEY_ID_KEY,
+    STORAGE_ALIYUN_OSS_SECRET_ACCESS_KEY_KEY,
+    STORAGE_ALIYUN_OSS_REGION_KEY,
+    LEGACY_STORAGE_OSS_ENDPOINT_KEY,
+    LEGACY_STORAGE_OSS_BUCKET_KEY,
+    LEGACY_STORAGE_OSS_ACCESS_KEY_ID_KEY,
+    LEGACY_STORAGE_OSS_SECRET_ACCESS_KEY_KEY,
 }
 
 IMAGE_MIME_TO_EXT = {
@@ -79,10 +111,21 @@ class ObjectStorageConfig:
     r2_access_key_id: str
     r2_secret_access_key: str
     r2_region: str
-    oss_endpoint: str
-    oss_bucket: str
-    oss_access_key_id: str
-    oss_secret_access_key: str
+    s3_endpoint: str
+    s3_bucket: str
+    s3_access_key_id: str
+    s3_secret_access_key: str
+    s3_region: str
+    hi168_s3_endpoint: str
+    hi168_s3_bucket: str
+    hi168_s3_access_key_id: str
+    hi168_s3_secret_access_key: str
+    hi168_s3_region: str
+    aliyun_oss_endpoint: str
+    aliyun_oss_bucket: str
+    aliyun_oss_access_key_id: str
+    aliyun_oss_secret_access_key: str
+    aliyun_oss_region: str
 
 
 def _normalize_text(value: Optional[str]) -> str:
@@ -98,8 +141,10 @@ def _parse_boolean(value: Optional[str], default: bool) -> bool:
 
 def _normalize_provider(value: Optional[str]) -> StorageProvider:
     text = _normalize_text(value).lower()
-    if text in {"local", "r2", "oss"}:
+    if text in {"local", "r2", "s3", "aliyun_oss", "hi168_s3"}:
         return text  # type: ignore[return-value]
+    if text == "oss":
+        return "s3"
     return "local"
 
 
@@ -138,6 +183,18 @@ def _settings_map(session: Session) -> dict[str, str]:
     }
 
 
+def _read_setting_with_fallback(setting_map: dict[str, str], primary: str, *fallback_keys: str) -> str:
+    text = _normalize_text(setting_map.get(primary))
+    if text:
+        return text
+
+    for key in fallback_keys:
+        text = _normalize_text(setting_map.get(key))
+        if text:
+            return text
+    return ""
+
+
 def get_object_storage_config(session: Session) -> ObjectStorageConfig:
     setting_map = _settings_map(session)
     return ObjectStorageConfig(
@@ -151,10 +208,45 @@ def get_object_storage_config(session: Session) -> ObjectStorageConfig:
         r2_access_key_id=_normalize_text(setting_map.get(STORAGE_R2_ACCESS_KEY_ID_KEY, "")),
         r2_secret_access_key=_normalize_text(setting_map.get(STORAGE_R2_SECRET_ACCESS_KEY_KEY, "")),
         r2_region=_normalize_text(setting_map.get(STORAGE_R2_REGION_KEY, "")) or "auto",
-        oss_endpoint=_normalize_endpoint(setting_map.get(STORAGE_OSS_ENDPOINT_KEY, "")),
-        oss_bucket=_normalize_bucket(setting_map.get(STORAGE_OSS_BUCKET_KEY, "")),
-        oss_access_key_id=_normalize_text(setting_map.get(STORAGE_OSS_ACCESS_KEY_ID_KEY, "")),
-        oss_secret_access_key=_normalize_text(setting_map.get(STORAGE_OSS_SECRET_ACCESS_KEY_KEY, "")),
+        s3_endpoint=_normalize_endpoint(
+            _read_setting_with_fallback(
+                setting_map,
+                STORAGE_S3_ENDPOINT_KEY,
+                LEGACY_STORAGE_OSS_ENDPOINT_KEY,
+            ),
+        ),
+        s3_bucket=_normalize_bucket(
+            _read_setting_with_fallback(
+                setting_map,
+                STORAGE_S3_BUCKET_KEY,
+                LEGACY_STORAGE_OSS_BUCKET_KEY,
+            ),
+        ),
+        s3_access_key_id=_normalize_text(
+            _read_setting_with_fallback(
+                setting_map,
+                STORAGE_S3_ACCESS_KEY_ID_KEY,
+                LEGACY_STORAGE_OSS_ACCESS_KEY_ID_KEY,
+            ),
+        ),
+        s3_secret_access_key=_normalize_text(
+            _read_setting_with_fallback(
+                setting_map,
+                STORAGE_S3_SECRET_ACCESS_KEY_KEY,
+                LEGACY_STORAGE_OSS_SECRET_ACCESS_KEY_KEY,
+            ),
+        ),
+        s3_region=_normalize_text(setting_map.get(STORAGE_S3_REGION_KEY, "")),
+        hi168_s3_endpoint=_normalize_endpoint(setting_map.get(STORAGE_HI168_S3_ENDPOINT_KEY, "")),
+        hi168_s3_bucket=_normalize_bucket(setting_map.get(STORAGE_HI168_S3_BUCKET_KEY, "")),
+        hi168_s3_access_key_id=_normalize_text(setting_map.get(STORAGE_HI168_S3_ACCESS_KEY_ID_KEY, "")),
+        hi168_s3_secret_access_key=_normalize_text(setting_map.get(STORAGE_HI168_S3_SECRET_ACCESS_KEY_KEY, "")),
+        hi168_s3_region=_normalize_text(setting_map.get(STORAGE_HI168_S3_REGION_KEY, "")),
+        aliyun_oss_endpoint=_normalize_endpoint(setting_map.get(STORAGE_ALIYUN_OSS_ENDPOINT_KEY, "")),
+        aliyun_oss_bucket=_normalize_bucket(setting_map.get(STORAGE_ALIYUN_OSS_BUCKET_KEY, "")),
+        aliyun_oss_access_key_id=_normalize_text(setting_map.get(STORAGE_ALIYUN_OSS_ACCESS_KEY_ID_KEY, "")),
+        aliyun_oss_secret_access_key=_normalize_text(setting_map.get(STORAGE_ALIYUN_OSS_SECRET_ACCESS_KEY_KEY, "")),
+        aliyun_oss_region=_normalize_text(setting_map.get(STORAGE_ALIYUN_OSS_REGION_KEY, "")),
     )
 
 
@@ -298,12 +390,12 @@ def _upload_r2_file(
     content: bytes,
 ) -> str:
     if not config.r2_endpoint or not config.r2_bucket or not config.r2_access_key_id or not config.r2_secret_access_key:
-        raise ValueError("CloudFlare R2 配置不完整")
+        raise ValueError("Cloudflare R2 配置不完整")
 
     try:
         import boto3
     except Exception as error:  # pragma: no cover - runtime dependency
-        raise RuntimeError("缺少 boto3 依赖，无法上传到 CloudFlare R2") from error
+        raise RuntimeError("缺少 boto3 依赖，无法上传到 Cloudflare R2") from error
 
     client = boto3.client(
         "s3",
@@ -326,35 +418,200 @@ def _upload_r2_file(
     return _join_public_url(f"{config.r2_endpoint}/{config.r2_bucket}", object_key)
 
 
-def _upload_oss_file(
+def _infer_region_from_endpoint(endpoint: str, *, fallback: str = "us-east-1") -> str:
+    parsed = urlparse(endpoint)
+    host = (parsed.netloc or parsed.path or "").lower()
+    # Common endpoint formats:
+    # - oss-cn-hangzhou.aliyuncs.com
+    # - s3.cn-hangzhou.aliyuncs.com
+    # - s3.ap-shanghai.myqcloud.com
+    # - s3.us-west-004.backblazeb2.com
+    match = re.search(r"oss-([a-z0-9-]+)\.", host)
+    if match:
+        candidate = match.group(1)
+        # Avoid treating plain host segments (e.g. "hi168") as region.
+        if "-" in candidate:
+            return candidate
+
+    match = re.search(r"s3[.-]([a-z0-9-]+)\.", host)
+    if match:
+        candidate = match.group(1)
+        # Common S3-compatible regions usually contain dashes, e.g. ap-guangzhou/us-east-1.
+        if "-" in candidate:
+            return candidate
+    return fallback
+
+
+def _build_s3_default_public_url(endpoint: str, bucket: str, object_key: str, *, virtual_hosted: bool) -> str:
+    parsed = urlparse(endpoint)
+    scheme = parsed.scheme or "https"
+    host = parsed.netloc or parsed.path
+    if not host:
+        return _join_public_url(f"{endpoint.rstrip('/')}/{bucket}", object_key)
+    if virtual_hosted:
+        return _join_public_url(f"{scheme}://{bucket}.{host}", object_key)
+    return _join_public_url(f"{scheme}://{host}/{bucket}", object_key)
+
+
+def _upload_s3_compatible_file(
+    *,
+    provider_label: str,
+    endpoint: str,
+    bucket: str,
+    access_key_id: str,
+    secret_access_key: str,
+    region: str,
+    object_key: str,
+    content_type: str,
+    content: bytes,
+    public_base_url: str,
+    default_virtual_hosted_url: bool,
+    allow_virtual_hosted_retry: bool = True,
+) -> str:
+    try:
+        import boto3
+        from botocore.config import Config as BotoCoreConfig
+    except Exception as error:  # pragma: no cover - runtime dependency
+        raise RuntimeError(f"缺少 boto3 依赖，无法上传到 {provider_label}") from error
+
+    resolved_region = _normalize_text(region) or _infer_region_from_endpoint(endpoint)
+    put_kwargs = {
+        "Bucket": bucket,
+        "Key": object_key,
+        "Body": content,
+    }
+    if content_type:
+        put_kwargs["ContentType"] = content_type
+
+    attempts = [
+        ("path", False),
+        ("path", True),
+    ]
+    if allow_virtual_hosted_retry:
+        attempts.extend([
+            ("virtual", False),
+            ("virtual", True),
+        ])
+
+    last_error: Exception | None = None
+    for addressing_style, payload_signing_enabled in attempts:
+        try:
+            client = boto3.client(
+                "s3",
+                endpoint_url=endpoint,
+                aws_access_key_id=access_key_id,
+                aws_secret_access_key=secret_access_key,
+                region_name=resolved_region,
+                config=BotoCoreConfig(
+                    signature_version="s3v4",
+                    s3={
+                        "addressing_style": addressing_style,
+                        "payload_signing_enabled": payload_signing_enabled,
+                    },
+                ),
+            )
+            client.put_object(**put_kwargs)
+            break
+        except Exception as error:  # pragma: no cover - runtime behavior depends on provider
+            last_error = error
+    else:
+        message = str(last_error) if last_error else "未知错误"
+        raise RuntimeError(f"{provider_label} 上传失败: {message}") from last_error
+
+    if public_base_url:
+        return _join_public_url(public_base_url, object_key)
+    return _build_s3_default_public_url(
+        endpoint=endpoint,
+        bucket=bucket,
+        object_key=object_key,
+        virtual_hosted=default_virtual_hosted_url,
+    )
+
+
+def _upload_s3_file(
     config: ObjectStorageConfig,
     object_key: str,
     content_type: str,
     content: bytes,
 ) -> str:
-    if not config.oss_endpoint or not config.oss_bucket or not config.oss_access_key_id or not config.oss_secret_access_key:
+    if not config.s3_endpoint or not config.s3_bucket or not config.s3_access_key_id or not config.s3_secret_access_key:
+        raise ValueError("S3对象存储配置不完整")
+
+    return _upload_s3_compatible_file(
+        provider_label="S3对象存储",
+        endpoint=config.s3_endpoint,
+        bucket=config.s3_bucket,
+        access_key_id=config.s3_access_key_id,
+        secret_access_key=config.s3_secret_access_key,
+        region=config.s3_region,
+        object_key=object_key,
+        content_type=content_type,
+        content=content,
+        public_base_url=config.public_base_url,
+        default_virtual_hosted_url=False,
+        allow_virtual_hosted_retry=True,
+    )
+
+
+def _upload_hi168_s3_file(
+    config: ObjectStorageConfig,
+    object_key: str,
+    content_type: str,
+    content: bytes,
+) -> str:
+    if (
+        not config.hi168_s3_endpoint
+        or not config.hi168_s3_bucket
+        or not config.hi168_s3_access_key_id
+        or not config.hi168_s3_secret_access_key
+    ):
+        raise ValueError("HI168 S3 配置不完整")
+
+    return _upload_s3_compatible_file(
+        provider_label="HI168 S3",
+        endpoint=config.hi168_s3_endpoint,
+        bucket=config.hi168_s3_bucket,
+        access_key_id=config.hi168_s3_access_key_id,
+        secret_access_key=config.hi168_s3_secret_access_key,
+        # HI168 endpoint does not encode region in hostname; use a stable default when empty.
+        region=config.hi168_s3_region or "us-east-1",
+        object_key=object_key,
+        content_type=content_type,
+        content=content,
+        public_base_url=config.public_base_url,
+        default_virtual_hosted_url=False,
+        allow_virtual_hosted_retry=False,
+    )
+
+
+def _upload_aliyun_oss_file(
+    config: ObjectStorageConfig,
+    object_key: str,
+    content_type: str,
+    content: bytes,
+) -> str:
+    if (
+        not config.aliyun_oss_endpoint
+        or not config.aliyun_oss_bucket
+        or not config.aliyun_oss_access_key_id
+        or not config.aliyun_oss_secret_access_key
+    ):
         raise ValueError("阿里云 OSS 配置不完整")
 
-    try:
-        import oss2
-    except Exception as error:  # pragma: no cover - runtime dependency
-        raise RuntimeError("缺少 oss2 依赖，无法上传到阿里云 OSS") from error
-
-    auth = oss2.Auth(config.oss_access_key_id, config.oss_secret_access_key)
-    bucket = oss2.Bucket(auth, config.oss_endpoint, config.oss_bucket)
-    headers = {"Content-Type": content_type} if content_type else None
-    result = bucket.put_object(object_key, content, headers=headers)
-    if int(getattr(result, "status", 200)) >= 300:
-        raise RuntimeError(f"阿里云 OSS 上传失败: {getattr(result, 'status', 'unknown')}")
-
-    if config.public_base_url:
-        return _join_public_url(config.public_base_url, object_key)
-
-    parsed = urlparse(config.oss_endpoint)
-    host = parsed.netloc or parsed.path
-    if not host:
-        return _join_public_url(config.oss_endpoint, object_key)
-    return _join_public_url(f"https://{config.oss_bucket}.{host}", object_key)
+    return _upload_s3_compatible_file(
+        provider_label="阿里云 OSS",
+        endpoint=config.aliyun_oss_endpoint,
+        bucket=config.aliyun_oss_bucket,
+        access_key_id=config.aliyun_oss_access_key_id,
+        secret_access_key=config.aliyun_oss_secret_access_key,
+        region=config.aliyun_oss_region,
+        object_key=object_key,
+        content_type=content_type,
+        content=content,
+        public_base_url=config.public_base_url,
+        default_virtual_hosted_url=True,
+        allow_virtual_hosted_retry=True,
+    )
 
 
 def upload_image_to_object_storage(
@@ -366,7 +623,7 @@ def upload_image_to_object_storage(
 ) -> dict[str, str]:
     config = get_object_storage_config(session)
     if not config.enabled:
-        raise ValueError("对象存储未启用")
+        raise ValueError("存储设置未启用")
 
     _validate_image_file(file_name, content_type, content)
     object_key = _build_object_key(config.local_path_rule, file_name=file_name, content_type=content_type)
@@ -380,8 +637,22 @@ def upload_image_to_object_storage(
             content_type=content_type,
             content=content,
         )
+    elif config.provider == "s3":
+        url = _upload_s3_file(
+            config,
+            object_key=object_key,
+            content_type=content_type,
+            content=content,
+        )
+    elif config.provider == "hi168_s3":
+        url = _upload_hi168_s3_file(
+            config,
+            object_key=object_key,
+            content_type=content_type,
+            content=content,
+        )
     else:
-        url = _upload_oss_file(
+        url = _upload_aliyun_oss_file(
             config,
             object_key=object_key,
             content_type=content_type,
