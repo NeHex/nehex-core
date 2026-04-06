@@ -12,11 +12,12 @@ FROM python:3.12-slim AS runtime
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 ENV ADMIN_MANAGER_BUILD_ON_STARTUP=false
+ARG PIP_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple
 
 WORKDIR /app
 
 COPY requirements.txt ./
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir -i ${PIP_INDEX_URL} -r requirements.txt
 
 COPY app ./app
 COPY --from=frontend-builder /build/app/nehex-admin/dist ./app/nehex-admin/dist
