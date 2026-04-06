@@ -88,7 +88,28 @@ function normalizeAdminFriendItem(raw: Partial<AdminFriendItem>): AdminFriendIte
   }
 }
 
-async function fetchPublicFriendsFallback(): Promise<AdminFriendItem[] | null> {
+function filterFriendsByKeyword(items: AdminFriendItem[], keyword: string): AdminFriendItem[] {
+  const normalized = keyword.trim().toLowerCase()
+  if (!normalized) {
+    return items
+  }
+
+  return items.filter((item) => {
+    const text = [
+      item.id,
+      item.title,
+      item.description || '',
+      item.category,
+      item.url,
+      item.status,
+    ]
+      .map((value) => String(value).toLowerCase())
+      .join(' ')
+    return text.includes(normalized)
+  })
+}
+
+async function fetchPublicFriendsFallback(keyword = ''): Promise<AdminFriendItem[] | null> {
   try {
     const response = await fetch('/friend', {
       method: 'GET',
@@ -106,7 +127,7 @@ async function fetchPublicFriendsFallback(): Promise<AdminFriendItem[] | null> {
     const mapped = payload.data
       .map((item) => normalizeAdminFriendItem(item))
       .filter((item): item is AdminFriendItem => item !== null)
-    return mapped
+    return filterFriendsByKeyword(mapped, keyword)
   } catch {
     return null
   }
@@ -114,25 +135,12 @@ async function fetchPublicFriendsFallback(): Promise<AdminFriendItem[] | null> {
 
 export async function fetchAdminFriends(keyword = ''): Promise<AdminFriendItem[]> {
   const normalized = keyword.trim()
-  const query = normalized ? `?keyword=${encodeURIComponent(normalized)}` : ''
-  try {
-    const response = await adminFetch(`/admin-api/friends${query}`, {
-      method: 'GET',
-    })
-
-    const payload = await parseJson<AdminFriendListResponse>(response)
-    if (!Array.isArray(payload?.data)) {
-      throw new Error('Unexpected friend list response format')
-    }
-    return payload.data
-  } catch (error) {
-    // Compatibility fallback for deployments where /admin-api/friends route is blocked/misrouted.
-    const fallback = await fetchPublicFriendsFallback()
-    if (fallback !== null) {
-      return fallback
-    }
-    throw error
+  // Use the same source API as public frontend to avoid data-source divergence.
+  const data = await fetchPublicFriendsFallback(normalized)
+  if (data !== null) {
+    return data
   }
+  throw new Error('加载友链失败：无法从 /friend 读取数据')
 }
 
 export async function createAdminFriend(
