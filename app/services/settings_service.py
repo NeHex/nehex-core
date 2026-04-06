@@ -18,6 +18,8 @@ from app.schemas.setting import SettingItem, ThemeSettingData
 SETTINGS_CACHE_KEY = "settings:list"
 SETTINGS_WITH_THEME_DETAILS_CACHE_KEY = "settings:list:with-theme-details"
 SETTINGS_CACHE_TTL_SECONDS = 60
+USER_HEADPIC_KEY = "user_headpic"
+DEFAULT_HEAD_PIC = "/images/head.jpg"
 PUBLIC_VISIBLE_SETTING_KEYS = {
     "site_title",
     "site_sub_title",
@@ -36,6 +38,7 @@ PUBLIC_VISIBLE_SETTING_KEYS = {
     "theme_nav",
     "nehex_article_class",
     "user_social_link",
+    USER_HEADPIC_KEY,
 }
 COMPAT_SETTING_DEFAULTS: dict[str, tuple[SettingType, Any]] = {
     "site_title": (SettingType.string, ""),
@@ -45,6 +48,7 @@ COMPAT_SETTING_DEFAULTS: dict[str, tuple[SettingType, Any]] = {
     "theme_background": (SettingType.string, ""),
     "theme_nav": (SettingType.json, {}),
     "user_social_link": (SettingType.json, []),
+    USER_HEADPIC_KEY: (SettingType.string, DEFAULT_HEAD_PIC),
 }
 COMPAT_SETTING_ALIASES: dict[str, str] = {
     "site_desc": "site_description",
@@ -123,6 +127,7 @@ def list_settings(session: Session, *, include_theme_details: bool = False) -> l
         for row in rows
     ]
     mapped = _with_compatibility_keys(mapped)
+    mapped = _with_theme_headpic_compat(mapped, session=session, include_theme_details=include_theme_details)
     cache.set(cache_key, mapped, SETTINGS_CACHE_TTL_SECONDS)
     return [item.model_copy(deep=True) for item in mapped]
 
@@ -170,6 +175,7 @@ def _clone_object(value: dict[str, Any]) -> dict[str, Any]:
 
 def _build_rei_theme_default() -> dict[str, Any]:
     return {
+        "head_pic": DEFAULT_HEAD_PIC,
         "background_images": "/images/background-2k.png",
         "headmsg": "hi",
         "social_link": {
@@ -347,6 +353,85 @@ def _parse_theme_profiles(raw: Any) -> dict[str, dict[str, Any]]:
             continue
         result[normalized] = _clone_object(raw_content)
     return result
+
+
+def _resolve_active_profile_name(settings_map: dict[str, SettingItem], profiles: dict[str, dict[str, Any]]) -> str:
+    active_setting = settings_map.get(THEME_ACTIVE_PROFILE_KEY)
+    active_profile = _normalize_theme_file_name(
+        _to_text(active_setting.setting_content if active_setting else REI_THEME_FILE),
+    )
+    if active_profile and active_profile in profiles:
+        return active_profile
+    return REI_THEME_FILE if REI_THEME_FILE in profiles else next(iter(profiles.keys()))
+
+
+def _resolve_headpic_from_theme_settings_map(settings_map: dict[str, SettingItem]) -> str:
+    raw_profiles = settings_map.get(THEME_PROFILES_KEY)
+    rei_default = _build_rei_theme_default()
+    profiles = _parse_theme_profiles(raw_profiles.setting_content if raw_profiles else None)
+    if not profiles:
+        profiles = {REI_THEME_FILE: _clone_object(rei_default)}
+    else:
+        profiles.setdefault(REI_THEME_FILE, _clone_object(rei_default))
+        merged_rei = _clone_object(rei_default)
+        merged_rei.update(profiles.get(REI_THEME_FILE, {}))
+        profiles[REI_THEME_FILE] = merged_rei
+
+    active_profile = _resolve_active_profile_name(settings_map, profiles)
+    active_content = profiles.get(active_profile, {})
+    head_pic = _to_text(active_content.get("head_pic"))
+    if head_pic:
+        return head_pic
+
+    if REI_THEME_FILE in profiles:
+        fallback_rei = _to_text(profiles[REI_THEME_FILE].get("head_pic"))
+        if fallback_rei:
+            return fallback_rei
+
+    return _to_text(rei_default.get("head_pic")) or DEFAULT_HEAD_PIC
+
+
+def _with_theme_headpic_compat(
+    items: list[SettingItem],
+    *,
+    session: Session,
+    include_theme_details: bool,
+) -> list[SettingItem]:
+    if not items:
+        return items
+
+    item_map = {item.setting_key: item for item in items}
+    resolved_head_pic = _to_text(item_map.get(USER_HEADPIC_KEY).setting_content if USER_HEADPIC_KEY in item_map else "")
+
+    try:
+        if include_theme_details:
+            resolved_head_pic = _resolve_headpic_from_theme_settings_map(item_map)
+        else:
+            theme_data = list_theme_settings(session)
+            resolved_head_pic = _to_text(theme_data.current.get("head_pic"))
+    except Exception:
+        pass
+
+    if not resolved_head_pic:
+        resolved_head_pic = DEFAULT_HEAD_PIC
+
+    latest_updated_at = max((item.updated_at for item in items), default=datetime.utcnow())
+    latest_created_at = min((item.created_at for item in items), default=latest_updated_at)
+
+    if USER_HEADPIC_KEY in item_map:
+        item_map[USER_HEADPIC_KEY].setting_type = SettingType.string
+        item_map[USER_HEADPIC_KEY].setting_content = resolved_head_pic
+    else:
+        item_map[USER_HEADPIC_KEY] = SettingItem(
+            setting_key=USER_HEADPIC_KEY,
+            setting_type=SettingType.string,
+            setting_content=resolved_head_pic,
+            description="theme derived",
+            updated_at=latest_updated_at,
+            created_at=latest_created_at,
+        )
+
+    return sorted(item_map.values(), key=lambda item: item.setting_key)
 
 
 def list_theme_settings(session: Session) -> ThemeSettingData:

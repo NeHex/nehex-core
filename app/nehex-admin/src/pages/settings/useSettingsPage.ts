@@ -95,6 +95,7 @@ const githubLatestReleaseApi = 'https://api.github.com/repos/nehex/nehex-core/re
 const REI_THEME_FILE = 'rei.json'
 const CREATE_THEME_OPTION_VALUE = '__create_theme_template__'
 const REI_THEME_DEFAULT_CONTENT: Record<string, unknown> = {
+  head_pic: '/images/head.jpg',
   background_images: '/images/background-2k.png',
   headmsg: 'hi',
   social_link: {

@@ -80,6 +80,7 @@ def _parse_boolean(raw: object) -> bool:
 def _build_default_theme_profiles() -> dict[str, dict[str, object]]:
     return {
         "rei.json": {
+            "head_pic": "/images/head.jpg",
             "background_images": "/images/background-2k.png",
             "headmsg": "hi",
             "social_link": {
