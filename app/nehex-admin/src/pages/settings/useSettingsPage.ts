@@ -17,6 +17,7 @@ import {
   type ThemeLegacyDefaults,
   type ThemeProfileEntry,
 } from '@/pages/settings/helpers'
+import { fetchBackendVersion } from '@/services/settings'
 import { normalizeBasePath } from '@/utils/path'
 import { getAuthenticatedAccount } from '@/utils/auth'
 
@@ -103,6 +104,130 @@ const REI_THEME_DEFAULT_CONTENT: Record<string, unknown> = {
     music: 'https://music.163.com',
     mail: 'mailto:i@uegee.com',
     feed: true,
+  },
+  nav_border: {
+    关于: '/about',
+    友链: '/friends',
+    游戏室: '/games',
+  },
+  about_page: {
+    welcome: {
+      text: 'hi👋 我是',
+      name: 'UEGEE',
+      desc: '是一个无业游民，一个穷孩子生活在有钱人的城市。',
+    },
+    map: {
+      天津: '117.200983, 39.084158',
+      山东: 'x118.000923, 36.675807',
+    },
+    slogan: {
+      text: '希望',
+      main: '我的人生可以早点',
+      more: [
+        '顺利',
+        '暴富',
+        '退休',
+      ],
+    },
+    skills: {
+      title: '创造,源于热爱',
+      programlanguage: [
+        'python',
+        'vue',
+        'nuxt',
+        'docker',
+        'ubuntu',
+        'linux mint',
+        'mysql',
+        'redis',
+      ],
+    },
+    education: {
+      text: '好好学习,天天向上！————毛泽东',
+      university: '山东曲阜师范大学',
+      time: '2020/2023',
+    },
+    visitor_data: {
+      title: '访问数据',
+      tips: '本站自主统计',
+    },
+    hobby: [
+      'jk',
+      'computer',
+      'hardware',
+      'linux',
+    ],
+    life_target: {
+      text: '人生目标',
+      target: {
+        not_yet: [
+          '拥有一辆自己的汽车',
+          '有一份稳定的工作',
+          '拥有9950x3d',
+          '月均收入达8000',
+          '与爱人结婚',
+          '有一套属于自己的房子',
+          'MacBookPro',
+          '活到100岁',
+        ],
+        finish: [
+          '建造属于自己的HomeLab',
+          '每年回一次老家2026',
+        ],
+      },
+    },
+    wifes_card: {
+      'Aihara Enju': {
+        cn_name: '蓝原延珠',
+        other_name: '藍原（あいはら） 延珠（えんじゅ）',
+        image: 'https://s3.hi168.com/hi168-31358-3621l8yj/wifes/Aihara_Enju-half.png',
+      },
+      'Alisa Mikhailovna Kujō': {
+        cn_name: '艾莉莎·米哈伊羅芙娜·九條',
+        other_name: 'Алиса Михайловна Кудзё',
+        image: 'https://s3.hi168.com/hi168-31358-3621l8yj/wifes/Alisa_Mikhaylovna_Kujō.png',
+      },
+      'Ijichi Nijika': {
+        cn_name: '伊地知虹夏',
+        other_name: '伊地知（いじち） 虹夏（にじか）',
+        image: 'https://s3.hi168.com/hi168-31358-3621l8yj/wifes/IjichiNijika-half.png',
+      },
+      Perlica: {
+        cn_name: '佩丽卡',
+        other_name: 'Perlica',
+        image: 'https://s3.hi168.com/hi168-31358-3621l8yj/wifes/Perlica-half.png',
+      },
+      'Sento Isuzu': {
+        cn_name: '千斗五十鈴',
+        other_name: 'Isuzuruha Centollusia',
+        image: 'https://s3.hi168.com/hi168-31358-3621l8yj/wifes/Sento_Isuzu-half.png',
+      },
+      'Togawa Sakiko': {
+        cn_name: '丰川祥子',
+        other_name: '豊川（とがわ） 祥子（さきこ）',
+        image: 'https://s3.hi168.com/hi168-31358-3621l8yj/wifes/Togawa Sakiko-top.png',
+      },
+      'Nao Tomori': {
+        cn_name: '友利奈绪',
+        other_name: '友利（ともり）  奈緒（なお）',
+        image: 'https://s3.hi168.com/hi168-31358-3621l8yj/wifes/Tomori_Nao-half.png',
+      },
+      'Suō Yuki': {
+        cn_name: '周防有希',
+        other_name: '周防(すおう) 有希(ゆき)',
+        image: 'https://s3.hi168.com/hi168-31358-3621l8yj/wifes/Yuki_Suou_1.png',
+      },
+      Takagi: {
+        cn_name: '高木同学',
+        other_name: '高木（たかぎ）',
+        image: 'https://s3.hi168.com/hi168-31358-3621l8yj/wifes/takagi3-half.png',
+      },
+      Zhuangfangyi: {
+        cn_name: '庄方宜',
+        other_name: 'ZhuangFangYi',
+        image: 'https://s3.hi168.com/hi168-31358-3621l8yj/wifes/zhuangfangyi.png',
+      },
+    },
   },
 }
 
@@ -287,12 +412,12 @@ export function useSettingsPage() {
   const updateChecking = ref(false)
   const updateCheckError = ref('')
   const latestRelease = ref<LatestRelease | null>(null)
-  const currentVersion = ref(
-    (
-      (import.meta as ImportMeta & { env?: Record<string, string | undefined> }).env
-        ?.VITE_NEHEX_CORE_VERSION || ''
-    ).trim(),
-  )
+  const currentVersion = ref('')
+
+  const envVersion = (
+    (import.meta as ImportMeta & { env?: Record<string, string | undefined> }).env
+      ?.VITE_NEHEX_CORE_VERSION || ''
+  ).trim()
 
   const nehexSnapshot = ref<NehexSnapshot>(getNehexSnapshotData())
   const siteSnapshot = ref<SiteForm>(getSiteFormData())
@@ -348,7 +473,7 @@ export function useSettingsPage() {
     }
 
     if (!currentVersion.value) {
-      return `最新版本 ${latestRelease.value.tagName}，当前版本未知（可设置 VITE_NEHEX_CORE_VERSION）`
+      return `最新版本 ${latestRelease.value.tagName}，当前版本未知（未从后端 /version 读取到）`
     }
 
     const result = compareVersionTag(currentVersion.value, latestRelease.value.tagName)
@@ -695,6 +820,18 @@ export function useSettingsPage() {
     }
   }
 
+  async function loadCurrentVersion(): Promise<void> {
+    currentVersion.value = envVersion
+    try {
+      const backendVersion = await fetchBackendVersion()
+      if (backendVersion) {
+        currentVersion.value = backendVersion
+      }
+    } catch {
+      // Keep env fallback when backend version endpoint is unavailable.
+    }
+  }
+
   function getThemeLegacyFields(content: Record<string, unknown>): {
     background: string
     primary: string
@@ -824,7 +961,10 @@ export function useSettingsPage() {
   }
 
   onMounted(async () => {
-    await loadSettings()
+    await Promise.all([
+      loadSettings(),
+      loadCurrentVersion(),
+    ])
   })
 
   return {

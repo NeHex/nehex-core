@@ -42,7 +42,7 @@
               clearable
               density="comfortable"
               hide-details
-              label="搜索友链（标题、分类、URL）"
+              label="搜索友链"
               prepend-inner-icon="mdi-magnify"
               variant="outlined"
               @keydown.enter.prevent="loadFriends"

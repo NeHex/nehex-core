@@ -17,6 +17,10 @@ type ThemeSettingsResponse = {
   data: ThemeSettingData
 }
 
+type VersionResponse = {
+  version?: unknown
+}
+
 export type ArticleClassOption = {
   value: string
   label: string
@@ -150,6 +154,20 @@ export async function fetchThemeBackgroundUrl(): Promise<string> {
 
   const settingsMap = await fetchSettingsMap()
   return String(settingsMap.get(THEME_BACKGROUND_KEY) ?? '').trim()
+}
+
+export async function fetchBackendVersion(): Promise<string> {
+  const response = await fetch('/version', {
+    method: 'GET',
+    credentials: 'same-origin',
+  })
+
+  if (!response.ok) {
+    throw new Error(`Failed to request backend version: ${response.status}`)
+  }
+
+  const payload = await response.json() as VersionResponse
+  return String(payload?.version ?? '').trim()
 }
 
 function parseClassOptionsFromMap(value: unknown): ArticleClassOption[] {

@@ -5,6 +5,7 @@ from app.services.admin_service_parts.comments import (
     update_admin_comment,
 )
 from app.services.admin_service_parts.common import SENSITIVE_ADMIN_SETTING_KEYS
+from app.services.admin_service_parts.dashboard import get_admin_dashboard_data
 from app.services.admin_service_parts.content import (
     create_album,
     create_article,
@@ -43,6 +44,7 @@ from app.services.admin_service_parts.settings import (
 
 __all__ = [
     "SENSITIVE_ADMIN_SETTING_KEYS",
+    "get_admin_dashboard_data",
     "get_admin_credentials",
     "list_admin_friends",
     "create_admin_friend",

@@ -57,6 +57,7 @@ def _invalidate_comment_cache(target_type: str, target_id: int) -> None:
 
 def _invalidate_settings_cache() -> None:
     cache.delete("settings:list")
+    cache.delete("settings:list:with-theme-details")
 
 
 def _normalize_optional_text(value: Optional[str]) -> Optional[str]:

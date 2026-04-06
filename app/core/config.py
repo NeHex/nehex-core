@@ -26,6 +26,7 @@ def normalize_admin_manager_web_path(value: Optional[str], fallback: str = "/neh
 
 class Settings(BaseSettings):
     app_name: str = "NeHex Core API"
+    app_version: str = "v1.0.0"
     app_env: str = "dev"
     app_port: int = 7878
     cors_allow_origins: str = "http://127.0.0.1:3000,http://localhost:3000"

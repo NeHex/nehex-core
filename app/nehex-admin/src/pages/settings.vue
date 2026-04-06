@@ -70,7 +70,7 @@
               <v-divider class="my-4" />
 
               <div class="stack-block">
-                <div class="block-title">分类设置（小卡片）</div>
+                <div class="block-title">分类设置</div>
                 <div class="class-editor-row">
                   <v-text-field
                     v-model="newClassLabel"
@@ -198,9 +198,6 @@
 
               <div class="stack-block">
                 <div class="block-title">后台帐号密码设置</div>
-                <v-alert class="mb-4" density="comfortable" type="warning" variant="tonal">
-                  修改密码时无需输入哈希，后端会自动计算并保存。
-                </v-alert>
 
                 <div class="form-grid">
                   <v-text-field
@@ -267,7 +264,7 @@
 
         <v-window-item value="theme">
           <v-card class="section-card" rounded="xl">
-            <v-card-title>主题配置（JSON直编）</v-card-title>
+            <v-card-title>主题配置</v-card-title>
             <v-card-text>
               <div class="theme-toolbar">
                 <v-select

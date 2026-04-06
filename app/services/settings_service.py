@@ -16,6 +16,7 @@ from app.models.setting import Setting, SettingType
 from app.schemas.setting import SettingItem, ThemeSettingData
 
 SETTINGS_CACHE_KEY = "settings:list"
+SETTINGS_WITH_THEME_DETAILS_CACHE_KEY = "settings:list:with-theme-details"
 SETTINGS_CACHE_TTL_SECONDS = 60
 PUBLIC_VISIBLE_SETTING_KEYS = {
     "site_title",
@@ -32,8 +33,6 @@ PUBLIC_VISIBLE_SETTING_KEYS = {
     "theme_primary",
     "theme_banner",
     "theme_card_style",
-    "theme_active_profile",
-    "theme_profiles",
     "theme_nav",
     "nehex_article_class",
     "user_social_link",
@@ -53,10 +52,16 @@ COMPAT_SETTING_ALIASES: dict[str, str] = {
 REI_THEME_FILE = "rei.json"
 THEME_ACTIVE_PROFILE_KEY = "theme_active_profile"
 THEME_PROFILES_KEY = "theme_profiles"
+THEME_DETAIL_SETTING_KEYS = {
+    THEME_ACTIVE_PROFILE_KEY,
+    THEME_PROFILES_KEY,
+}
 
 
-def _is_public_setting_key(setting_key: str) -> bool:
-    return setting_key in PUBLIC_VISIBLE_SETTING_KEYS
+def _is_public_setting_key(setting_key: str, *, include_theme_details: bool) -> bool:
+    if setting_key in PUBLIC_VISIBLE_SETTING_KEYS:
+        return True
+    return include_theme_details and setting_key in THEME_DETAIL_SETTING_KEYS
 
 
 def parse_setting_content(setting_type: SettingType, raw_content: Optional[str]) -> Any:
@@ -81,24 +86,29 @@ def parse_setting_content(setting_type: SettingType, raw_content: Optional[str])
     return raw_content
 
 
-def list_settings(session: Session) -> list[SettingItem]:
-    cached = cache.get(SETTINGS_CACHE_KEY)
+def list_settings(session: Session, *, include_theme_details: bool = False) -> list[SettingItem]:
+    cache_key = SETTINGS_WITH_THEME_DETAILS_CACHE_KEY if include_theme_details else SETTINGS_CACHE_KEY
+    cached = cache.get(cache_key)
     if cached is not None:
         return [item.model_copy(deep=True) for item in cached]
 
     try:
         if not database_table_exists("settings"):
             mapped = _with_compatibility_keys([])
-            cache.set(SETTINGS_CACHE_KEY, mapped, SETTINGS_CACHE_TTL_SECONDS)
+            cache.set(cache_key, mapped, SETTINGS_CACHE_TTL_SECONDS)
             return [item.model_copy(deep=True) for item in mapped]
 
         stmt = select(Setting).order_by(Setting.setting_key.asc())
         result = session.execute(stmt)
         rows = result.scalars().all()
-        rows = [row for row in rows if _is_public_setting_key(row.setting_key)]
+        rows = [
+            row
+            for row in rows
+            if _is_public_setting_key(row.setting_key, include_theme_details=include_theme_details)
+        ]
     except SQLAlchemyError:
         mapped = _with_compatibility_keys([])
-        cache.set(SETTINGS_CACHE_KEY, mapped, SETTINGS_CACHE_TTL_SECONDS)
+        cache.set(cache_key, mapped, SETTINGS_CACHE_TTL_SECONDS)
         return [item.model_copy(deep=True) for item in mapped]
 
     mapped = [
@@ -113,7 +123,7 @@ def list_settings(session: Session) -> list[SettingItem]:
         for row in rows
     ]
     mapped = _with_compatibility_keys(mapped)
-    cache.set(SETTINGS_CACHE_KEY, mapped, SETTINGS_CACHE_TTL_SECONDS)
+    cache.set(cache_key, mapped, SETTINGS_CACHE_TTL_SECONDS)
     return [item.model_copy(deep=True) for item in mapped]
 
 
@@ -170,6 +180,130 @@ def _build_rei_theme_default() -> dict[str, Any]:
             "mail": "mailto:i@uegee.com",
             "feed": True,
         },
+        "nav_border": {
+            "关于": "/about",
+            "友链": "/friends",
+            "游戏室": "/games",
+        },
+        "about_page": {
+            "welcome": {
+                "text": "hi👋 我是",
+                "name": "UEGEE",
+                "desc": "是一个无业游民，一个穷孩子生活在有钱人的城市。",
+            },
+            "map": {
+                "天津": "117.200983, 39.084158",
+                "山东": "x118.000923, 36.675807",
+            },
+            "slogan": {
+                "text": "希望",
+                "main": "我的人生可以早点",
+                "more": [
+                    "顺利",
+                    "暴富",
+                    "退休",
+                ],
+            },
+            "skills": {
+                "title": "创造,源于热爱",
+                "programlanguage": [
+                    "python",
+                    "vue",
+                    "nuxt",
+                    "docker",
+                    "ubuntu",
+                    "linux mint",
+                    "mysql",
+                    "redis",
+                ],
+            },
+            "education": {
+                "text": "好好学习,天天向上！————毛泽东",
+                "university": "山东曲阜师范大学",
+                "time": "2020/2023",
+            },
+            "visitor_data": {
+                "title": "访问数据",
+                "tips": "本站自主统计",
+            },
+            "hobby": [
+                "jk",
+                "computer",
+                "hardware",
+                "linux",
+            ],
+            "life_target": {
+                "text": "人生目标",
+                "target": {
+                    "not_yet": [
+                        "拥有一辆自己的汽车",
+                        "有一份稳定的工作",
+                        "拥有9950x3d",
+                        "月均收入达8000",
+                        "与爱人结婚",
+                        "有一套属于自己的房子",
+                        "MacBookPro",
+                        "活到100岁",
+                    ],
+                    "finish": [
+                        "建造属于自己的HomeLab",
+                        "每年回一次老家2026",
+                    ],
+                },
+            },
+            "wifes_card": {
+                "Aihara Enju": {
+                    "cn_name": "蓝原延珠",
+                    "other_name": "藍原（あいはら） 延珠（えんじゅ）",
+                    "image": "https://s3.hi168.com/hi168-31358-3621l8yj/wifes/Aihara_Enju-half.png",
+                },
+                "Alisa Mikhailovna Kujō": {
+                    "cn_name": "艾莉莎·米哈伊羅芙娜·九條",
+                    "other_name": "Алиса Михайловна Кудзё",
+                    "image": "https://s3.hi168.com/hi168-31358-3621l8yj/wifes/Alisa_Mikhaylovna_Kujō.png",
+                },
+                "Ijichi Nijika": {
+                    "cn_name": "伊地知虹夏",
+                    "other_name": "伊地知（いじち） 虹夏（にじか）",
+                    "image": "https://s3.hi168.com/hi168-31358-3621l8yj/wifes/IjichiNijika-half.png",
+                },
+                "Perlica": {
+                    "cn_name": "佩丽卡",
+                    "other_name": "Perlica",
+                    "image": "https://s3.hi168.com/hi168-31358-3621l8yj/wifes/Perlica-half.png",
+                },
+                "Sento Isuzu": {
+                    "cn_name": "千斗五十鈴",
+                    "other_name": "Isuzuruha Centollusia",
+                    "image": "https://s3.hi168.com/hi168-31358-3621l8yj/wifes/Sento_Isuzu-half.png",
+                },
+                "Togawa Sakiko": {
+                    "cn_name": "丰川祥子",
+                    "other_name": "豊川（とがわ） 祥子（さきこ）",
+                    "image": "https://s3.hi168.com/hi168-31358-3621l8yj/wifes/Togawa Sakiko-top.png",
+                },
+                "Nao Tomori": {
+                    "cn_name": "友利奈绪",
+                    "other_name": "友利（ともり）  奈緒（なお）",
+                    "image": "https://s3.hi168.com/hi168-31358-3621l8yj/wifes/Tomori_Nao-half.png",
+                },
+                "Suō Yuki": {
+                    "cn_name": "周防有希",
+                    "other_name": "周防(すおう) 有希(ゆき)",
+                    "image": "https://s3.hi168.com/hi168-31358-3621l8yj/wifes/Yuki_Suou_1.png",
+                },
+                "Takagi": {
+                    "cn_name": "高木同学",
+                    "other_name": "高木（たかぎ）",
+                    "image": "https://s3.hi168.com/hi168-31358-3621l8yj/wifes/takagi3-half.png",
+                },
+                "Zhuangfangyi": {
+                    "cn_name": "庄方宜",
+                    "other_name": "ZhuangFangYi",
+                    "image": "https://s3.hi168.com/hi168-31358-3621l8yj/wifes/zhuangfangyi.png",
+                },
+            },
+        },
     }
 
 
@@ -216,7 +350,7 @@ def _parse_theme_profiles(raw: Any) -> dict[str, dict[str, Any]]:
 
 
 def list_theme_settings(session: Session) -> ThemeSettingData:
-    items = list_settings(session)
+    items = list_settings(session, include_theme_details=True)
     settings_map = {item.setting_key: item for item in items}
     legacy_default = _build_legacy_theme_default(settings_map)
     rei_default = _build_rei_theme_default()

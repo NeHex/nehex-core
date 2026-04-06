@@ -117,6 +117,7 @@ async def lifespan(_: FastAPI):
 
 app = FastAPI(
     title=settings.app_name,
+    version=settings.app_version,
     lifespan=lifespan,
 )
 
@@ -203,7 +204,15 @@ def _extract_admin_relative_path(request_path: str, admin_base_path: str) -> Opt
 
 @app.get("/health", tags=["system"], summary="Health check")
 async def health() -> dict[str, str]:
-    return {"status": "ok"}
+    return {
+        "status": "ok",
+        "version": settings.app_version,
+    }
+
+
+@app.get("/version", tags=["system"], summary="Application version")
+async def version() -> dict[str, str]:
+    return {"version": settings.app_version}
 
 
 @app.get("/{full_path:path}", include_in_schema=False)

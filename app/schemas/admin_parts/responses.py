@@ -78,3 +78,33 @@ class AdminFriendApplyDetailResponse(BaseModel):
 
 class AdminFriendApplyListResponse(BaseModel):
     data: list[FriendApplyItem]
+
+
+class AdminDashboardSeries(BaseModel):
+    labels: list[str]
+    values: list[int]
+    total: int = Field(ge=0)
+
+
+class AdminDashboardPeriodMetrics(BaseModel):
+    day: AdminDashboardSeries
+    week: AdminDashboardSeries
+    month: AdminDashboardSeries
+    year: AdminDashboardSeries
+
+
+class AdminDashboardSiteTotals(BaseModel):
+    text_count: int = Field(ge=0)
+    article_count: int = Field(ge=0)
+    comment_count: int = Field(ge=0)
+    album_count: int = Field(ge=0)
+
+
+class AdminDashboardData(BaseModel):
+    visit_ip: AdminDashboardPeriodMetrics
+    api_calls: AdminDashboardPeriodMetrics
+    site_totals: AdminDashboardSiteTotals
+
+
+class AdminDashboardResponse(BaseModel):
+    data: AdminDashboardData

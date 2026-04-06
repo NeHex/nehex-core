@@ -35,6 +35,11 @@ from app.schemas.admin_parts.content import (
     AdminSimpleArticleUpdateRequest,
 )
 from app.schemas.admin_parts.responses import (
+    AdminDashboardData,
+    AdminDashboardPeriodMetrics,
+    AdminDashboardResponse,
+    AdminDashboardSeries,
+    AdminDashboardSiteTotals,
     AdminAlbumDetailResponse,
     AdminArticleDetailResponse,
     AdminArticleListResponse,
@@ -102,4 +107,9 @@ __all__ = [
     "AdminFriendListResponse",
     "AdminFriendApplyDetailResponse",
     "AdminFriendApplyListResponse",
+    "AdminDashboardSeries",
+    "AdminDashboardPeriodMetrics",
+    "AdminDashboardSiteTotals",
+    "AdminDashboardData",
+    "AdminDashboardResponse",
 ]
