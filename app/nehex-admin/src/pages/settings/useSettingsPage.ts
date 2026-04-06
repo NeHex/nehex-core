@@ -32,6 +32,7 @@ type SiteForm = {
   siteSubtitle: string
   siteUrl: string
   siteKeywords: string
+  siteIcp: string
   siteDescription: string
   siteFavicon: string
 }
@@ -111,7 +112,7 @@ const sections: SectionMeta[] = [
     key: 'site',
     label: '网站配置',
     icon: 'mdi-web',
-    description: '站点标题、副标题、地址、关键词、描述与 favicon。',
+    description: '站点标题、副标题、地址、关键词、ICP备案、描述与 favicon。',
   },
   {
     key: 'storage',
@@ -507,6 +508,7 @@ export function useSettingsPage() {
     siteSubtitle: '',
     siteUrl: '',
     siteKeywords: '',
+    siteIcp: '',
     siteDescription: '',
     siteFavicon: '',
   })
@@ -878,6 +880,7 @@ export function useSettingsPage() {
       siteSubtitle: siteForm.siteSubtitle,
       siteUrl: siteForm.siteUrl,
       siteKeywords: siteForm.siteKeywords,
+      siteIcp: siteForm.siteIcp,
       siteDescription: siteForm.siteDescription,
       siteFavicon: siteForm.siteFavicon,
     }
@@ -993,6 +996,7 @@ export function useSettingsPage() {
     siteForm.siteSubtitle = readSetting(settingsMap, 'site_sub_title')
     siteForm.siteUrl = readSetting(settingsMap, 'site_url')
     siteForm.siteKeywords = readSetting(settingsMap, 'site_keywords')
+    siteForm.siteIcp = readSetting(settingsMap, 'site_icp')
     siteForm.siteDescription = readSetting(settingsMap, 'site_description')
     siteForm.siteFavicon = readSetting(settingsMap, 'site_favicon')
 
@@ -1203,6 +1207,7 @@ export function useSettingsPage() {
         { setting_key: 'site_sub_title', setting_content: siteForm.siteSubtitle.trim(), setting_type: 'string' },
         { setting_key: 'site_url', setting_content: siteForm.siteUrl.trim(), setting_type: 'string' },
         { setting_key: 'site_keywords', setting_content: siteForm.siteKeywords.trim(), setting_type: 'string' },
+        { setting_key: 'site_icp', setting_content: siteForm.siteIcp.trim(), setting_type: 'string' },
         { setting_key: 'site_description', setting_content: siteForm.siteDescription, setting_type: 'string' },
         { setting_key: 'site_favicon', setting_content: siteForm.siteFavicon.trim(), setting_type: 'string' },
       ]

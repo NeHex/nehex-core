@@ -242,6 +242,7 @@
                   label="站点关键词（site_keywords）"
                   variant="outlined"
                 />
+                <v-text-field v-model="siteForm.siteIcp" label="ICP备案（site_icp）" variant="outlined" />
                 <v-text-field
                   v-model="siteForm.siteFavicon"
                   label="站点 favicon（site_favicon）"
