@@ -108,3 +108,13 @@ class AdminDashboardData(BaseModel):
 
 class AdminDashboardResponse(BaseModel):
     data: AdminDashboardData
+
+
+class AdminStorageUploadData(BaseModel):
+    provider: str
+    key: str
+    url: str
+
+
+class AdminStorageUploadResponse(BaseModel):
+    data: AdminStorageUploadData

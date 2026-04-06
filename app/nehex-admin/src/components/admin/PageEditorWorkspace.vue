@@ -89,14 +89,45 @@
     </div>
 
     <div class="split-panel" ref="splitPanelRef">
-      <section class="panel panel-left" :style="{ width: `${leftPaneWidth}%` }">
-        <header class="panel-head">Markdown</header>
+      <section
+        class="panel panel-left panel-left-markdown"
+        :style="{ width: `${leftPaneWidth}%` }"
+        @dragenter.prevent="onDragEnter"
+        @dragover.prevent="onDragOver"
+        @dragleave.prevent="onDragLeave"
+        @drop.prevent="onDropImage"
+      >
+        <header class="panel-head panel-head-main">
+          <span>Markdown</span>
+          <div class="panel-tools">
+            <input
+              ref="imageInputRef"
+              accept="image/*"
+              class="upload-input"
+              type="file"
+              @change="handleImageInputChange"
+            >
+            <v-btn
+              color="primary"
+              density="comfortable"
+              prepend-icon="mdi-image-plus-outline"
+              size="small"
+              :loading="uploadingImage"
+              variant="text"
+              @click="triggerImageSelect"
+            >
+              上传图片
+            </v-btn>
+          </div>
+        </header>
         <textarea
+          ref="markdownInputRef"
           v-model="editorForm.content"
           class="markdown-input"
           placeholder="在这里输入 Markdown 内容..."
           spellcheck="false"
         />
+        <div v-if="dragOver" class="drop-overlay">松开鼠标上传图片并插入 Markdown</div>
       </section>
 
       <div
@@ -121,12 +152,14 @@
 import MarkdownIt from 'markdown-it'
 import { computed, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
+import { useGlobalSnackbar } from '@/composables/useGlobalSnackbar'
 import {
   createStandalonePage,
   fetchStandalonePageById,
   updateStandalonePage,
   type StandalonePageUpsertPayload,
 } from '@/services/pages'
+import { uploadMarkdownImage } from '@/services/storage'
 
 const props = defineProps<{
   pageId?: number | null
@@ -156,11 +189,17 @@ const statusOptions = [
 
 const loading = ref(false)
 const submitting = ref(false)
+const uploadingImage = ref(false)
 const errorMessage = ref('')
 const successMessage = ref('')
 const leftPaneWidth = ref(50)
 const resizing = ref(false)
+const dragOver = ref(false)
+const dragDepth = ref(0)
 const splitPanelRef = ref<HTMLElement | null>(null)
+const markdownInputRef = ref<HTMLTextAreaElement | null>(null)
+const imageInputRef = ref<HTMLInputElement | null>(null)
+const { showGlobalSuccess } = useGlobalSnackbar()
 
 const editorForm = reactive<EditorForm>({
   pageKey: '',
@@ -242,6 +281,107 @@ function normalizePageKey(value: string): string {
   return value.trim().replace(/^\/+|\/+$/g, '')
 }
 
+function triggerImageSelect(): void {
+  imageInputRef.value?.click()
+}
+
+function _escapeMarkdownText(value: string): string {
+  return value.replace(/[\[\]\(\)]/g, '')
+}
+
+function _pickFirstImage(files: FileList | null): File | null {
+  if (!files || files.length <= 0) {
+    return null
+  }
+  for (const file of Array.from(files)) {
+    if (file.type.startsWith('image/')) {
+      return file
+    }
+  }
+  return null
+}
+
+function _insertMarkdownImage(url: string, fileName: string): void {
+  const altText = _escapeMarkdownText(fileName.replace(/\.[^.]+$/, '').trim()) || 'image'
+  const snippet = `\n![${altText}](${url})\n`
+
+  const input = markdownInputRef.value
+  if (!input) {
+    editorForm.content = `${editorForm.content}${snippet}`
+    return
+  }
+
+  const start = input.selectionStart ?? editorForm.content.length
+  const end = input.selectionEnd ?? start
+  editorForm.content = `${editorForm.content.slice(0, start)}${snippet}${editorForm.content.slice(end)}`
+
+  requestAnimationFrame(() => {
+    const cursor = start + snippet.length
+    input.focus()
+    input.setSelectionRange(cursor, cursor)
+  })
+}
+
+async function _uploadImageAndInsert(file: File): Promise<void> {
+  if (uploadingImage.value) {
+    return
+  }
+
+  uploadingImage.value = true
+  errorMessage.value = ''
+  try {
+    const imageUrl = await uploadMarkdownImage(file)
+    _insertMarkdownImage(imageUrl, file.name)
+    successMessage.value = '图片上传成功'
+  } catch (error) {
+    errorMessage.value = error instanceof Error ? error.message : '图片上传失败'
+  } finally {
+    uploadingImage.value = false
+  }
+}
+
+async function handleImageInputChange(event: Event): Promise<void> {
+  const target = event.target as HTMLInputElement | null
+  const imageFile = _pickFirstImage(target?.files || null)
+  if (target) {
+    target.value = ''
+  }
+  if (!imageFile) {
+    return
+  }
+  await _uploadImageAndInsert(imageFile)
+}
+
+function onDragEnter(): void {
+  dragDepth.value += 1
+  dragOver.value = true
+}
+
+function onDragOver(event: DragEvent): void {
+  const imageFile = _pickFirstImage(event.dataTransfer?.files || null)
+  if (imageFile) {
+    event.dataTransfer!.dropEffect = 'copy'
+    dragOver.value = true
+  }
+}
+
+function onDragLeave(): void {
+  dragDepth.value = Math.max(0, dragDepth.value - 1)
+  if (dragDepth.value === 0) {
+    dragOver.value = false
+  }
+}
+
+async function onDropImage(event: DragEvent): Promise<void> {
+  dragDepth.value = 0
+  dragOver.value = false
+  const imageFile = _pickFirstImage(event.dataTransfer?.files || null)
+  if (!imageFile) {
+    return
+  }
+  await _uploadImageAndInsert(imageFile)
+}
+
 function buildPayload(): StandalonePageUpsertPayload | null {
   const title = editorForm.title.trim()
   const pageKey = normalizePageKey(editorForm.pageKey)
@@ -312,12 +452,11 @@ async function submitEditor(): Promise<void> {
   try {
     if (isEditing.value && props.pageId) {
       await updateStandalonePage(props.pageId, payload)
-      successMessage.value = '页面已保存'
     } else {
-      const created = await createStandalonePage(payload)
-      successMessage.value = '页面已创建'
-      await router.replace(`/pages/edit/${created.id}`)
+      await createStandalonePage(payload)
     }
+    showGlobalSuccess('独立页发布成功')
+    await router.push('/pages')
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : '保存页面失败'
   } finally {
@@ -398,6 +537,27 @@ onMounted(async () => {
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
 
+.panel-head-main {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.panel-tools {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.upload-input {
+  display: none;
+}
+
+.panel-left-markdown {
+  position: relative;
+}
+
 .markdown-input {
   flex: 1;
   width: 100%;
@@ -410,6 +570,20 @@ onMounted(async () => {
   resize: none;
   outline: none;
   font-family: 'Cascadia Code', 'Consolas', 'Monaco', monospace;
+}
+
+.drop-overlay {
+  position: absolute;
+  inset: 46px 10px 10px 10px;
+  display: grid;
+  place-items: center;
+  border: 2px dashed rgba(115, 164, 255, 0.88);
+  border-radius: 12px;
+  background: rgba(16, 24, 39, 0.82);
+  color: #d7e6ff;
+  font-size: 14px;
+  font-weight: 600;
+  pointer-events: none;
 }
 
 .markdown-preview {

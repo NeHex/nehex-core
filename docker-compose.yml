@@ -20,6 +20,8 @@ services:
         condition: service_started
     ports:
       - "${APP_PORT:-7878}:7878"
+    volumes:
+      - backend-storage:/app/storage
     networks:
       - nehex-internal
     healthcheck:
@@ -68,5 +70,6 @@ networks:
     driver: bridge
 
 volumes:
+  backend-storage:
   mysql-data:
   redis-data:

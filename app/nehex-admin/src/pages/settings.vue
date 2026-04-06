@@ -262,6 +262,121 @@
           </v-card>
         </v-window-item>
 
+        <v-window-item value="storage">
+          <v-card class="section-card" rounded="xl">
+            <v-card-title>对象存储</v-card-title>
+            <v-card-text>
+              <div class="stack-block">
+                <div class="block-title">存储平台</div>
+                <v-select
+                  v-model="storageForm.provider"
+                  :items="storageProviderOptions"
+                  item-title="label"
+                  item-value="value"
+                  label="对象存储平台"
+                  variant="outlined"
+                />
+                <div class="block-subtitle">保存后默认启用对象存储。</div>
+              </div>
+
+              <v-divider class="my-4" />
+
+              <div class="stack-block">
+                <div class="block-title">公共访问地址（可选）</div>
+                <v-text-field
+                  v-model="storageForm.publicBaseUrl"
+                  label="公共访问 Base URL（如 https://cdn.example.com）"
+                  variant="outlined"
+                />
+              </div>
+
+              <v-divider class="my-4" />
+
+              <div v-if="showLocalStorageFields" class="stack-block">
+                <div class="block-title">本机存储配置</div>
+                <div class="form-grid">
+                  <v-text-field
+                    v-model="storageForm.localRoot"
+                    label="本机存储目录（相对项目根目录）"
+                    placeholder="storage"
+                    variant="outlined"
+                  />
+                  <v-text-field
+                    v-model="storageForm.localPathRule"
+                    label="路径规则"
+                    placeholder="/{year}-{month}/{day}/{random_name}.{file_type}"
+                    variant="outlined"
+                  />
+                </div>
+                <v-alert class="mt-2" density="comfortable" type="info" variant="tonal">
+                  路径规则支持占位符：{year} {month} {day} {hour} {minute} {second} {timestamp} {random_name} {file_type}
+                </v-alert>
+              </div>
+
+              <div v-if="showR2StorageFields" class="stack-block">
+                <div class="block-title">CloudFlare R2 配置</div>
+                <div class="form-grid">
+                  <v-text-field
+                    v-model="storageForm.r2Endpoint"
+                    label="Endpoint"
+                    placeholder="https://<accountid>.r2.cloudflarestorage.com"
+                    variant="outlined"
+                  />
+                  <v-text-field
+                    v-model="storageForm.r2Bucket"
+                    label="Bucket"
+                    variant="outlined"
+                  />
+                  <v-text-field
+                    v-model="storageForm.r2AccessKeyId"
+                    label="Access Key ID"
+                    variant="outlined"
+                  />
+                  <v-text-field
+                    v-model="storageForm.r2SecretAccessKey"
+                    label="Secret Access Key"
+                    type="password"
+                    variant="outlined"
+                  />
+                  <v-text-field
+                    v-model="storageForm.r2Region"
+                    label="Region（默认 auto）"
+                    variant="outlined"
+                  />
+                </div>
+              </div>
+
+              <div v-if="showOssStorageFields" class="stack-block">
+                <div class="block-title">阿里云 OSS 配置</div>
+                <div class="form-grid">
+                  <v-text-field
+                    v-model="storageForm.ossEndpoint"
+                    label="Endpoint"
+                    placeholder="https://oss-cn-hangzhou.aliyuncs.com"
+                    variant="outlined"
+                  />
+                  <v-text-field
+                    v-model="storageForm.ossBucket"
+                    label="Bucket"
+                    variant="outlined"
+                  />
+                  <v-text-field
+                    v-model="storageForm.ossAccessKeyId"
+                    label="Access Key ID"
+                    variant="outlined"
+                  />
+                  <v-text-field
+                    v-model="storageForm.ossSecretAccessKey"
+                    label="Access Key Secret"
+                    type="password"
+                    variant="outlined"
+                  />
+                </div>
+              </div>
+            </v-card-text>
+          </v-card>
+        </v-window-item>
+
         <v-window-item value="theme">
           <v-card class="section-card" rounded="xl">
             <v-card-title>主题配置</v-card-title>
@@ -378,6 +493,11 @@ const {
   accountForm,
 
   siteForm,
+  storageForm,
+  storageProviderOptions,
+  showLocalStorageFields,
+  showR2StorageFields,
+  showOssStorageFields,
 
   themeProfiles,
   selectedThemeFile,

@@ -431,14 +431,27 @@ function resetFriendForm(): void {
 
 function buildFriendPayload(): AdminFriendUpsertPayload | null {
   const title = friendForm.title.trim()
-  const url = friendForm.url.trim()
+  const urlInput = friendForm.url.trim()
+  const faviconInput = friendForm.favicon.trim()
   const category = friendForm.category.trim() || 'default'
   if (!title) {
     errorMessage.value = '友链名称不能为空'
     return null
   }
-  if (!url) {
+  if (!urlInput) {
     errorMessage.value = '友链地址不能为空'
+    return null
+  }
+
+  const url = normalizeHttpUrl(urlInput)
+  if (!url) {
+    errorMessage.value = '友链地址格式错误，请输入 http:// 或 https:// 地址'
+    return null
+  }
+
+  const favicon = faviconInput ? normalizeHttpUrl(faviconInput) : null
+  if (faviconInput && !favicon) {
+    errorMessage.value = '图标地址格式错误，请输入 http:// 或 https:// 地址'
     return null
   }
 
@@ -446,9 +459,30 @@ function buildFriendPayload(): AdminFriendUpsertPayload | null {
     title,
     description: friendForm.description.trim() || null,
     category,
-    favicon: friendForm.favicon.trim() || null,
+    favicon,
     url,
     status: friendForm.status,
+  }
+}
+
+function normalizeHttpUrl(raw: string): string {
+  const text = raw.trim()
+  if (!text) {
+    return ''
+  }
+
+  const withScheme = /^[a-z][a-z0-9+.-]*:\/\//i.test(text) ? text : `https://${text}`
+  try {
+    const parsed = new URL(withScheme)
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+      return ''
+    }
+    if (!parsed.hostname) {
+      return ''
+    }
+    return parsed.toString()
+  } catch {
+    return ''
   }
 }
 

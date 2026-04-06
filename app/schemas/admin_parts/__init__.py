@@ -40,6 +40,8 @@ from app.schemas.admin_parts.responses import (
     AdminDashboardResponse,
     AdminDashboardSeries,
     AdminDashboardSiteTotals,
+    AdminStorageUploadData,
+    AdminStorageUploadResponse,
     AdminAlbumDetailResponse,
     AdminArticleDetailResponse,
     AdminArticleListResponse,
@@ -112,4 +114,6 @@ __all__ = [
     "AdminDashboardSiteTotals",
     "AdminDashboardData",
     "AdminDashboardResponse",
+    "AdminStorageUploadData",
+    "AdminStorageUploadResponse",
 ]

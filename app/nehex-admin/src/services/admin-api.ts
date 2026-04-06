@@ -28,6 +28,24 @@ let adminSessionCache: AdminSession | null = null
 let adminSessionPromise: Promise<AdminSession> | null = null
 
 function normalizeApiError(response: Response, payload: ApiErrorPayload | null): string {
+  const detailArray = Array.isArray(payload?.detail) ? payload.detail : null
+  if (detailArray && detailArray.length > 0) {
+    const first = detailArray[0] as {
+      msg?: unknown
+      loc?: unknown
+    }
+    const message = typeof first?.msg === 'string' ? first.msg : ''
+    const location = Array.isArray(first?.loc)
+      ? first.loc.map((item) => String(item)).join('.')
+      : ''
+    if (message && location) {
+      return `${location}: ${message}`
+    }
+    if (message) {
+      return message
+    }
+  }
+
   const detail = typeof payload?.detail === 'string' ? payload.detail : ''
   const message = typeof payload?.message === 'string' ? payload.message : ''
   const base = detail || message
@@ -38,7 +56,14 @@ export async function adminFetch(path: string, init: RequestInit = {}): Promise<
   const headers = new Headers(init.headers)
   headers.set('X-NeHex-Admin-Client', ADMIN_API_CLIENT_ID)
 
-  if (init.body && !headers.has('Content-Type')) {
+  const body = init.body
+  const shouldSetJsonContentType = !!body
+    && !(body instanceof FormData)
+    && !(body instanceof URLSearchParams)
+    && !(body instanceof Blob)
+    && !headers.has('Content-Type')
+
+  if (shouldSetJsonContentType) {
     headers.set('Content-Type', 'application/json')
   }
 

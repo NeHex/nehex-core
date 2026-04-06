@@ -21,7 +21,7 @@ import { fetchBackendVersion } from '@/services/settings'
 import { normalizeBasePath } from '@/utils/path'
 import { getAuthenticatedAccount } from '@/utils/auth'
 
-type SectionKey = 'nehex' | 'site' | 'theme'
+type SectionKey = 'nehex' | 'site' | 'storage' | 'theme'
 
 type NehexForm = {
   adminManagerWeb: string
@@ -34,6 +34,25 @@ type SiteForm = {
   siteKeywords: string
   siteDescription: string
   siteFavicon: string
+}
+
+type StorageProvider = 'local' | 'r2' | 'oss'
+
+type StorageForm = {
+  provider: StorageProvider
+  enabled: boolean
+  publicBaseUrl: string
+  localRoot: string
+  localPathRule: string
+  r2Endpoint: string
+  r2Bucket: string
+  r2AccessKeyId: string
+  r2SecretAccessKey: string
+  r2Region: string
+  ossEndpoint: string
+  ossBucket: string
+  ossAccessKeyId: string
+  ossSecretAccessKey: string
 }
 
 type AccountForm = {
@@ -61,6 +80,8 @@ type ThemeSnapshot = {
   selectedFile: string
 }
 
+type StorageSnapshot = StorageForm
+
 type LatestRelease = {
   tagName: string
   name: string
@@ -82,6 +103,12 @@ const sections: SectionMeta[] = [
     description: '站点标题、副标题、地址、关键词、描述与 favicon。',
   },
   {
+    key: 'storage',
+    label: '对象存储',
+    icon: 'mdi-cloud-upload-outline',
+    description: '配置图片上传存储平台（CloudFlare R2、阿里云 OSS、本机存储）。',
+  },
+  {
     key: 'theme',
     label: '主题配置',
     icon: 'mdi-code-json',
@@ -94,6 +121,30 @@ const defaultSection: SectionMeta = sections[0]!
 const githubLatestReleaseApi = 'https://api.github.com/repos/nehex/nehex-core/releases/latest'
 const REI_THEME_FILE = 'rei.json'
 const CREATE_THEME_OPTION_VALUE = '__create_theme_template__'
+const DEFAULT_STORAGE_LOCAL_ROOT = 'storage'
+const DEFAULT_STORAGE_LOCAL_PATH_RULE = '/{year}-{month}/{day}/{random_name}.{file_type}'
+const storageProviderOptions: Array<{ label: string, value: StorageProvider }> = [
+  { label: 'CloudFlare R2', value: 'r2' },
+  { label: '阿里云 OSS', value: 'oss' },
+  { label: '本机存储', value: 'local' },
+]
+
+const STORAGE_SETTING_KEYS = {
+  provider: 'object_storage_provider',
+  enabled: 'object_storage_enabled',
+  publicBaseUrl: 'object_storage_public_base_url',
+  localRoot: 'object_storage_local_root',
+  localPathRule: 'object_storage_local_path_rule',
+  r2Endpoint: 'object_storage_r2_endpoint',
+  r2Bucket: 'object_storage_r2_bucket',
+  r2AccessKeyId: 'object_storage_r2_access_key_id',
+  r2SecretAccessKey: 'object_storage_r2_secret_access_key',
+  r2Region: 'object_storage_r2_region',
+  ossEndpoint: 'object_storage_oss_endpoint',
+  ossBucket: 'object_storage_oss_bucket',
+  ossAccessKeyId: 'object_storage_oss_access_key_id',
+  ossSecretAccessKey: 'object_storage_oss_secret_access_key',
+} as const
 const REI_THEME_DEFAULT_CONTENT: Record<string, unknown> = {
   head_pic: '/images/head.jpg',
   background_images: '/images/background-2k.png',
@@ -371,6 +422,22 @@ function validateAdminManagerWebPath(raw: string): string {
   return ''
 }
 
+function normalizeStorageProvider(raw: string): StorageProvider {
+  const normalized = raw.trim().toLowerCase()
+  if (normalized === 'r2' || normalized === 'oss' || normalized === 'local') {
+    return normalized
+  }
+  return 'local'
+}
+
+function parseBooleanSetting(raw: string, fallback = true): boolean {
+  const text = raw.trim().toLowerCase()
+  if (!text) {
+    return fallback
+  }
+  return ['1', 'true', 'yes', 'on'].includes(text)
+}
+
 export function useSettingsPage() {
   const activeSectionKey = ref<SectionKey>('nehex')
   const loading = ref(false)
@@ -394,6 +461,23 @@ export function useSettingsPage() {
     siteKeywords: '',
     siteDescription: '',
     siteFavicon: '',
+  })
+
+  const storageForm = reactive<StorageForm>({
+    provider: 'local',
+    enabled: true,
+    publicBaseUrl: '',
+    localRoot: DEFAULT_STORAGE_LOCAL_ROOT,
+    localPathRule: DEFAULT_STORAGE_LOCAL_PATH_RULE,
+    r2Endpoint: '',
+    r2Bucket: '',
+    r2AccessKeyId: '',
+    r2SecretAccessKey: '',
+    r2Region: 'auto',
+    ossEndpoint: '',
+    ossBucket: '',
+    ossAccessKeyId: '',
+    ossSecretAccessKey: '',
   })
 
   const accountForm = reactive<AccountForm>({
@@ -422,6 +506,7 @@ export function useSettingsPage() {
 
   const nehexSnapshot = ref<NehexSnapshot>(getNehexSnapshotData())
   const siteSnapshot = ref<SiteForm>(getSiteFormData())
+  const storageSnapshot = ref<StorageSnapshot>(getStorageFormData())
   const themeSnapshot = ref<ThemeSnapshot>(getThemeSnapshotData())
 
   const activeSection = computed<SectionMeta>(() => {
@@ -496,6 +581,10 @@ export function useSettingsPage() {
     }
     return true
   })
+
+  const showLocalStorageFields = computed(() => storageForm.provider === 'local')
+  const showR2StorageFields = computed(() => storageForm.provider === 'r2')
+  const showOssStorageFields = computed(() => storageForm.provider === 'oss')
 
   watch(selectedThemeFile, (next, previous) => {
     if (previous) {
@@ -733,6 +822,25 @@ export function useSettingsPage() {
     }
   }
 
+  function getStorageFormData(): StorageSnapshot {
+    return {
+      provider: storageForm.provider,
+      enabled: storageForm.enabled,
+      publicBaseUrl: storageForm.publicBaseUrl,
+      localRoot: storageForm.localRoot,
+      localPathRule: storageForm.localPathRule,
+      r2Endpoint: storageForm.r2Endpoint,
+      r2Bucket: storageForm.r2Bucket,
+      r2AccessKeyId: storageForm.r2AccessKeyId,
+      r2SecretAccessKey: storageForm.r2SecretAccessKey,
+      r2Region: storageForm.r2Region,
+      ossEndpoint: storageForm.ossEndpoint,
+      ossBucket: storageForm.ossBucket,
+      ossAccessKeyId: storageForm.ossAccessKeyId,
+      ossSecretAccessKey: storageForm.ossSecretAccessKey,
+    }
+  }
+
   function getThemeSnapshotData(): ThemeSnapshot {
     syncThemeEditorToProfile(undefined, false)
     return {
@@ -754,6 +862,25 @@ export function useSettingsPage() {
     Object.assign(siteForm, data)
   }
 
+  function applyStorageFormData(data: StorageSnapshot): void {
+    Object.assign(storageForm, {
+      provider: normalizeStorageProvider(data.provider),
+      enabled: !!data.enabled,
+      publicBaseUrl: data.publicBaseUrl || '',
+      localRoot: data.localRoot || DEFAULT_STORAGE_LOCAL_ROOT,
+      localPathRule: data.localPathRule || DEFAULT_STORAGE_LOCAL_PATH_RULE,
+      r2Endpoint: data.r2Endpoint || '',
+      r2Bucket: data.r2Bucket || '',
+      r2AccessKeyId: data.r2AccessKeyId || '',
+      r2SecretAccessKey: data.r2SecretAccessKey || '',
+      r2Region: data.r2Region || 'auto',
+      ossEndpoint: data.ossEndpoint || '',
+      ossBucket: data.ossBucket || '',
+      ossAccessKeyId: data.ossAccessKeyId || '',
+      ossSecretAccessKey: data.ossSecretAccessKey || '',
+    })
+  }
+
   function applyThemeSnapshot(snapshot: ThemeSnapshot): void {
     themeProfiles.value = mergeWithReiTemplate(snapshot.profiles)
     selectedThemeFile.value = snapshot.selectedFile || themeProfiles.value[0]?.file || REI_THEME_FILE
@@ -766,6 +893,7 @@ export function useSettingsPage() {
   function updateSnapshots(): void {
     nehexSnapshot.value = getNehexSnapshotData()
     siteSnapshot.value = getSiteFormData()
+    storageSnapshot.value = getStorageFormData()
     themeSnapshot.value = getThemeSnapshotData()
   }
 
@@ -784,6 +912,21 @@ export function useSettingsPage() {
     siteForm.siteKeywords = readSetting(settingsMap, 'site_keywords')
     siteForm.siteDescription = readSetting(settingsMap, 'site_description')
     siteForm.siteFavicon = readSetting(settingsMap, 'site_favicon')
+
+    storageForm.provider = normalizeStorageProvider(readSetting(settingsMap, STORAGE_SETTING_KEYS.provider))
+    storageForm.enabled = parseBooleanSetting(readSetting(settingsMap, STORAGE_SETTING_KEYS.enabled), true)
+    storageForm.publicBaseUrl = readSetting(settingsMap, STORAGE_SETTING_KEYS.publicBaseUrl)
+    storageForm.localRoot = readSetting(settingsMap, STORAGE_SETTING_KEYS.localRoot) || DEFAULT_STORAGE_LOCAL_ROOT
+    storageForm.localPathRule = readSetting(settingsMap, STORAGE_SETTING_KEYS.localPathRule) || DEFAULT_STORAGE_LOCAL_PATH_RULE
+    storageForm.r2Endpoint = readSetting(settingsMap, STORAGE_SETTING_KEYS.r2Endpoint)
+    storageForm.r2Bucket = readSetting(settingsMap, STORAGE_SETTING_KEYS.r2Bucket)
+    storageForm.r2AccessKeyId = readSetting(settingsMap, STORAGE_SETTING_KEYS.r2AccessKeyId)
+    storageForm.r2SecretAccessKey = readSetting(settingsMap, STORAGE_SETTING_KEYS.r2SecretAccessKey)
+    storageForm.r2Region = readSetting(settingsMap, STORAGE_SETTING_KEYS.r2Region) || 'auto'
+    storageForm.ossEndpoint = readSetting(settingsMap, STORAGE_SETTING_KEYS.ossEndpoint)
+    storageForm.ossBucket = readSetting(settingsMap, STORAGE_SETTING_KEYS.ossBucket)
+    storageForm.ossAccessKeyId = readSetting(settingsMap, STORAGE_SETTING_KEYS.ossAccessKeyId)
+    storageForm.ossSecretAccessKey = readSetting(settingsMap, STORAGE_SETTING_KEYS.ossSecretAccessKey)
 
     const legacyTheme: ThemeLegacyDefaults = {
       background: readSetting(settingsMap, 'theme_background'),
@@ -857,6 +1000,51 @@ export function useSettingsPage() {
     return payload
   }
 
+  function buildStorageSettingsPayload(): AdminSettingUpdateItem[] {
+    const provider = storageForm.provider
+    const localRoot = storageForm.localRoot.trim() || DEFAULT_STORAGE_LOCAL_ROOT
+    const localPathRule = storageForm.localPathRule.trim() || DEFAULT_STORAGE_LOCAL_PATH_RULE
+    const publicBaseUrl = storageForm.publicBaseUrl.trim()
+    const r2Endpoint = storageForm.r2Endpoint.trim()
+    const r2Bucket = storageForm.r2Bucket.trim()
+    const r2AccessKeyId = storageForm.r2AccessKeyId.trim()
+    const r2SecretAccessKey = storageForm.r2SecretAccessKey.trim()
+    const r2Region = storageForm.r2Region.trim() || 'auto'
+    const ossEndpoint = storageForm.ossEndpoint.trim()
+    const ossBucket = storageForm.ossBucket.trim()
+    const ossAccessKeyId = storageForm.ossAccessKeyId.trim()
+    const ossSecretAccessKey = storageForm.ossSecretAccessKey.trim()
+
+    if (provider === 'r2') {
+      if (!r2Endpoint || !r2Bucket || !r2AccessKeyId || !r2SecretAccessKey) {
+        throw new Error('CloudFlare R2 配置不完整，请填写 Endpoint、Bucket、AccessKey 和 Secret')
+      }
+    }
+
+    if (provider === 'oss') {
+      if (!ossEndpoint || !ossBucket || !ossAccessKeyId || !ossSecretAccessKey) {
+        throw new Error('阿里云 OSS 配置不完整，请填写 Endpoint、Bucket、AccessKey 和 Secret')
+      }
+    }
+
+    return [
+      { setting_key: STORAGE_SETTING_KEYS.provider, setting_content: provider, setting_type: 'string' },
+      { setting_key: STORAGE_SETTING_KEYS.enabled, setting_content: true, setting_type: 'boolean' },
+      { setting_key: STORAGE_SETTING_KEYS.publicBaseUrl, setting_content: publicBaseUrl, setting_type: 'string' },
+      { setting_key: STORAGE_SETTING_KEYS.localRoot, setting_content: localRoot, setting_type: 'string' },
+      { setting_key: STORAGE_SETTING_KEYS.localPathRule, setting_content: localPathRule, setting_type: 'string' },
+      { setting_key: STORAGE_SETTING_KEYS.r2Endpoint, setting_content: r2Endpoint, setting_type: 'string' },
+      { setting_key: STORAGE_SETTING_KEYS.r2Bucket, setting_content: r2Bucket, setting_type: 'string' },
+      { setting_key: STORAGE_SETTING_KEYS.r2AccessKeyId, setting_content: r2AccessKeyId, setting_type: 'string' },
+      { setting_key: STORAGE_SETTING_KEYS.r2SecretAccessKey, setting_content: r2SecretAccessKey, setting_type: 'string' },
+      { setting_key: STORAGE_SETTING_KEYS.r2Region, setting_content: r2Region, setting_type: 'string' },
+      { setting_key: STORAGE_SETTING_KEYS.ossEndpoint, setting_content: ossEndpoint, setting_type: 'string' },
+      { setting_key: STORAGE_SETTING_KEYS.ossBucket, setting_content: ossBucket, setting_type: 'string' },
+      { setting_key: STORAGE_SETTING_KEYS.ossAccessKeyId, setting_content: ossAccessKeyId, setting_type: 'string' },
+      { setting_key: STORAGE_SETTING_KEYS.ossSecretAccessKey, setting_content: ossSecretAccessKey, setting_type: 'string' },
+    ]
+  }
+
   function buildSectionItems(section: SectionKey): AdminSettingUpdateItem[] {
     if (section === 'nehex') {
       return [
@@ -874,6 +1062,10 @@ export function useSettingsPage() {
         { setting_key: 'site_description', setting_content: siteForm.siteDescription, setting_type: 'string' },
         { setting_key: 'site_favicon', setting_content: siteForm.siteFavicon.trim(), setting_type: 'string' },
       ]
+    }
+
+    if (section === 'storage') {
+      return buildStorageSettingsPayload()
     }
 
     syncThemeEditorToProfile(undefined, true)
@@ -899,6 +1091,8 @@ export function useSettingsPage() {
       applyNehexSnapshot(nehexSnapshot.value)
     } else if (section === 'site') {
       applySiteFormData(siteSnapshot.value)
+    } else if (section === 'storage') {
+      applyStorageFormData(storageSnapshot.value)
     } else if (section === 'theme') {
       applyThemeSnapshot(themeSnapshot.value)
     }
@@ -985,6 +1179,11 @@ export function useSettingsPage() {
     accountForm,
 
     siteForm,
+    storageForm,
+    storageProviderOptions,
+    showLocalStorageFields,
+    showR2StorageFields,
+    showOssStorageFields,
 
     themeProfiles,
     selectedThemeFile,

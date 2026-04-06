@@ -179,6 +179,7 @@
 <script lang="ts" setup>
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
+import { useGlobalSnackbar } from '@/composables/useGlobalSnackbar'
 import {
   createAlbum,
   fetchAlbumById,
@@ -208,6 +209,7 @@ const uploadZoneActive = ref(false)
 const errorMessage = ref('')
 const successMessage = ref('')
 const activePreviewIndex = ref(0)
+const { showGlobalSuccess } = useGlobalSnackbar()
 
 const editorForm = reactive<EditorForm>({
   title: '',
@@ -353,12 +355,11 @@ async function submitEditor(): Promise<void> {
   try {
     if (isEditing.value && props.albumId) {
       await updateAlbum(props.albumId, payload)
-      successMessage.value = '相册已保存'
     } else {
-      const created = await createAlbum(payload)
-      successMessage.value = '相册已创建'
-      await router.replace(`/albums/edit/${created.id}`)
+      await createAlbum(payload)
     }
+    showGlobalSuccess('相册发布成功')
+    await router.push('/albums')
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : '保存相册失败'
   } finally {
