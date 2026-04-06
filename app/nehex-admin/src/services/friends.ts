@@ -77,10 +77,16 @@ export async function fetchAdminFriends(keyword = ''): Promise<AdminFriendItem[]
   return payload.data
 }
 
-export async function createAdminFriend(payload: AdminFriendUpsertPayload): Promise<AdminFriendItem> {
+export async function createAdminFriend(
+  payload: AdminFriendUpsertPayload,
+  options: { overwriteExisting?: boolean } = {},
+): Promise<AdminFriendItem> {
   const response = await adminFetch('/admin-api/friends', {
     method: 'POST',
-    body: JSON.stringify(payload),
+    body: JSON.stringify({
+      ...payload,
+      overwrite_existing: Boolean(options.overwriteExisting),
+    }),
   })
 
   const result = await parseJson<AdminFriendDetailResponse>(response)

@@ -53,6 +53,7 @@ def admin_create_friend_api(
             favicon=payload.favicon,
             url=payload.url,
             status=payload.status,
+            overwrite_existing=payload.overwrite_existing,
         )
     except IntegrityError as error:
         session.rollback()

@@ -326,6 +326,21 @@
         </v-card-actions>
       </v-card>
     </v-dialog>
+
+    <v-dialog v-model="overwriteDialog" max-width="480">
+      <v-card class="dialog-card" rounded="xl">
+        <v-card-title class="dialog-title">检测到重复 URL</v-card-title>
+        <v-card-text>
+          当前 URL 已存在友链记录，是否用当前表单内容覆盖原记录？
+          <div class="mt-2">URL: {{ pendingOverwritePayload?.url || '-' }}</div>
+        </v-card-text>
+        <v-card-actions class="dialog-actions">
+          <v-spacer />
+          <v-btn variant="text" @click="closeOverwriteDialog">取消</v-btn>
+          <v-btn color="warning" :loading="friendSubmitting" @click="confirmOverwriteCreate">覆盖保存</v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
   </AdminLayout>
 </template>
 
@@ -366,8 +381,10 @@ const applyActionLoading = ref<Record<number, boolean>>({})
 
 const friendDialog = ref(false)
 const deleteDialog = ref(false)
+const overwriteDialog = ref(false)
 const editingFriendId = ref<number | null>(null)
 const pendingDelete = ref<AdminFriendItem | null>(null)
+const pendingOverwritePayload = ref<AdminFriendUpsertPayload | null>(null)
 
 const friendForm = reactive<{
   title: string
@@ -517,6 +534,8 @@ function openCreateFriendDialog(): void {
   errorMessage.value = ''
   successMessage.value = ''
   editingFriendId.value = null
+  pendingOverwritePayload.value = null
+  overwriteDialog.value = false
   resetFriendForm()
   friendDialog.value = true
 }
@@ -524,6 +543,8 @@ function openCreateFriendDialog(): void {
 function openEditFriendDialog(item: AdminFriendItem): void {
   errorMessage.value = ''
   successMessage.value = ''
+  pendingOverwritePayload.value = null
+  overwriteDialog.value = false
   editingFriendId.value = item.id
   friendForm.title = item.title
   friendForm.description = item.description || ''
@@ -539,6 +560,43 @@ function closeFriendDialog(force = false): void {
     return
   }
   friendDialog.value = false
+  pendingOverwritePayload.value = null
+  overwriteDialog.value = false
+}
+
+function isDuplicateFriendUrlError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error || '')
+  return message.includes('Friend URL already exists')
+}
+
+function closeOverwriteDialog(force = false): void {
+  if (friendSubmitting.value && !force) {
+    return
+  }
+  overwriteDialog.value = false
+  pendingOverwritePayload.value = null
+}
+
+async function confirmOverwriteCreate(): Promise<void> {
+  const payload = pendingOverwritePayload.value
+  if (!payload) {
+    return
+  }
+
+  friendSubmitting.value = true
+  errorMessage.value = ''
+  successMessage.value = ''
+  try {
+    await createAdminFriend(payload, { overwriteExisting: true })
+    closeOverwriteDialog(true)
+    closeFriendDialog(true)
+    successMessage.value = '检测到重复 URL，已覆盖原友链'
+    await loadFriends()
+  } catch (error) {
+    errorMessage.value = error instanceof Error ? error.message : '覆盖友链失败'
+  } finally {
+    friendSubmitting.value = false
+  }
 }
 
 async function submitFriendForm(): Promise<void> {
@@ -561,6 +619,11 @@ async function submitFriendForm(): Promise<void> {
     closeFriendDialog(true)
     await loadFriends()
   } catch (error) {
+    if (!editingFriendId.value && isDuplicateFriendUrlError(error)) {
+      pendingOverwritePayload.value = payload
+      overwriteDialog.value = true
+      return
+    }
     errorMessage.value = error instanceof Error ? error.message : '保存友链失败'
   } finally {
     friendSubmitting.value = false

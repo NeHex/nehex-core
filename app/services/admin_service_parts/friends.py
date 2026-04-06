@@ -56,16 +56,29 @@ def create_admin_friend(
     favicon: Optional[str] = None,
     url: str,
     status: str = "ok",
+    overwrite_existing: bool = False,
 ) -> FriendItem:
     normalized_url = url.strip()
     if not normalized_url:
         raise ValueError("url is required")
 
     existing = session.execute(
-        select(Friend.id).where(Friend.url == normalized_url).limit(1),
+        select(Friend).where(Friend.url == normalized_url).limit(1),
     ).scalars().first()
     if existing is not None:
-        raise ValueError("Friend URL already exists")
+        if not overwrite_existing:
+            raise ValueError("Friend URL already exists")
+
+        existing.title = title.strip()
+        existing.description = _normalize_optional_text(description)
+        existing.category = _normalize_optional_text(category) or "default"
+        existing.favicon = _normalize_optional_text(favicon)
+        existing.url = normalized_url
+        existing.status = _normalize_friend_status(status)
+        session.commit()
+        session.refresh(existing)
+        _invalidate_friends_cache()
+        return _map_friend_item(existing)
 
     row = Friend(
         title=title.strip(),

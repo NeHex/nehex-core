@@ -268,6 +268,7 @@ class AdminFriendCreateRequest(BaseModel):
     favicon: Optional[str] = Field(default=None, max_length=500)
     url: str = Field(min_length=1, max_length=500)
     status: FriendStatus = "ok"
+    overwrite_existing: bool = False
 
     @field_validator("title", "category")
     @classmethod
