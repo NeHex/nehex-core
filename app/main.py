@@ -1,5 +1,7 @@
 from contextlib import asynccontextmanager
+import logging
 from pathlib import Path
+import re
 import shutil
 import subprocess
 import threading
@@ -29,11 +31,16 @@ ADMIN_INDEX_FILE = ADMIN_DIST_DIR / "index.html"
 ADMIN_BASE_PLACEHOLDER = "__ADMIN_MANAGER_WEB__"
 _ADMIN_INDEX_CACHE_LOCK = threading.Lock()
 _ADMIN_INDEX_TEMPLATE_CACHE: tuple[float, str] | None = None
+MDI_PRELOAD_LINK_RE = re.compile(
+    r'\s*<link[^>]*rel="preload"[^>]*href="assets/materialdesignicons-webfont[^"]+"[^>]*>\s*',
+    flags=re.IGNORECASE,
+)
+logger = logging.getLogger(__name__)
 
 
 def _run_startup_command(command: list[str], cwd: Path) -> None:
     cmd_display = " ".join(command)
-    print(f"[startup] running `{cmd_display}` in {cwd}")
+    logger.info("[startup] running `%s` in %s", cmd_display, cwd)
     completed = subprocess.run(command, cwd=str(cwd), check=False)
     if completed.returncode != 0:
         raise RuntimeError(
@@ -45,7 +52,7 @@ def _build_admin_frontend() -> None:
     npm_executable = shutil.which("npm")
     if npm_executable is None:
         if ADMIN_INDEX_FILE.exists():
-            print(
+            logger.warning(
                 "[startup] `npm` not found in PATH, skip admin frontend build "
                 "and use prebuilt dist files.",
             )
@@ -69,13 +76,13 @@ def _wait_for_database_ready() -> None:
         try:
             check_database_connection()
             if attempt > 1:
-                print(f"[startup] database ready after retry {attempt}/{max_retries}")
+                logger.info("[startup] database ready after retry %s/%s", attempt, max_retries)
             return
         except Exception as error:
             last_error = error
             if attempt >= max_retries:
                 break
-            print(
+            logger.warning(
                 f"[startup] database not ready ({attempt}/{max_retries}) "
                 f"{settings.db_host}:{settings.db_port}, retry in {retry_interval}s: {error}",
             )
@@ -89,6 +96,14 @@ def _wait_for_database_ready() -> None:
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
+    if (
+        settings.admin_api_secret.strip() == "please-change-me"
+        and settings.app_env.strip().lower() not in {"dev", "development", "local", "test"}
+    ):
+        raise RuntimeError(
+            "Unsafe default ADMIN_API_SECRET is not allowed outside development environments.",
+        )
+
     if settings.admin_manager_build_on_startup:
         _build_admin_frontend()
     if not ADMIN_INDEX_FILE.exists():
@@ -102,14 +117,14 @@ async def lifespan(_: FastAPI):
             ensure_system_tables()
         except Exception as error:
             # Do not block API startup when DB account lacks DDL privileges.
-            print(f"[startup] skip ensure_system_tables: {error}")
+            logger.warning("[startup] skip ensure_system_tables: %s", error)
         try:
             ensure_performance_indexes()
         except Exception as error:
             # Do not block API startup when DB account lacks index privileges.
-            print(f"[startup] skip ensure_performance_indexes: {error}")
+            logger.warning("[startup] skip ensure_performance_indexes: %s", error)
     else:
-        print("[startup] skip schema DDL/index auto-create (DB_AUTO_CREATE_TABLES=false)")
+        logger.info("[startup] skip schema DDL/index auto-create (DB_AUTO_CREATE_TABLES=false)")
     yield
     close_cache()
     close_database()
@@ -143,6 +158,8 @@ def _render_admin_index(admin_base_path: str) -> str:
     index_html = _read_admin_index_template()
     admin_base = _admin_base_with_slash(admin_base_path)
     rendered = index_html.replace(ADMIN_BASE_PLACEHOLDER, admin_base)
+    # Drop MDI font preloads to avoid unsupported type warnings (eot/ttf) and noisy unused-preload warnings.
+    rendered = MDI_PRELOAD_LINK_RE.sub("\n", rendered)
 
     base_tag = f'<base href="{admin_base}">'
     if "<base " not in rendered:

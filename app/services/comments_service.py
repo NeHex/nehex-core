@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 from app.core.simple_cache import cache
 from app.models.comment import Comment
 from app.schemas.comment import CommentCreateRequest, CommentItem
+from app.services.mail_service import send_comment_notification_mails
 
 SUPPORTED_TARGET_TYPES = {"article", "album", "singlepage", "friend_page"}
 
@@ -203,6 +204,7 @@ def create_comment(
     ip_address: str | None = None,
 ) -> CommentItem:
     parent_id = payload.parent_id if payload.parent_id > 0 else 0
+    parent_row: Comment | None = None
 
     if parent_id > 0:
         parent_stmt = (
@@ -236,6 +238,15 @@ def create_comment(
     session.add(new_comment)
     session.commit()
     session.refresh(new_comment)
+    try:
+        send_comment_notification_mails(
+            session=session,
+            comment=new_comment,
+            parent_comment=parent_row,
+        )
+    except Exception:
+        # Mail notifications should not block comment creation.
+        session.rollback()
 
     _invalidate_comment_cache(payload.target_type, payload.target_id)
     return _map_comment_item(new_comment)

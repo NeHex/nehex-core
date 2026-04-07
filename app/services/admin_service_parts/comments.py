@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.models.comment import Comment
 from app.schemas.comment import CommentItem
+from app.services.mail_service import send_comment_notification_mails
 from app.services.admin_service_parts.common import (
     _invalidate_comment_cache,
     _map_comment_item,
@@ -69,8 +70,13 @@ def create_admin_comment(
     website: Optional[str] = None,
     status: int = 1,
 ) -> CommentItem:
+    normalized_parent_id = max(0, int(parent_id))
+    parent_comment: Comment | None = None
+    if normalized_parent_id > 0:
+        parent_comment = session.get(Comment, normalized_parent_id)
+
     row = Comment(
-        parent_id=max(0, int(parent_id)),
+        parent_id=normalized_parent_id,
         target_type=target_type.strip().lower(),
         target_id=int(target_id),
         content=content.strip(),
@@ -82,6 +88,15 @@ def create_admin_comment(
     session.add(row)
     session.commit()
     session.refresh(row)
+    try:
+        send_comment_notification_mails(
+            session=session,
+            comment=row,
+            parent_comment=parent_comment,
+        )
+    except Exception:
+        # Mail notifications should not block admin comment operations.
+        session.rollback()
     _invalidate_comment_cache(row.target_type, row.target_id)
     return _map_comment_item(row)
 

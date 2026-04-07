@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from datetime import datetime
+
 from pydantic import BaseModel, Field
 
 from app.schemas.album import AlbumItem
@@ -17,6 +19,21 @@ class AdminPagination(BaseModel):
     size: int = Field(ge=1)
     total: int = Field(ge=0)
     total_pages: int = Field(ge=0)
+
+
+class AdminBackupItem(BaseModel):
+    filename: str
+    size_bytes: int = Field(ge=0)
+    created_at: datetime
+    updated_at: datetime
+
+
+class AdminBackupDetailResponse(BaseModel):
+    data: AdminBackupItem
+
+
+class AdminBackupListResponse(BaseModel):
+    data: list[AdminBackupItem]
 
 
 class AdminArticleDetailResponse(BaseModel):
@@ -41,6 +58,25 @@ class AdminCommentDetailResponse(BaseModel):
 
 class AdminCommentListResponse(BaseModel):
     data: list[CommentItem]
+    pagination: AdminPagination
+
+
+class AdminMailLogItem(BaseModel):
+    id: int
+    category: str
+    template_key: str
+    to_email: str
+    subject: str
+    body: str
+    status: str
+    error_message: str | None = None
+    trigger_comment_id: int | None = None
+    created_at: datetime
+    sent_at: datetime | None = None
+
+
+class AdminMailLogListResponse(BaseModel):
+    data: list[AdminMailLogItem]
     pagination: AdminPagination
 
 

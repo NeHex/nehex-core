@@ -1,3 +1,11 @@
+from app.services.admin_service_parts.backup import (
+    create_admin_backup,
+    get_admin_backup_file_path,
+    list_admin_backups,
+    restore_admin_backup,
+    upload_and_restore_admin_backup,
+    upload_and_restore_admin_backup_stream,
+)
 from app.services.admin_service_parts.comments import (
     create_admin_comment,
     delete_admin_comment,
@@ -35,6 +43,7 @@ from app.services.admin_service_parts.friends import (
     update_admin_friend,
     update_admin_friend_apply_status,
 )
+from app.services.admin_service_parts.mail import list_admin_mail_logs, test_admin_mail_smtp
 from app.services.admin_service_parts.settings import (
     get_admin_credentials,
     list_admin_settings,
@@ -44,6 +53,12 @@ from app.services.admin_service_parts.settings import (
 
 __all__ = [
     "SENSITIVE_ADMIN_SETTING_KEYS",
+    "list_admin_backups",
+    "create_admin_backup",
+    "get_admin_backup_file_path",
+    "restore_admin_backup",
+    "upload_and_restore_admin_backup",
+    "upload_and_restore_admin_backup_stream",
     "get_admin_dashboard_data",
     "get_admin_credentials",
     "list_admin_friends",
@@ -78,4 +93,6 @@ __all__ = [
     "create_admin_comment",
     "update_admin_comment",
     "delete_admin_comment",
+    "list_admin_mail_logs",
+    "test_admin_mail_smtp",
 ]

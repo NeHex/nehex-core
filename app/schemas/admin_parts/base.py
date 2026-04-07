@@ -37,6 +37,50 @@ class AdminActionResponse(BaseModel):
     message: str
 
 
+class AdminBackupRestoreRequest(BaseModel):
+    confirm_overwrite: bool = Field(default=False)
+
+
+class AdminMailSmtpTestRequest(BaseModel):
+    smtp_host: str = Field(min_length=1, max_length=255)
+    smtp_port: int = Field(default=465, ge=1, le=65535)
+    smtp_security: str = Field(default="ssl", min_length=1, max_length=20)
+    smtp_username: Optional[str] = Field(default=None, max_length=255)
+    smtp_password: Optional[str] = Field(default=None, max_length=255)
+    smtp_from_email: Optional[str] = Field(default=None, max_length=255)
+    smtp_from_name: Optional[str] = Field(default=None, max_length=120)
+    smtp_timeout_seconds: int = Field(default=12, ge=3, le=120)
+    test_email: str = Field(min_length=1, max_length=255)
+
+    @field_validator(
+        "smtp_host",
+        "smtp_security",
+        "test_email",
+    )
+    @classmethod
+    def normalize_required_text(cls, value: str) -> str:
+        normalized = value.strip()
+        if not normalized:
+            raise ValueError("Field is required")
+        return normalized
+
+    @field_validator("smtp_username", "smtp_password", "smtp_from_email", "smtp_from_name")
+    @classmethod
+    def normalize_optional_text(cls, value: Optional[str]) -> Optional[str]:
+        if value is None:
+            return None
+        normalized = value.strip()
+        return normalized or None
+
+    @field_validator("smtp_security")
+    @classmethod
+    def normalize_smtp_security(cls, value: str) -> str:
+        normalized = value.strip().lower()
+        if normalized not in {"none", "starttls", "ssl"}:
+            raise ValueError("smtp_security must be one of: none/starttls/ssl")
+        return normalized
+
+
 class AdminSettingUpdateItem(BaseModel):
     setting_key: str = Field(min_length=1, max_length=100)
     setting_content: Any = None

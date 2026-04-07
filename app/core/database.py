@@ -1,4 +1,5 @@
 from collections.abc import Generator
+import logging
 
 from sqlalchemy import inspect, text
 from sqlalchemy.orm import Session, sessionmaker
@@ -7,7 +8,10 @@ from sqlalchemy import create_engine
 from app.core.config import settings
 from app.models.base import Base
 from app.models.friend_apply import FriendApply
+from app.models.mail_log import MailLog
 import app.models  # noqa: F401
+
+logger = logging.getLogger(__name__)
 
 
 engine = create_engine(
@@ -46,7 +50,7 @@ def check_database_connection() -> None:
 
 
 def ensure_system_tables() -> None:
-    Base.metadata.create_all(bind=engine, tables=[FriendApply.__table__], checkfirst=True)
+    Base.metadata.create_all(bind=engine, tables=[FriendApply.__table__, MailLog.__table__], checkfirst=True)
 
 
 def ensure_all_tables() -> None:
@@ -75,6 +79,8 @@ def ensure_performance_indexes() -> None:
         ("friend_apply", "idx_friend_apply_status_time", "status,create_time,id", False),
         ("friend_apply", "idx_friend_apply_url_time", "site_url,create_time,id", False),
         ("friends", "uq_friends_url", "url", True),
+        ("mail_log", "idx_mail_log_status_time", "status,created_at,id", False),
+        ("mail_log", "idx_mail_log_comment", "trigger_comment_id,created_at,id", False),
     ]
 
     check_table_sql = text(
@@ -132,7 +138,7 @@ def ensure_performance_indexes() -> None:
                 )
             except Exception as error:
                 # Continue with remaining indexes to avoid blocking startup due to a single bad index.
-                print(f"[startup] skip index {index_name} on {table_name}: {error}")
+                logger.warning("[startup] skip index %s on %s: %s", index_name, table_name, error)
 
 
 def close_database() -> None:

@@ -1,8 +1,8 @@
 <template>
-  <AdminLayout>
+  <AdminLayout v-if="isRootSettingsRoute">
     <template #secondary-nav>
       <div class="settings-subnav">
-        <div class="subnav-title">站点设置</div>
+        <div class="subnav-title">设定</div>
         <v-list class="subnav-list" density="comfortable" nav>
           <v-list-item
             v-for="item in sections"
@@ -545,11 +545,17 @@
       </v-dialog>
     </section>
   </AdminLayout>
+  <RouterView v-else />
 </template>
 
 <script lang="ts" setup>
+import { computed } from 'vue'
+import { useRoute } from 'vue-router'
 import AdminLayout from '@/components/admin/AdminLayout.vue'
 import { useSettingsPage } from '@/pages/settings/useSettingsPage'
+
+const route = useRoute()
+const isRootSettingsRoute = computed(() => route.path === '/settings')
 
 const {
   sections,

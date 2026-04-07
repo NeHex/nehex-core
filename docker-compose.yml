@@ -24,6 +24,7 @@ services:
       - "${APP_PORT:-7878}:7878"
     volumes:
       - backend-storage:/app/storage
+      - backend-backups:/app/backups
     networks:
       - nehex-internal
     healthcheck:
@@ -73,5 +74,6 @@ networks:
 
 volumes:
   backend-storage:
+  backend-backups:
   mysql-data:
   redis-data:

@@ -125,7 +125,17 @@ const menuItems: MenuItem[] = [
       { label: '新增', to: '/projects/new' },
     ],
   },
-  { icon: 'mdi-cog-outline', label: '站点设置', to: '/settings' },
+  {
+    icon: 'mdi-cog-outline',
+    label: '设定',
+    to: '/settings',
+    children: [
+      { label: '设定', to: '/settings', parentTo: '/settings' },
+      { label: '通知设置', to: '/settings/mail-notify' },
+      { label: '邮件管理', to: '/settings/mail-management' },
+      { label: '备份与恢复', to: '/settings/backup-restore' },
+    ],
+  },
 ]
 
 const router = useRouter()
@@ -152,6 +162,9 @@ async function handleLogout(): Promise<void> {
 }
 
 function isMenuItemActive(item: MenuItem): boolean {
+  if (item.children?.length) {
+    return hasActiveSubmenuItem(item) || route.path === item.to
+  }
   if (item.to === '/') {
     return route.path === '/'
   }
@@ -162,7 +175,7 @@ function isSubmenuItemActive(item: MenuChildItem): boolean {
   if (item.parentTo && item.to === item.parentTo) {
     return route.path === item.parentTo || route.path.startsWith(`${item.parentTo}/edit/`)
   }
-  return route.path === item.to
+  return route.path === item.to || route.path.startsWith(`${item.to}/`)
 }
 
 function handleMenuItemClick(item: MenuItem): void {
@@ -192,6 +205,9 @@ function isSubmenuExpanded(item: MenuItem): boolean {
   if (expandedMenuKey.value === item.to) {
     return true
   }
+  if (item.children?.length) {
+    return route.path === item.to || hasActiveSubmenuItem(item)
+  }
   return route.path === item.to || route.path.startsWith(`${item.to}/`)
 }
 
@@ -200,10 +216,17 @@ function getDefaultExpandedMenuKey(): string | null {
     if (!item.children?.length) {
       return false
     }
-    return route.path === item.to || route.path.startsWith(`${item.to}/`)
+    return route.path === item.to || hasActiveSubmenuItem(item)
   })
 
   return matched?.to ?? null
+}
+
+function hasActiveSubmenuItem(item: MenuItem): boolean {
+  if (!item.children?.length) {
+    return false
+  }
+  return item.children.some((child) => isSubmenuItemActive(child))
 }
 </script>
 

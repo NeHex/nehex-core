@@ -38,7 +38,10 @@ declare module 'vue-router/auto-routes' {
     '/projects': RouteRecordInfo<'/projects', '/projects', Record<never, never>, Record<never, never>, '/projects/edit/[id]' | '/projects/new'>,
     '/projects/edit/[id]': RouteRecordInfo<'/projects/edit/[id]', '/projects/edit/:id', { id: ParamValue<true> }, { id: ParamValue<false> }>,
     '/projects/new': RouteRecordInfo<'/projects/new', '/projects/new', Record<never, never>, Record<never, never>>,
-    '/settings': RouteRecordInfo<'/settings', '/settings', Record<never, never>, Record<never, never>>,
+    '/settings': RouteRecordInfo<'/settings', '/settings', Record<never, never>, Record<never, never>, '/settings/backup-restore' | '/settings/mail-management' | '/settings/mail-notify'>,
+    '/settings/backup-restore': RouteRecordInfo<'/settings/backup-restore', '/settings/backup-restore', Record<never, never>, Record<never, never>>,
+    '/settings/mail-management': RouteRecordInfo<'/settings/mail-management', '/settings/mail-management', Record<never, never>, Record<never, never>>,
+    '/settings/mail-notify': RouteRecordInfo<'/settings/mail-notify', '/settings/mail-notify', Record<never, never>, Record<never, never>>,
   }
 
   /**
@@ -133,7 +136,19 @@ declare module 'vue-router/auto-routes' {
       views: never
     }
     'src/pages/settings.vue': {
-      routes: '/settings'
+      routes: '/settings' | '/settings/backup-restore' | '/settings/mail-management' | '/settings/mail-notify'
+      views: 'default'
+    }
+    'src/pages/settings/backup-restore.vue': {
+      routes: '/settings/backup-restore'
+      views: never
+    }
+    'src/pages/settings/mail-management.vue': {
+      routes: '/settings/mail-management'
+      views: never
+    }
+    'src/pages/settings/mail-notify.vue': {
+      routes: '/settings/mail-notify'
       views: never
     }
   }

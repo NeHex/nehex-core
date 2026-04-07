@@ -1,11 +1,22 @@
 from __future__ import annotations
 
-import pickle
+import base64
+import dataclasses
+from datetime import date, datetime, time
+from decimal import Decimal
+import importlib
+import json
+import logging
 import threading
 import time
 from typing import Any
 
 from app.core.config import settings
+
+try:
+    from pydantic import BaseModel
+except Exception:  # pragma: no cover - fallback for environments without pydantic
+    BaseModel = None  # type: ignore[assignment]
 
 try:
     import redis
@@ -15,6 +26,8 @@ except Exception:  # pragma: no cover - fallback path for missing optional depen
 
     class RedisError(Exception):
         pass
+
+logger = logging.getLogger(__name__)
 
 
 class TTLCache:
@@ -92,6 +105,142 @@ class RedisBackedTTLCache:
         self._next_connect_retry_at = 0.0
         self._last_error_log_at = 0.0
         self._missing_dependency_logged = False
+        self._resolved_class_cache: dict[str, type[Any] | None] = {}
+
+    _SERIALIZED_TYPE_KEY = "$nehex_cache_type"
+    _SERIALIZED_CLASS_KEY = "$nehex_cache_class"
+    _SERIALIZED_DATA_KEY = "$nehex_cache_data"
+
+    def _is_allowed_cache_class(self, class_path: str) -> bool:
+        if class_path == "app.services.install_service.InstallStatus":
+            return True
+        return class_path.startswith("app.schemas.")
+
+    def _resolve_cache_class(self, class_path: str) -> type[Any] | None:
+        cached = self._resolved_class_cache.get(class_path)
+        if class_path in self._resolved_class_cache:
+            return cached
+
+        if not self._is_allowed_cache_class(class_path):
+            self._resolved_class_cache[class_path] = None
+            return None
+
+        module_name, _, class_name = class_path.rpartition(".")
+        if not module_name or not class_name:
+            self._resolved_class_cache[class_path] = None
+            return None
+
+        try:
+            module = importlib.import_module(module_name)
+            target: Any = module
+            for part in class_name.split("."):
+                target = getattr(target, part, None)
+                if target is None:
+                    break
+            if isinstance(target, type):
+                self._resolved_class_cache[class_path] = target
+                return target
+        except Exception:
+            pass
+
+        self._resolved_class_cache[class_path] = None
+        return None
+
+    def _serialize_value(self, value: Any) -> Any:
+        if value is None or isinstance(value, (str, int, float, bool)):
+            return value
+
+        if isinstance(value, datetime):
+            return {
+                self._SERIALIZED_TYPE_KEY: "datetime",
+                self._SERIALIZED_DATA_KEY: value.isoformat(),
+            }
+        if isinstance(value, date):
+            return {
+                self._SERIALIZED_TYPE_KEY: "date",
+                self._SERIALIZED_DATA_KEY: value.isoformat(),
+            }
+        if isinstance(value, time):
+            return {
+                self._SERIALIZED_TYPE_KEY: "time",
+                self._SERIALIZED_DATA_KEY: value.isoformat(),
+            }
+        if isinstance(value, Decimal):
+            return {
+                self._SERIALIZED_TYPE_KEY: "decimal",
+                self._SERIALIZED_DATA_KEY: str(value),
+            }
+        if isinstance(value, bytes):
+            return {
+                self._SERIALIZED_TYPE_KEY: "bytes",
+                self._SERIALIZED_DATA_KEY: base64.b64encode(value).decode("ascii"),
+            }
+
+        if BaseModel is not None and isinstance(value, BaseModel):
+            return {
+                self._SERIALIZED_TYPE_KEY: "pydantic",
+                self._SERIALIZED_CLASS_KEY: f"{value.__class__.__module__}.{value.__class__.__qualname__}",
+                self._SERIALIZED_DATA_KEY: self._serialize_value(value.model_dump(mode="json")),
+            }
+
+        if dataclasses.is_dataclass(value) and not isinstance(value, type):
+            return {
+                self._SERIALIZED_TYPE_KEY: "dataclass",
+                self._SERIALIZED_CLASS_KEY: f"{value.__class__.__module__}.{value.__class__.__qualname__}",
+                self._SERIALIZED_DATA_KEY: self._serialize_value(dataclasses.asdict(value)),
+            }
+
+        if isinstance(value, dict):
+            return {str(key): self._serialize_value(item) for key, item in value.items()}
+        if isinstance(value, (list, tuple, set)):
+            return [self._serialize_value(item) for item in value]
+
+        return str(value)
+
+    def _deserialize_value(self, value: Any) -> Any:
+        if isinstance(value, list):
+            return [self._deserialize_value(item) for item in value]
+
+        if not isinstance(value, dict):
+            return value
+
+        marker = value.get(self._SERIALIZED_TYPE_KEY)
+        raw = value.get(self._SERIALIZED_DATA_KEY)
+        if marker == "datetime" and isinstance(raw, str):
+            return datetime.fromisoformat(raw)
+        if marker == "date" and isinstance(raw, str):
+            return date.fromisoformat(raw)
+        if marker == "time" and isinstance(raw, str):
+            return time.fromisoformat(raw)
+        if marker == "decimal" and isinstance(raw, str):
+            return Decimal(raw)
+        if marker == "bytes" and isinstance(raw, str):
+            return base64.b64decode(raw.encode("ascii"))
+
+        if marker in {"pydantic", "dataclass"}:
+            class_path = str(value.get(self._SERIALIZED_CLASS_KEY) or "").strip()
+            decoded_data = self._deserialize_value(raw)
+            model_cls = self._resolve_cache_class(class_path)
+            if model_cls is None:
+                return decoded_data
+            try:
+                if marker == "pydantic" and hasattr(model_cls, "model_validate"):
+                    return model_cls.model_validate(decoded_data)
+                if marker == "dataclass" and isinstance(decoded_data, dict):
+                    return model_cls(**decoded_data)
+            except Exception:
+                return decoded_data
+            return decoded_data
+
+        return {str(key): self._deserialize_value(item) for key, item in value.items()}
+
+    def _serialize_payload(self, payload: Any) -> bytes:
+        serialized = self._serialize_value(payload)
+        return json.dumps(serialized, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+
+    def _deserialize_payload(self, payload: bytes) -> Any:
+        decoded = json.loads(payload.decode("utf-8"))
+        return self._deserialize_value(decoded)
 
     def _redis_key(self, key: str) -> str:
         return f"{self._prefix}{key}"
@@ -99,7 +248,7 @@ class RedisBackedTTLCache:
     def _log_error(self, message: str) -> None:
         now = time.monotonic()
         if now - self._last_error_log_at >= 30:
-            print(message)
+            logger.warning(message)
             self._last_error_log_at = now
 
     def _mark_client_failed(self, error: Exception) -> None:
@@ -119,7 +268,7 @@ class RedisBackedTTLCache:
             if redis is None:
                 self._next_connect_retry_at = now + self._retry_seconds
                 if not self._missing_dependency_logged:
-                    print("[cache] redis dependency missing, fallback to in-memory cache.")
+                    logger.warning("[cache] redis dependency missing, fallback to in-memory cache.")
                     self._missing_dependency_logged = True
                 return None
 
@@ -135,7 +284,7 @@ class RedisBackedTTLCache:
                 client.ping()
                 self._client = client
                 self._next_connect_retry_at = 0.0
-                print("[cache] redis cache enabled.")
+                logger.info("[cache] redis cache enabled.")
                 return client
             except Exception as error:
                 self._client = None
@@ -164,9 +313,12 @@ class RedisBackedTTLCache:
             payload = client.get(self._redis_key(key))
             if payload is None:
                 return None
-            return pickle.loads(payload)
+            return self._deserialize_payload(payload)
         except Exception as error:
-            self._mark_client_failed(error if isinstance(error, Exception) else Exception(str(error)))
+            try:
+                client.delete(self._redis_key(key))
+            except Exception:
+                self._mark_client_failed(error if isinstance(error, Exception) else Exception(str(error)))
             return self._fallback.get(key)
 
     def set(self, key: str, payload: Any, ttl_seconds: int) -> Any:
@@ -176,7 +328,7 @@ class RedisBackedTTLCache:
             return self._fallback.set(key, payload, ttl)
 
         try:
-            serialized = pickle.dumps(payload, protocol=pickle.HIGHEST_PROTOCOL)
+            serialized = self._serialize_payload(payload)
             client.setex(self._redis_key(key), ttl, serialized)
             self._fallback.delete(key)
             return payload
