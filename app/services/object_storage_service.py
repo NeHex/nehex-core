@@ -467,6 +467,7 @@ def _upload_s3_compatible_file(
     public_base_url: str,
     default_virtual_hosted_url: bool,
     allow_virtual_hosted_retry: bool = True,
+    allow_signature_v2_retry: bool = False,
 ) -> str:
     try:
         import boto3
@@ -483,32 +484,61 @@ def _upload_s3_compatible_file(
     if content_type:
         put_kwargs["ContentType"] = content_type
 
+    put_kwargs["ContentLength"] = len(content)
+
     attempts = [
-        ("path", False),
-        ("path", True),
+        ("s3v4", "path", False, True),
+        ("s3v4", "path", True, True),
+        ("s3v4", "path", False, False),
+        ("s3v4", "path", True, False),
     ]
     if allow_virtual_hosted_retry:
         attempts.extend([
-            ("virtual", False),
-            ("virtual", True),
+            ("s3v4", "virtual", False, True),
+            ("s3v4", "virtual", True, True),
+            ("s3v4", "virtual", False, False),
+            ("s3v4", "virtual", True, False),
         ])
+    if allow_signature_v2_retry:
+        attempts.extend([
+            ("s3", "path", False, True),
+            ("s3", "path", False, False),
+        ])
+        if allow_virtual_hosted_retry:
+            attempts.extend([
+                ("s3", "virtual", False, True),
+                ("s3", "virtual", False, False),
+            ])
 
     last_error: Exception | None = None
-    for addressing_style, payload_signing_enabled in attempts:
+    for signature_version, addressing_style, payload_signing_enabled, checksum_compat in attempts:
         try:
+            config_kwargs: dict[str, object] = {
+                "signature_version": signature_version,
+                "s3": {
+                    "addressing_style": addressing_style,
+                    "payload_signing_enabled": payload_signing_enabled,
+                },
+            }
+            if checksum_compat:
+                # Some S3-compatible providers fail when SDK sends optional checksum-related headers.
+                config_kwargs["request_checksum_calculation"] = "when_required"
+                config_kwargs["response_checksum_validation"] = "when_required"
+            try:
+                client_config = BotoCoreConfig(**config_kwargs)
+            except TypeError:
+                # Backward compatibility for older botocore versions lacking checksum config options.
+                config_kwargs.pop("request_checksum_calculation", None)
+                config_kwargs.pop("response_checksum_validation", None)
+                client_config = BotoCoreConfig(**config_kwargs)
+
             client = boto3.client(
                 "s3",
                 endpoint_url=endpoint,
                 aws_access_key_id=access_key_id,
                 aws_secret_access_key=secret_access_key,
                 region_name=resolved_region,
-                config=BotoCoreConfig(
-                    signature_version="s3v4",
-                    s3={
-                        "addressing_style": addressing_style,
-                        "payload_signing_enabled": payload_signing_enabled,
-                    },
-                ),
+                config=client_config,
             )
             client.put_object(**put_kwargs)
             break
@@ -567,21 +597,37 @@ def _upload_hi168_s3_file(
     ):
         raise ValueError("HI168 S3 配置不完整")
 
-    return _upload_s3_compatible_file(
-        provider_label="HI168 S3",
-        endpoint=config.hi168_s3_endpoint,
-        bucket=config.hi168_s3_bucket,
-        access_key_id=config.hi168_s3_access_key_id,
-        secret_access_key=config.hi168_s3_secret_access_key,
-        # HI168 endpoint does not encode region in hostname; use a stable default when empty.
-        region=config.hi168_s3_region or "us-east-1",
-        object_key=object_key,
-        content_type=content_type,
-        content=content,
-        public_base_url=config.public_base_url,
-        default_virtual_hosted_url=False,
-        allow_virtual_hosted_retry=False,
-    )
+    region_candidates: list[str] = []
+    normalized_region = _normalize_text(config.hi168_s3_region)
+    if normalized_region and normalized_region.lower() != "auto":
+        region_candidates.append(normalized_region)
+    if "us-east-1" not in {item.lower() for item in region_candidates}:
+        region_candidates.append("us-east-1")
+
+    last_error: Exception | None = None
+    for region in region_candidates:
+        try:
+            return _upload_s3_compatible_file(
+                provider_label="HI168 S3",
+                endpoint=config.hi168_s3_endpoint,
+                bucket=config.hi168_s3_bucket,
+                access_key_id=config.hi168_s3_access_key_id,
+                secret_access_key=config.hi168_s3_secret_access_key,
+                region=region,
+                object_key=object_key,
+                content_type=content_type,
+                content=content,
+                public_base_url=config.public_base_url,
+                default_virtual_hosted_url=False,
+                allow_virtual_hosted_retry=False,
+                allow_signature_v2_retry=True,
+            )
+        except Exception as error:  # pragma: no cover - runtime behavior depends on provider
+            last_error = error
+
+    if last_error is None:
+        raise RuntimeError("HI168 S3 上传失败: 未知错误")
+    raise last_error
 
 
 def _upload_aliyun_oss_file(
