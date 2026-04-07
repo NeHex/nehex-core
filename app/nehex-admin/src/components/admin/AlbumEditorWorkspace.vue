@@ -96,6 +96,26 @@
         <v-card class="panel-card upload-card" rounded="xl">
           <v-card-title>上传图片</v-card-title>
           <v-card-text>
+            <div class="upload-actions">
+              <input
+                ref="imageInputRef"
+                accept="image/*"
+                class="upload-input"
+                multiple
+                type="file"
+                @change="handleImageInputChange"
+              >
+              <v-btn
+                color="primary"
+                density="comfortable"
+                prepend-icon="mdi-image-plus-outline"
+                size="small"
+                :loading="uploadingImage"
+                @click="triggerImageSelect"
+              >
+                选择图片上传
+              </v-btn>
+            </div>
             <div
               class="upload-dropzone"
               :class="{ 'upload-dropzone--active': uploadZoneActive }"
@@ -106,7 +126,7 @@
             >
               <v-icon icon="mdi-cloud-upload-outline" size="36" />
               <div class="dropzone-title">拖拽图片到这里上传</div>
-              <div class="dropzone-desc">上传接口预留中，当前仅展示占位区域。</div>
+              <div class="dropzone-desc">支持多图上传，成功后将自动追加到“图片链接”输入框。</div>
             </div>
           </v-card-text>
         </v-card>
@@ -188,6 +208,7 @@ import {
   updateAlbum,
   type AlbumUpsertPayload,
 } from '@/services/albums'
+import { uploadMarkdownImage } from '@/services/storage'
 
 const props = defineProps<{
   albumId?: number | null
@@ -205,10 +226,12 @@ type EditorForm = {
 
 const loading = ref(false)
 const submitting = ref(false)
+const uploadingImage = ref(false)
 const uploadZoneActive = ref(false)
 const errorMessage = ref('')
 const successMessage = ref('')
 const activePreviewIndex = ref(0)
+const imageInputRef = ref<HTMLInputElement | null>(null)
 const { showGlobalSuccess } = useGlobalSnackbar()
 
 const editorForm = reactive<EditorForm>({
@@ -319,10 +342,91 @@ function showNextImage(): void {
   activePreviewIndex.value = (activePreviewIndex.value + 1) % total
 }
 
-function handleDropFiles(): void {
-  uploadZoneActive.value = false
+function triggerImageSelect(): void {
+  imageInputRef.value?.click()
+}
+
+function _pickImageFiles(files: FileList | null): File[] {
+  if (!files || files.length <= 0) {
+    return []
+  }
+  return Array.from(files).filter((file) => file.type.startsWith('image/'))
+}
+
+function _appendUploadedUrls(urls: string[]): void {
+  if (urls.length <= 0) {
+    return
+  }
+
+  const existing = parseAlbumImageUrls(editorForm.imageUrlsText)
+  const merged = new Set(existing)
+  urls.forEach((item) => merged.add(item))
+
+  const nextUrls = Array.from(merged)
+  editorForm.imageUrlsText = joinAlbumImageUrls(nextUrls) || ''
+
+  if (!editorForm.cover.trim()) {
+    editorForm.cover = urls[0] || ''
+  }
+
+  const firstInserted = nextUrls.findIndex((item) => item === urls[0])
+  if (firstInserted >= 0) {
+    activePreviewIndex.value = firstInserted
+  }
+}
+
+async function _uploadImages(files: File[]): Promise<void> {
+  if (files.length <= 0 || uploadingImage.value) {
+    return
+  }
+
+  uploadingImage.value = true
   successMessage.value = ''
-  errorMessage.value = '上传接口暂未接入，拖拽上传功能预留中'
+  errorMessage.value = ''
+
+  const uploadedUrls: string[] = []
+  const failedFiles: string[] = []
+
+  try {
+    for (const file of files) {
+      try {
+        const url = await uploadMarkdownImage(file)
+        uploadedUrls.push(url)
+      } catch {
+        failedFiles.push(file.name || 'unknown')
+      }
+    }
+
+    if (uploadedUrls.length > 0) {
+      _appendUploadedUrls(uploadedUrls)
+      successMessage.value = `成功上传 ${uploadedUrls.length} 张图片`
+    }
+
+    if (failedFiles.length > 0) {
+      errorMessage.value = `有 ${failedFiles.length} 张图片上传失败`
+    }
+
+    if (uploadedUrls.length <= 0 && failedFiles.length <= 0) {
+      errorMessage.value = '未检测到可上传的图片文件'
+    }
+  } finally {
+    uploadingImage.value = false
+  }
+}
+
+async function handleImageInputChange(event: Event): Promise<void> {
+  const target = event.target as HTMLInputElement | null
+  const files = _pickImageFiles(target?.files || null)
+  if (target) {
+    target.value = ''
+  }
+  await _uploadImages(files)
+}
+
+async function handleDropFiles(event: DragEvent): Promise<void> {
+  uploadZoneActive.value = false
+  const files = _pickImageFiles(event.dataTransfer?.files || null)
+  await _uploadImages(files)
 }
 
 async function loadAlbumDetail(): Promise<void> {
@@ -436,6 +540,16 @@ onMounted(async () => {
 
 .upload-card {
   flex: 1;
+}
+
+.upload-actions {
+  display: flex;
+  justify-content: flex-start;
+  margin-bottom: 10px;
+}
+
+.upload-input {
+  display: none;
 }
 
 .upload-dropzone {
