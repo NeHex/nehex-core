@@ -6,6 +6,7 @@ from app.api.routes.articles import router as articles_router
 from app.api.routes.comments import router as comments_router
 from app.api.routes.dailies import router as dailies_router
 from app.api.routes.friends import router as friends_router
+from app.api.routes.online_ws import router as online_ws_router
 from app.api.routes.pages import router as pages_router
 from app.api.routes.projects import router as projects_router
 from app.api.routes.settings import router as settings_router
@@ -18,6 +19,7 @@ api_router.include_router(articles_router)
 api_router.include_router(comments_router)
 api_router.include_router(dailies_router)
 api_router.include_router(friends_router)
+api_router.include_router(online_ws_router)
 api_router.include_router(pages_router)
 api_router.include_router(projects_router)
 api_router.include_router(settings_router)
