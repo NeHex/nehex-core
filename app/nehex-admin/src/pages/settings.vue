@@ -293,6 +293,21 @@
 
               <v-divider class="my-4" />
 
+              <div class="stack-block">
+                <div class="block-title">上传路径规则（全部存储类型生效）</div>
+                <v-text-field
+                  v-model="storageForm.localPathRule"
+                  label="路径规则"
+                  placeholder="/{year}-{month}/{day}/{random_name}.{file_type}"
+                  variant="outlined"
+                />
+                <v-alert class="mt-2" density="comfortable" type="info" variant="tonal">
+                  路径规则支持占位符：{year} {month} {day} {hour} {minute} {second} {timestamp} {random_name} {file_type}
+                </v-alert>
+              </div>
+
+              <v-divider class="my-4" />
+
               <div v-if="showLocalStorageFields" class="stack-block">
                 <div class="block-title">本机存储配置</div>
                 <div class="form-grid">
@@ -302,16 +317,7 @@
                     placeholder="storage"
                     variant="outlined"
                   />
-                  <v-text-field
-                    v-model="storageForm.localPathRule"
-                    label="路径规则"
-                    placeholder="/{year}-{month}/{day}/{random_name}.{file_type}"
-                    variant="outlined"
-                  />
                 </div>
-                <v-alert class="mt-2" density="comfortable" type="info" variant="tonal">
-                  路径规则支持占位符：{year} {month} {day} {hour} {minute} {second} {timestamp} {random_name} {file_type}
-                </v-alert>
               </div>
 
               <div v-if="showR2StorageFields" class="stack-block">
