@@ -32,6 +32,7 @@ class AdminArticleCreateRequest(BaseModel):
     articleTopImage: Optional[str] = Field(default=None, max_length=500)
     class_: str = Field(alias="class", min_length=1, max_length=100)
     read: int = Field(default=0, ge=0)
+    like_count: int = Field(default=0, ge=0)
     tag: Optional[str] = Field(default=None, max_length=255)
     top: int = Field(default=0, ge=0)
     content: Optional[str] = None
@@ -60,6 +61,7 @@ class AdminArticleUpdateRequest(BaseModel):
     articleTopImage: Optional[str] = Field(default=None, max_length=500)
     class_: Optional[str] = Field(default=None, alias="class", min_length=1, max_length=100)
     read: Optional[int] = Field(default=None, ge=0)
+    like_count: Optional[int] = Field(default=None, ge=0)
     tag: Optional[str] = Field(default=None, max_length=255)
     top: Optional[int] = Field(default=None, ge=0)
     content: Optional[str] = None

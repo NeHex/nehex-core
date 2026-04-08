@@ -14,6 +14,7 @@ class ArticleItem(BaseModel):
     articleTopImage: Optional[str] = None
     class_: str = Field(alias="class")
     read: int
+    like_count: int
     lastEditTime: datetime
     tag: Optional[str] = None
     top: int

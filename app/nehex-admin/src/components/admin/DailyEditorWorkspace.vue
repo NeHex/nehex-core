@@ -58,10 +58,12 @@
         variant="outlined"
       />
 
-      <v-text-field
+      <v-select
         v-model="editorForm.weather"
+        :items="weatherOptions"
         label="天气（可选）"
         variant="outlined"
+        clearable
       />
     </div>
 
@@ -177,6 +179,8 @@ const editorForm = reactive<EditorForm>({
 })
 
 const isEditing = computed(() => Number.isFinite(props.dailyId))
+const weatherOptions = ['cloud', 'rain', 'snow', 'sun', 'wind']
+const weatherOptionSet = new Set<string>(weatherOptions)
 
 const renderedMarkdown = computed(() => {
   const content = editorForm.content.trim()
@@ -239,9 +243,10 @@ function buildPayload(): DailyUpsertPayload | null {
     return null
   }
 
+  const weather = editorForm.weather.trim().toLowerCase()
   return {
     title,
-    weather: editorForm.weather.trim() || null,
+    weather: weatherOptionSet.has(weather) ? weather : null,
     content: editorForm.content.trim() || null,
   }
 }
@@ -352,8 +357,9 @@ function fillEditorForm(daily: {
   weather?: string | null
   content?: string | null
 }): void {
+  const weather = daily.weather?.trim().toLowerCase() || ''
   editorForm.title = daily.title?.trim() || ''
-  editorForm.weather = daily.weather?.trim() || ''
+  editorForm.weather = weatherOptionSet.has(weather) ? weather : ''
   editorForm.content = daily.content || ''
 }
 

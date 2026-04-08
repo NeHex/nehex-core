@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from sqlalchemy import desc, func, select
+from sqlalchemy import desc, func, select, update
 from sqlalchemy.orm import Session
 
 from app.models.article import Article
@@ -17,6 +17,7 @@ def _map_article_item(row: Article) -> ArticleItem:
         articleTopImage=row.article_top_image,
         class_=row.article_class,
         read=row.read_count,
+        like_count=row.like_count,
         lastEditTime=row.last_edit_time,
         tag=row.tag,
         top=row.top,
@@ -64,3 +65,41 @@ def get_article_by_id(session: Session, article_id: int) -> ArticleItem | None:
     if row is None:
         return None
     return _map_article_item(row)
+
+
+def increase_article_read_count(session: Session, article_id: int) -> ArticleItem | None:
+    stmt = select(Article).where(Article.id == article_id).limit(1)
+    row = session.execute(stmt).scalars().first()
+    if row is None:
+        return None
+
+    session.execute(
+        update(Article)
+        .where(Article.id == article_id)
+        .values(read_count=Article.read_count + 1),
+    )
+    session.commit()
+
+    refreshed = session.execute(stmt).scalars().first()
+    if refreshed is None:
+        return None
+    return _map_article_item(refreshed)
+
+
+def increase_article_like_count(session: Session, article_id: int) -> ArticleItem | None:
+    stmt = select(Article).where(Article.id == article_id).limit(1)
+    row = session.execute(stmt).scalars().first()
+    if row is None:
+        return None
+
+    session.execute(
+        update(Article)
+        .where(Article.id == article_id)
+        .values(like_count=Article.like_count + 1),
+    )
+    session.commit()
+
+    refreshed = session.execute(stmt).scalars().first()
+    if refreshed is None:
+        return None
+    return _map_article_item(refreshed)

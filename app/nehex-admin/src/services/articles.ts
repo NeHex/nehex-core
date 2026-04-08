@@ -6,6 +6,7 @@ export type ArticleItem = {
   articleTopImage?: string | null
   class: string
   read: number
+  like_count: number
   lastEditTime: string
   tag?: string | null
   top: number
@@ -31,6 +32,7 @@ export type ArticleUpsertPayload = {
   articleTopImage?: string | null
   class: string
   read: number
+  like_count?: number
   tag?: string | null
   top: number
   content?: string | null

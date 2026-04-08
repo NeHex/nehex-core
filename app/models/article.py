@@ -27,6 +27,12 @@ class Article(Base):
         server_default=text("0"),
         default=0,
     )
+    like_count: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        server_default=text("0"),
+        default=0,
+    )
     last_edit_time: Mapped[datetime] = mapped_column(
         "lastEditTime",
         DateTime,

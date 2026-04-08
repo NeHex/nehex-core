@@ -57,6 +57,33 @@ def ensure_all_tables() -> None:
     Base.metadata.create_all(bind=engine, checkfirst=True)
 
 
+def ensure_schema_compatibility_columns() -> None:
+    inspector = inspect(engine)
+
+    if not inspector.has_table("article"):
+        return
+
+    try:
+        existing_columns = {str(column.get("name", "")) for column in inspector.get_columns("article")}
+    except Exception as error:
+        logger.warning("[startup] skip schema compatibility check for article columns: %s", error)
+        return
+
+    ddl_statements: list[str] = []
+    if "like_count" not in existing_columns:
+        ddl_statements.append("ALTER TABLE article ADD COLUMN like_count INT NOT NULL DEFAULT 0")
+
+    if not ddl_statements:
+        return
+
+    with engine.begin() as conn:
+        for ddl in ddl_statements:
+            try:
+                conn.execute(text(ddl))
+            except Exception as error:
+                logger.warning("[startup] skip schema compatibility ddl `%s`: %s", ddl, error)
+
+
 def list_database_tables() -> set[str]:
     inspector = inspect(engine)
     return set(inspector.get_table_names())

@@ -237,6 +237,7 @@ def create_article(
     article_class: str,
     article_top_image: Optional[str] = None,
     read_count: int = 0,
+    like_count: int = 0,
     tag: Optional[str] = None,
     top: int = 0,
     content: Optional[str] = None,
@@ -246,6 +247,7 @@ def create_article(
         article_class=article_class.strip(),
         article_top_image=_normalize_optional_text(article_top_image),
         read_count=max(0, int(read_count)),
+        like_count=max(0, int(like_count)),
         tag=_normalize_optional_text(tag),
         top=max(0, int(top)),
         content=_normalize_optional_text(content),
@@ -265,6 +267,7 @@ def update_article(
     article_class: Optional[str] = None,
     article_top_image: Optional[str] = None,
     read_count: Optional[int] = None,
+    like_count: Optional[int] = None,
     tag: Optional[str] = None,
     top: Optional[int] = None,
     content: Optional[str] = None,
@@ -286,6 +289,8 @@ def update_article(
         row.article_top_image = _normalize_optional_text(article_top_image)
     if read_count is not None:
         row.read_count = max(0, int(read_count))
+    if like_count is not None:
+        row.like_count = max(0, int(like_count))
     if tag is not None:
         row.tag = _normalize_optional_text(tag)
     if top is not None:

@@ -17,6 +17,7 @@ from app.core.config import settings
 from app.core.database import (
     check_database_connection,
     close_database,
+    ensure_schema_compatibility_columns,
     ensure_system_tables,
     ensure_performance_indexes,
 )
@@ -118,6 +119,11 @@ async def lifespan(_: FastAPI):
         except Exception as error:
             # Do not block API startup when DB account lacks DDL privileges.
             logger.warning("[startup] skip ensure_system_tables: %s", error)
+        try:
+            ensure_schema_compatibility_columns()
+        except Exception as error:
+            # Do not block API startup when DB account lacks DDL privileges.
+            logger.warning("[startup] skip ensure_schema_compatibility_columns: %s", error)
         try:
             ensure_performance_indexes()
         except Exception as error:

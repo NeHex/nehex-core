@@ -74,6 +74,7 @@ def _map_article_item(row: Article) -> ArticleItem:
         articleTopImage=row.article_top_image,
         class_=row.article_class,
         read=row.read_count,
+        like_count=row.like_count,
         lastEditTime=row.last_edit_time,
         tag=row.tag,
         top=row.top,

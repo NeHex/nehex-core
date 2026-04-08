@@ -233,6 +233,7 @@ def _seed_default_content(
                 article_class=primary_article_class,
                 article_top_image=None,
                 read_count=0,
+                like_count=0,
                 tag="公告,示例",
                 top=1,
                 content=(
