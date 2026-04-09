@@ -3,7 +3,7 @@
     <header class="editor-header">
       <div class="header-text">
         <h1>{{ isEditing ? '编辑文章' : '新增文章' }}</h1>
-        <p>左侧编辑 Markdown，右侧实时预览；拖动中间分割线可调整宽度。</p>
+        <p>编辑器默认全屏 Markdown 输入，右下角可切换预览。</p>
       </div>
       <div class="header-actions">
         <v-btn
@@ -14,12 +14,21 @@
           返回管理
         </v-btn>
         <v-btn
-          color="primary"
-          prepend-icon="mdi-content-save-outline"
+          color="secondary"
+          prepend-icon="mdi-file-document-edit-outline"
           :loading="submitting"
-          @click="submitEditor"
+          variant="tonal"
+          @click="submitEditor(0, true)"
         >
-          {{ isEditing ? '保存修改' : '创建文章' }}
+          保存草稿
+        </v-btn>
+        <v-btn
+          color="primary"
+          prepend-icon="mdi-publish"
+          :loading="submitting"
+          @click="submitEditor(1)"
+        >
+          {{ isEditing ? '发布并返回' : '发布文章' }}
         </v-btn>
       </div>
     </header>
@@ -51,64 +60,93 @@
       indeterminate
     />
 
-    <div class="meta-grid">
-      <v-text-field
-        v-model="editorForm.title"
-        label="文章标题"
-        variant="outlined"
-      />
-
-      <v-select
-        v-model="editorForm.className"
-        :items="classOptions"
-        item-title="label"
-        item-value="value"
-        label="文章分类"
-        no-data-text="暂无可用分类"
-        variant="outlined"
-      />
-
-      <v-text-field
-        v-model="editorForm.tag"
-        label="标签（可选）"
-        variant="outlined"
-      />
-
-      <v-text-field
-        v-model="editorForm.articleTopImage"
-        label="封面图片链接（可选）"
-        variant="outlined"
-      />
-
-      <v-text-field
-        v-model.number="editorForm.top"
-        label="置顶权重（top）"
-        min="0"
-        type="number"
-        variant="outlined"
-      />
-
-      <v-text-field
-        v-model.number="editorForm.read"
-        label="阅读数（read）"
-        min="0"
-        type="number"
-        variant="outlined"
-      />
-    </div>
-
-    <div class="split-panel" ref="splitPanelRef">
+    <div class="workspace-grid">
       <section
-        class="panel panel-left panel-left-markdown"
-        :style="{ width: `${leftPaneWidth}%` }"
+        class="editor-card"
         @dragenter.prevent="onDragEnter"
         @dragover.prevent="onDragOver"
         @dragleave.prevent="onDragLeave"
         @drop.prevent="onDropImage"
       >
-        <header class="panel-head panel-head-main">
-          <span>Markdown</span>
-          <div class="panel-tools">
+        <header class="editor-card-head">
+          <div class="editor-title-wrap">
+            <span class="editor-card-title">Markdown</span>
+            <span class="editor-card-subtitle">支持拖拽上传图片与快捷格式插入</span>
+          </div>
+
+          <div class="editor-toolbar">
+            <v-btn
+              density="comfortable"
+              size="small"
+              variant="text"
+              prepend-icon="mdi-format-header-1"
+              @click="insertHeading(1)"
+            >
+              H1
+            </v-btn>
+            <v-btn
+              density="comfortable"
+              size="small"
+              variant="text"
+              prepend-icon="mdi-format-header-2"
+              @click="insertHeading(2)"
+            >
+              H2
+            </v-btn>
+            <v-btn
+              density="comfortable"
+              size="small"
+              variant="text"
+              prepend-icon="mdi-format-bold"
+              @click="insertBold"
+            >
+              粗体
+            </v-btn>
+            <v-btn
+              density="comfortable"
+              size="small"
+              variant="text"
+              prepend-icon="mdi-format-italic"
+              @click="insertItalic"
+            >
+              斜体
+            </v-btn>
+            <v-btn
+              density="comfortable"
+              size="small"
+              variant="text"
+              prepend-icon="mdi-format-list-bulleted"
+              @click="insertBulletList"
+            >
+              列表
+            </v-btn>
+            <v-btn
+              density="comfortable"
+              size="small"
+              variant="text"
+              prepend-icon="mdi-format-quote-open"
+              @click="insertQuote"
+            >
+              引用
+            </v-btn>
+            <v-btn
+              density="comfortable"
+              size="small"
+              variant="text"
+              prepend-icon="mdi-link-variant"
+              @click="insertLink"
+            >
+              链接
+            </v-btn>
+            <v-btn
+              density="comfortable"
+              size="small"
+              variant="text"
+              prepend-icon="mdi-code-tags"
+              @click="insertCodeBlock"
+            >
+              代码块
+            </v-btn>
             <input
               ref="imageInputRef"
               accept="image/*"
@@ -122,44 +160,112 @@
               prepend-icon="mdi-image-plus-outline"
               size="small"
               :loading="uploadingImage"
-              variant="text"
+              variant="tonal"
               @click="triggerImageSelect"
             >
-              上传图片
+              插入图片
             </v-btn>
           </div>
         </header>
-        <textarea
-          ref="markdownInputRef"
-          v-model="editorForm.content"
-          class="markdown-input"
-          placeholder="在这里输入 Markdown 内容..."
-          spellcheck="false"
-        />
-        <div v-if="dragOver" class="drop-overlay">松开鼠标上传图片并插入 Markdown</div>
+
+        <div class="editor-surface">
+          <textarea
+            v-if="!previewMode"
+            ref="markdownInputRef"
+            v-model="editorForm.content"
+            class="markdown-input"
+            placeholder="在这里输入 Markdown 内容..."
+            spellcheck="false"
+          />
+          <article
+            v-else
+            class="markdown-preview"
+            v-html="renderedMarkdown"
+          />
+
+          <div v-if="dragOver" class="drop-overlay">松开鼠标上传图片并插入 Markdown</div>
+
+          <v-btn
+            class="preview-toggle"
+            color="primary"
+            size="small"
+            variant="elevated"
+            :prepend-icon="previewMode ? 'mdi-pencil' : 'mdi-eye-outline'"
+            @click="togglePreviewMode"
+          >
+            {{ previewMode ? '返回编辑' : '预览' }}
+          </v-btn>
+        </div>
       </section>
 
-      <div
-        class="splitter"
-        @pointerdown="startResize"
-        @pointermove="moveResize"
-        @pointerup="stopResize"
-        @pointercancel="stopResize"
-      >
-        <div class="splitter-handle" />
-      </div>
+      <aside class="settings-card">
+        <header class="settings-head">
+          <h2>文章设置</h2>
+          <p>文章标题、分类与展示选项</p>
+        </header>
 
-      <section class="panel panel-right" :style="{ width: `${100 - leftPaneWidth}%` }">
-        <header class="panel-head">预览</header>
-        <article class="markdown-preview" v-html="renderedMarkdown" />
-      </section>
+        <div class="settings-form">
+          <v-text-field
+            v-model="editorForm.title"
+            label="文章标题"
+            variant="outlined"
+          />
+
+          <v-select
+            v-model="editorForm.className"
+            :items="classOptions"
+            item-title="label"
+            item-value="value"
+            label="文章分类"
+            no-data-text="暂无可用分类"
+            variant="outlined"
+          />
+
+          <v-text-field
+            v-model="editorForm.tag"
+            label="标签（可选）"
+            variant="outlined"
+          />
+
+          <v-text-field
+            v-model="editorForm.articleTopImage"
+            label="封面图片链接（可选）"
+            variant="outlined"
+          />
+
+          <v-text-field
+            v-model.number="editorForm.top"
+            label="置顶权重（top）"
+            min="0"
+            type="number"
+            variant="outlined"
+          />
+
+          <v-text-field
+            v-model.number="editorForm.read"
+            label="阅读数（read）"
+            min="0"
+            type="number"
+            variant="outlined"
+          />
+
+          <v-select
+            v-model.number="editorForm.status"
+            :items="statusOptions"
+            item-title="label"
+            item-value="value"
+            label="发布状态（status）"
+            variant="outlined"
+          />
+        </div>
+      </aside>
     </div>
   </section>
 </template>
 
 <script lang="ts" setup>
 import MarkdownIt from 'markdown-it'
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, nextTick, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import {
   createArticle,
@@ -190,7 +296,14 @@ type EditorForm = {
   articleTopImage: string
   top: number
   read: number
+  status: number
   content: string
+}
+
+type SelectionTransformResult = {
+  text: string
+  selectionStart?: number
+  selectionEnd?: number
 }
 
 const DEFAULT_CLASS_OPTIONS: ArticleClassOption[] = [
@@ -199,17 +312,19 @@ const DEFAULT_CLASS_OPTIONS: ArticleClassOption[] = [
     label: '默认分类',
   },
 ]
+const statusOptions = [
+  { label: '草稿（0）', value: 0 },
+  { label: '已发布（1）', value: 1 },
+]
 
 const loading = ref(false)
 const submitting = ref(false)
 const uploadingImage = ref(false)
 const errorMessage = ref('')
 const successMessage = ref('')
-const leftPaneWidth = ref(50)
-const resizing = ref(false)
+const previewMode = ref(false)
 const dragOver = ref(false)
 const dragDepth = ref(0)
-const splitPanelRef = ref<HTMLElement | null>(null)
 const markdownInputRef = ref<HTMLTextAreaElement | null>(null)
 const imageInputRef = ref<HTMLInputElement | null>(null)
 
@@ -223,6 +338,7 @@ const editorForm = reactive<EditorForm>({
   articleTopImage: '',
   top: 0,
   read: 0,
+  status: 1,
   content: '',
 })
 
@@ -231,56 +347,10 @@ const isEditing = computed(() => Number.isFinite(props.articleId))
 const renderedMarkdown = computed(() => {
   const content = editorForm.content.trim()
   if (!content) {
-    return '<p class="preview-empty">暂无内容，左侧输入 Markdown 开始编辑。</p>'
+    return '<p class="preview-empty">暂无内容，输入 Markdown 后点击右下角预览。</p>'
   }
   return markdown.render(content)
 })
-
-function clampPercent(value: number): number {
-  return Math.min(75, Math.max(25, value))
-}
-
-function updatePaneWidth(clientX: number): void {
-  const panel = splitPanelRef.value
-  if (!panel) {
-    return
-  }
-
-  const rect = panel.getBoundingClientRect()
-  if (rect.width <= 0) {
-    return
-  }
-
-  const ratio = ((clientX - rect.left) / rect.width) * 100
-  leftPaneWidth.value = clampPercent(ratio)
-}
-
-function startResize(event: PointerEvent): void {
-  if (event.button !== 0) {
-    return
-  }
-
-  const currentTarget = event.currentTarget as HTMLElement | null
-  if (!currentTarget) {
-    return
-  }
-
-  currentTarget.setPointerCapture(event.pointerId)
-  resizing.value = true
-  updatePaneWidth(event.clientX)
-  event.preventDefault()
-}
-
-function moveResize(event: PointerEvent): void {
-  if (!resizing.value) {
-    return
-  }
-  updatePaneWidth(event.clientX)
-}
-
-function stopResize(): void {
-  resizing.value = false
-}
 
 function ensureClassOption(value: string): void {
   const normalized = value.trim()
@@ -307,8 +377,14 @@ function normalizeNumber(value: number): number {
   return Math.max(0, Math.floor(value))
 }
 
+function normalizeStatus(value: number): 0 | 1 {
+  return Number(value) > 0 ? 1 : 0
+}
+
 function triggerImageSelect(): void {
-  imageInputRef.value?.click()
+  ensureEditMode(() => {
+    imageInputRef.value?.click()
+  })
 }
 
 function _escapeMarkdownText(value: string): string {
@@ -329,24 +405,144 @@ function _pickFirstImage(files: FileList | null): File | null {
   return null
 }
 
+function ensureEditMode(callback: () => void): void {
+  if (!previewMode.value) {
+    callback()
+    return
+  }
+
+  previewMode.value = false
+  nextTick(() => {
+    callback()
+  })
+}
+
+function updateSelection(transform: (selectedText: string) => SelectionTransformResult): void {
+  const content = editorForm.content
+  const input = markdownInputRef.value
+
+  const start = input?.selectionStart ?? content.length
+  const end = input?.selectionEnd ?? start
+  const selectedText = content.slice(start, end)
+  const result = transform(selectedText)
+
+  editorForm.content = `${content.slice(0, start)}${result.text}${content.slice(end)}`
+
+  requestAnimationFrame(() => {
+    const latestInput = markdownInputRef.value
+    if (!latestInput) {
+      return
+    }
+
+    latestInput.focus()
+    const selectionStart = start + (result.selectionStart ?? result.text.length)
+    const selectionEnd = start + (result.selectionEnd ?? selectionStart - start)
+    latestInput.setSelectionRange(selectionStart, selectionEnd)
+  })
+}
+
+function wrapSelection(before: string, after: string, placeholder: string): void {
+  ensureEditMode(() => {
+    updateSelection((selectedText) => {
+      if (selectedText) {
+        const text = `${before}${selectedText}${after}`
+        return { text }
+      }
+
+      const text = `${before}${placeholder}${after}`
+      return {
+        text,
+        selectionStart: before.length,
+        selectionEnd: before.length + placeholder.length,
+      }
+    })
+  })
+}
+
+function prefixSelectionLines(prefix: string, placeholder: string): void {
+  ensureEditMode(() => {
+    updateSelection((selectedText) => {
+      if (!selectedText) {
+        const text = `${prefix}${placeholder}`
+        return {
+          text,
+          selectionStart: prefix.length,
+          selectionEnd: prefix.length + placeholder.length,
+        }
+      }
+
+      const text = selectedText
+        .split('\n')
+        .map((line) => `${prefix}${line}`)
+        .join('\n')
+
+      return { text }
+    })
+  })
+}
+
+function insertHeading(level: 1 | 2): void {
+  const prefix = `${'#'.repeat(level)} `
+  const placeholder = level === 1 ? '一级标题' : '二级标题'
+  prefixSelectionLines(prefix, placeholder)
+}
+
+function insertBold(): void {
+  wrapSelection('**', '**', '粗体文本')
+}
+
+function insertItalic(): void {
+  wrapSelection('*', '*', '斜体文本')
+}
+
+function insertQuote(): void {
+  prefixSelectionLines('> ', '引用内容')
+}
+
+function insertBulletList(): void {
+  prefixSelectionLines('- ', '列表项')
+}
+
+function insertLink(): void {
+  ensureEditMode(() => {
+    updateSelection((selectedText) => {
+      const linkText = selectedText || '链接文字'
+      const text = `[${linkText}](https://example.com)`
+      const urlStart = text.indexOf('https://example.com')
+      return {
+        text,
+        selectionStart: urlStart,
+        selectionEnd: urlStart + 'https://example.com'.length,
+      }
+    })
+  })
+}
+
+function insertCodeBlock(): void {
+  ensureEditMode(() => {
+    updateSelection((selectedText) => {
+      const codeText = selectedText || 'code'
+      const text = `\n\`\`\`\n${codeText}\n\`\`\`\n`
+      const selectionStart = 5
+      return {
+        text,
+        selectionStart,
+        selectionEnd: selectionStart + codeText.length,
+      }
+    })
+  })
+}
+
+function togglePreviewMode(): void {
+  previewMode.value = !previewMode.value
+}
+
 function _insertMarkdownImage(url: string, fileName: string): void {
   const altText = _escapeMarkdownText(fileName.replace(/\.[^.]+$/, '').trim()) || 'image'
   const snippet = `\n![${altText}](${url})\n`
 
-  const input = markdownInputRef.value
-  if (!input) {
-    editorForm.content = `${editorForm.content}${snippet}`
-    return
-  }
-
-  const start = input.selectionStart ?? editorForm.content.length
-  const end = input.selectionEnd ?? start
-  editorForm.content = `${editorForm.content.slice(0, start)}${snippet}${editorForm.content.slice(end)}`
-
-  requestAnimationFrame(() => {
-    const cursor = start + snippet.length
-    input.focus()
-    input.setSelectionRange(cursor, cursor)
+  ensureEditMode(() => {
+    updateSelection(() => ({ text: snippet }))
   })
 }
 
@@ -411,13 +607,18 @@ async function onDropImage(event: DragEvent): Promise<void> {
   await _uploadImageAndInsert(imageFile)
 }
 
-function buildPayload(): ArticleUpsertPayload | null {
-  const title = editorForm.title.trim()
+function buildPayload(statusOverride?: 0 | 1): ArticleUpsertPayload | null {
+  const status = normalizeStatus(statusOverride ?? editorForm.status)
+  let title = editorForm.title.trim()
   const className = editorForm.className.trim()
 
   if (!title) {
-    errorMessage.value = '文章标题不能为空'
-    return null
+    if (status === 0) {
+      title = '未命名草稿'
+    } else {
+      errorMessage.value = '文章标题不能为空'
+      return null
+    }
   }
 
   if (!className) {
@@ -432,6 +633,7 @@ function buildPayload(): ArticleUpsertPayload | null {
     articleTopImage: editorForm.articleTopImage.trim() || null,
     top: normalizeNumber(editorForm.top),
     read: normalizeNumber(editorForm.read),
+    status,
     content: editorForm.content.trim() || null,
   }
 }
@@ -443,6 +645,7 @@ function fillEditorForm(article: {
   articleTopImage?: string | null
   top?: number | null
   read?: number | null
+  status?: number | null
   content?: string | null
 }): void {
   editorForm.title = article.title?.trim() || ''
@@ -453,6 +656,8 @@ function fillEditorForm(article: {
   editorForm.articleTopImage = article.articleTopImage?.trim() || ''
   editorForm.top = Number.isFinite(article.top) ? Number(article.top) : 0
   editorForm.read = Number.isFinite(article.read) ? Number(article.read) : 0
+  const rawStatus = Number(article.status)
+  editorForm.status = Number.isFinite(rawStatus) ? normalizeStatus(rawStatus) : 1
   editorForm.content = article.content || ''
 }
 
@@ -486,11 +691,11 @@ async function loadArticleDetail(): Promise<void> {
   }
 }
 
-async function submitEditor(): Promise<void> {
+async function submitEditor(nextStatus?: 0 | 1, stayOnPage = false): Promise<void> {
   successMessage.value = ''
   errorMessage.value = ''
 
-  const payload = buildPayload()
+  const payload = buildPayload(nextStatus)
   if (!payload) {
     return
   }
@@ -498,13 +703,31 @@ async function submitEditor(): Promise<void> {
   submitting.value = true
 
   try {
+    const saved = isEditing.value && props.articleId
+      ? await updateArticle(props.articleId, payload)
+      : await createArticle(payload)
+
+    fillEditorForm(saved)
+
+    const savedAsDraft = normalizeStatus(payload.status) === 0
     if (isEditing.value && props.articleId) {
-      await updateArticle(props.articleId, payload)
-    } else {
-      await createArticle(payload)
+      showGlobalSuccess(savedAsDraft ? '草稿已保存' : '文章已发布')
+      if (!stayOnPage) {
+        await router.push('/articles')
+      }
+      return
     }
-    showGlobalSuccess('文章发布成功')
-    await router.push('/articles')
+
+    if (savedAsDraft && stayOnPage) {
+      showGlobalSuccess('草稿已创建')
+      await router.replace(`/articles/edit/${saved.id}`)
+      return
+    }
+
+    showGlobalSuccess(savedAsDraft ? '草稿已保存' : '文章发布成功')
+    if (!stayOnPage) {
+      await router.push('/articles')
+    }
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : '保存文章失败'
   } finally {
@@ -527,7 +750,9 @@ onMounted(async () => {
   display: flex;
   flex-direction: column;
   gap: 14px;
-  min-height: calc(100vh - 64px);
+  height: calc(100vh - 64px);
+  min-height: 0;
+  overflow: hidden;
 }
 
 .editor-header {
@@ -554,76 +779,110 @@ onMounted(async () => {
   flex-shrink: 0;
 }
 
-.meta-grid {
+.workspace-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 10px;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  gap: 14px;
+  align-items: stretch;
+  flex: 1;
+  min-height: 0;
 }
 
-.split-panel {
-  min-height: 560px;
-  height: calc(100vh - 320px);
-  display: flex;
+.editor-card,
+.settings-card {
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 16px;
-  overflow: hidden;
   background: #111826;
+  min-height: 0;
 }
 
-.panel {
-  min-width: 0;
+.editor-card {
+  height: 100%;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
 }
 
-.panel-head {
-  padding: 10px 12px;
-  font-size: 13px;
-  font-weight: 700;
-  letter-spacing: 0.4px;
-  color: #dbe7ff;
-  background: rgba(255, 255, 255, 0.05);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-}
-
-.panel-head-main {
+.editor-card-head {
+  padding: 12px;
   display: flex;
-  align-items: center;
+  flex-direction: column;
+  gap: 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.editor-title-wrap {
+  display: flex;
+  align-items: baseline;
   justify-content: space-between;
   gap: 8px;
 }
 
-.panel-tools {
+.editor-card-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: #dbe7ff;
+}
+
+.editor-card-subtitle {
+  font-size: 12px;
+  color: #9eb0ce;
+}
+
+.editor-toolbar {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
 }
 
 .upload-input {
   display: none;
 }
 
-.panel-left-markdown {
+.editor-surface {
   position: relative;
+  flex: 1;
+  min-height: 0;
+}
+
+.markdown-input,
+.markdown-preview {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  border: 0;
+  outline: none;
 }
 
 .markdown-input {
-  flex: 1;
-  width: 100%;
-  border: 0;
+  resize: none;
   background: #0f1624;
   color: #f4f7ff;
   font-size: 14px;
   line-height: 1.7;
   padding: 14px;
-  resize: none;
-  outline: none;
   font-family: 'Cascadia Code', 'Consolas', 'Monaco', monospace;
+}
+
+.markdown-preview {
+  overflow: auto;
+  padding: 16px;
+  color: #dde6fb;
+  line-height: 1.75;
+}
+
+.preview-toggle {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  z-index: 3;
 }
 
 .drop-overlay {
   position: absolute;
-  inset: 46px 10px 10px 10px;
+  inset: 10px;
   display: grid;
   place-items: center;
   border: 2px dashed rgba(115, 164, 255, 0.88);
@@ -633,33 +892,36 @@ onMounted(async () => {
   font-size: 14px;
   font-weight: 600;
   pointer-events: none;
+  z-index: 2;
 }
 
-.markdown-preview {
-  flex: 1;
-  overflow: auto;
-  padding: 16px;
-  color: #dde6fb;
-  line-height: 1.75;
-}
-
-.splitter {
-  width: 12px;
-  cursor: col-resize;
+.settings-card {
+  padding: 14px;
   display: flex;
-  align-items: center;
-  justify-content: center;
-  background: linear-gradient(180deg, rgba(38, 48, 71, 0.9), rgba(25, 34, 51, 0.9));
-  border-left: 1px solid rgba(255, 255, 255, 0.08);
-  border-right: 1px solid rgba(255, 255, 255, 0.08);
-  touch-action: none;
+  flex-direction: column;
+  overflow: hidden;
 }
 
-.splitter-handle {
-  width: 4px;
-  height: 48px;
-  border-radius: 999px;
-  background: rgba(205, 218, 255, 0.6);
+.settings-head h2 {
+  margin: 0;
+  font-size: 18px;
+  color: #e8efff;
+}
+
+.settings-head p {
+  margin: 6px 0 0;
+  color: #9eb0ce;
+  font-size: 13px;
+}
+
+.settings-form {
+  margin-top: 12px;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+  min-height: 0;
+  overflow: auto;
+  padding-right: 2px;
 }
 
 :deep(.markdown-preview p) {
@@ -714,15 +976,22 @@ onMounted(async () => {
   color: #97a4bf;
 }
 
-@media (max-width: 1120px) {
-  .meta-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+@media (max-width: 1100px) {
+  .workspace-grid {
+    grid-template-columns: minmax(0, 1fr) 280px;
+  }
+
+  .editor-title-wrap {
+    flex-direction: column;
+    align-items: flex-start;
   }
 }
 
 @media (max-width: 900px) {
   .article-editor-page {
+    height: auto;
     min-height: auto;
+    overflow: visible;
   }
 
   .editor-header {
@@ -738,38 +1007,17 @@ onMounted(async () => {
     flex: 1;
   }
 
-  .meta-grid {
+  .workspace-grid {
     grid-template-columns: 1fr;
   }
 
-  .split-panel {
-    flex-direction: column;
+  .editor-card {
     height: auto;
-    min-height: 0;
   }
 
-  .panel-left,
-  .panel-right {
-    width: 100% !important;
-  }
-
-  .splitter {
-    width: 100%;
-    height: 12px;
-    cursor: row-resize;
-  }
-
-  .splitter-handle {
-    width: 48px;
-    height: 4px;
-  }
-
-  .markdown-input {
-    min-height: 300px;
-  }
-
+  .markdown-input,
   .markdown-preview {
-    min-height: 300px;
+    min-height: 360px;
   }
 }
 </style>

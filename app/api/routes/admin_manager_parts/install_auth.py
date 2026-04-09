@@ -7,8 +7,10 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.core.admin_security import (
+    ADMIN_PUBLIC_MARKER_COOKIE_KEY,
     ADMIN_TOKEN_COOKIE_KEY,
     AdminPrincipal,
+    create_admin_public_marker,
     create_admin_token,
     require_admin_principal,
     verify_admin_password,
@@ -47,6 +49,13 @@ def _is_request_secure(request: Request) -> bool:
     if forwarded_proto:
         return forwarded_proto == "https"
     return request.url.scheme == "https"
+
+
+def _cookie_domain_from_setting(raw_value: str) -> str | None:
+    value = (raw_value or "").strip().lower()
+    if not value:
+        return None
+    return value
 
 
 def _map_install_status_response() -> AdminInstallStatusResponse:
@@ -170,7 +179,13 @@ def admin_login(
         )
 
     token, expires_at = create_admin_token(expected_account)
+    marker_token, marker_expires_at = create_admin_public_marker(expected_account)
     max_age = max(60, expires_at - int(datetime.utcnow().timestamp()))
+    marker_max_age = max(60, marker_expires_at - int(datetime.utcnow().timestamp()))
+    admin_cookie_domain = _cookie_domain_from_setting(settings.admin_cookie_domain)
+    public_cookie_domain = _cookie_domain_from_setting(
+        settings.admin_public_cookie_domain or settings.admin_cookie_domain,
+    )
     response.set_cookie(
         key=ADMIN_TOKEN_COOKIE_KEY,
         value=token,
@@ -179,6 +194,17 @@ def admin_login(
         secure=_is_request_secure(request),
         samesite="lax",
         path="/",
+        domain=admin_cookie_domain,
+    )
+    response.set_cookie(
+        key=ADMIN_PUBLIC_MARKER_COOKIE_KEY,
+        value=marker_token,
+        max_age=marker_max_age,
+        httponly=False,
+        secure=_is_request_secure(request),
+        samesite="lax",
+        path="/",
+        domain=public_cookie_domain,
     )
     return AdminLoginResponse(
         data=AdminLoginData(
@@ -201,8 +227,18 @@ def admin_me(principal: AdminPrincipal = Depends(require_admin_principal)) -> Ad
 
 @router.post("/auth/logout", response_model=AdminActionResponse, summary="Admin logout")
 def admin_logout(response: Response) -> AdminActionResponse:
+    admin_cookie_domain = _cookie_domain_from_setting(settings.admin_cookie_domain)
+    public_cookie_domain = _cookie_domain_from_setting(
+        settings.admin_public_cookie_domain or settings.admin_cookie_domain,
+    )
     response.delete_cookie(
         key=ADMIN_TOKEN_COOKIE_KEY,
         path="/",
+        domain=admin_cookie_domain,
+    )
+    response.delete_cookie(
+        key=ADMIN_PUBLIC_MARKER_COOKIE_KEY,
+        path="/",
+        domain=public_cookie_domain,
     )
     return AdminActionResponse(message="Logged out")

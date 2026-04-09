@@ -42,6 +42,7 @@ class AdminArticleDetailResponse(BaseModel):
 
 class AdminArticleListResponse(BaseModel):
     data: list[ArticleItem]
+    pagination: AdminPagination
 
 
 class AdminDailyDetailResponse(BaseModel):
@@ -134,6 +135,7 @@ class AdminDashboardSiteTotals(BaseModel):
     article_count: int = Field(ge=0)
     comment_count: int = Field(ge=0)
     album_count: int = Field(ge=0)
+    friend_count: int = Field(ge=0)
 
 
 class AdminDashboardData(BaseModel):

@@ -35,6 +35,7 @@ class AdminArticleCreateRequest(BaseModel):
     like_count: int = Field(default=0, ge=0)
     tag: Optional[str] = Field(default=None, max_length=255)
     top: int = Field(default=0, ge=0)
+    status: int = Field(default=1, ge=0, le=1)
     content: Optional[str] = None
 
     @field_validator("title", "class_")
@@ -64,6 +65,7 @@ class AdminArticleUpdateRequest(BaseModel):
     like_count: Optional[int] = Field(default=None, ge=0)
     tag: Optional[str] = Field(default=None, max_length=255)
     top: Optional[int] = Field(default=None, ge=0)
+    status: Optional[int] = Field(default=None, ge=0, le=1)
     content: Optional[str] = None
 
     @field_validator("title", "class_")

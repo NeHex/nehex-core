@@ -68,6 +68,7 @@ def _normalize_optional_text(value: Optional[str]) -> Optional[str]:
 
 
 def _map_article_item(row: Article) -> ArticleItem:
+    status = row.status if row.status is not None else 1
     return ArticleItem(
         id=row.id,
         title=row.title,
@@ -78,6 +79,7 @@ def _map_article_item(row: Article) -> ArticleItem:
         lastEditTime=row.last_edit_time,
         tag=row.tag,
         top=row.top,
+        status=1 if int(status) > 0 else 0,
         content=row.content,
     )
 
@@ -205,6 +207,7 @@ def _map_comment_item(row: Comment) -> CommentItem:
         website=row.website,
         like_count=row.like_count,
         status=row.status,
+        is_admin=bool(row.is_admin),
         ip=row.ip,
         create_time=row.create_time,
         update_time=row.update_time,

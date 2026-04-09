@@ -22,6 +22,7 @@ from app.schemas.admin import (
 from app.services.admin_service import (
     SENSITIVE_ADMIN_SETTING_KEYS,
     create_admin_backup,
+    delete_admin_backup,
     get_admin_backup_file_path,
     list_admin_mail_logs,
     list_admin_backups,
@@ -159,6 +160,27 @@ def admin_download_backup_api(
         media_type="application/gzip",
         filename=backup_file.name,
     )
+
+
+@router.delete(
+    "/backups/{filename}",
+    response_model=AdminActionResponse,
+    summary="Delete backup archive",
+)
+def admin_delete_backup_api(
+    filename: str,
+    _: AdminPrincipal = Depends(require_admin_principal),
+) -> AdminActionResponse:
+    try:
+        deleted = delete_admin_backup(filename)
+    except FileNotFoundError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+    except (ValueError, TypeError) as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
+    except Exception as error:
+        raise HTTPException(status_code=422, detail=f"删除失败: {error}") from error
+
+    return AdminActionResponse(message=f"备份已删除：{deleted.filename}")
 
 
 @router.post(

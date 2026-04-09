@@ -117,6 +117,10 @@
                 <div class="summary-label">相册数</div>
                 <div class="summary-value">{{ formatNumber(siteTotals.album_count) }}</div>
               </div>
+              <div class="summary-item">
+                <div class="summary-label">友链数</div>
+                <div class="summary-value">{{ formatNumber(siteTotals.friend_count) }}</div>
+              </div>
             </div>
           </v-card>
         </v-col>
@@ -168,6 +172,7 @@ const siteTotals = computed(() => dashboardData.value?.site_totals || {
   article_count: 0,
   comment_count: 0,
   album_count: 0,
+  friend_count: 0,
 })
 
 function formatNumber(value: number): string {
@@ -239,7 +244,7 @@ onMounted(async () => {
 
 .summary-grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 12px;
 }
 

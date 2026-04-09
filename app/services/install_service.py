@@ -236,6 +236,7 @@ def _seed_default_content(
                 like_count=0,
                 tag="公告,示例",
                 top=1,
+                status=1,
                 content=(
                     "欢迎使用 NeHex。\n\n"
                     "这是系统在首次安装时自动创建的示例文章，你可以在后台管理中编辑或删除。"

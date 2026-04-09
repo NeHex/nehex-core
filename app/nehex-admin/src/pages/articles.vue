@@ -38,48 +38,112 @@
         <span>共 {{ totalArticles }} 篇文章</span>
       </div>
 
-      <div class="articles-grid">
-        <v-card
-          v-for="article in articles"
-          :key="article.id"
-          class="article-card"
-          :style="getArticleCardStyle(article)"
-          rounded="xl"
-        >
-          <div class="article-overlay">
-            <div class="card-actions">
-              <v-btn
-                class="icon-btn"
-                color="white"
-                icon="mdi-pencil-outline"
-                size="small"
-                variant="text"
-                @click.stop="openEditPage(article)"
-              />
-              <v-btn
-                class="icon-btn"
-                color="error"
-                icon="mdi-delete-outline"
-                size="small"
-                variant="text"
-                @click.stop="openDeleteDialog(article)"
-              />
-            </div>
+      <div class="article-section">
+        <div class="section-head">
+          <h2>已发布</h2>
+          <span>{{ publishedArticles.length }} 篇</span>
+        </div>
+        <div class="articles-grid">
+          <v-card
+            v-for="article in publishedArticles"
+            :key="article.id"
+            class="article-card"
+            :style="getArticleCardStyle(article)"
+            rounded="xl"
+          >
+            <div class="article-overlay">
+              <div class="card-actions">
+                <v-btn
+                  class="icon-btn"
+                  color="white"
+                  icon="mdi-pencil-outline"
+                  size="small"
+                  variant="text"
+                  @click.stop="openEditPage(article)"
+                />
+                <v-btn
+                  class="icon-btn"
+                  color="error"
+                  icon="mdi-delete-outline"
+                  size="small"
+                  variant="text"
+                  @click.stop="openDeleteDialog(article)"
+                />
+              </div>
 
-            <div class="card-footer">
-              <div class="article-title">{{ article.title }}</div>
+              <div class="card-footer">
+                <div class="article-title">{{ article.title }}</div>
+                <v-chip
+                  class="status-chip"
+                  :color="isPublished(article) ? 'success' : 'warning'"
+                  size="small"
+                  variant="tonal"
+                >
+                  {{ isPublished(article) ? '已发布' : '草稿' }}
+                </v-chip>
+              </div>
             </div>
-          </div>
-        </v-card>
+          </v-card>
+          <div v-if="publishedArticles.length === 0" class="section-empty">暂无已发布文章</div>
+        </div>
+      </div>
 
-        <v-card
-          class="add-card"
-          rounded="xl"
-          @click="openCreatePage"
-        >
-          <v-icon class="add-icon" icon="mdi-plus-circle-outline" size="40" />
-          <div class="add-label">新增文章</div>
-        </v-card>
+      <div class="article-section">
+        <div class="section-head">
+          <h2>草稿</h2>
+          <span>{{ draftArticles.length }} 篇</span>
+        </div>
+        <div class="articles-grid">
+          <v-card
+            v-for="article in draftArticles"
+            :key="article.id"
+            class="article-card"
+            :style="getArticleCardStyle(article)"
+            rounded="xl"
+          >
+            <div class="article-overlay">
+              <div class="card-actions">
+                <v-btn
+                  class="icon-btn"
+                  color="white"
+                  icon="mdi-pencil-outline"
+                  size="small"
+                  variant="text"
+                  @click.stop="openEditPage(article)"
+                />
+                <v-btn
+                  class="icon-btn"
+                  color="error"
+                  icon="mdi-delete-outline"
+                  size="small"
+                  variant="text"
+                  @click.stop="openDeleteDialog(article)"
+                />
+              </div>
+
+              <div class="card-footer">
+                <div class="article-title">{{ article.title }}</div>
+                <v-chip
+                  class="status-chip"
+                  :color="isPublished(article) ? 'success' : 'warning'"
+                  size="small"
+                  variant="tonal"
+                >
+                  {{ isPublished(article) ? '已发布' : '草稿' }}
+                </v-chip>
+              </div>
+            </div>
+          </v-card>
+          <v-card
+            class="add-card"
+            rounded="xl"
+            @click="openCreatePage"
+          >
+            <v-icon class="add-icon" icon="mdi-plus-circle-outline" size="40" />
+            <div class="add-label">新增文章</div>
+          </v-card>
+          <div v-if="draftArticles.length === 0" class="section-empty">暂无草稿文章</div>
+        </div>
       </div>
 
       <div v-if="totalPages > 1" class="pagination-row">
@@ -139,6 +203,16 @@ const totalPages = ref(0)
 const articles = ref<ArticleItem[]>([])
 const deleteDialog = ref(false)
 const pendingDelete = ref<ArticleItem | null>(null)
+const publishedArticles = computed(() => articles.value.filter((article) => isPublished(article)))
+const draftArticles = computed(() => articles.value.filter((article) => !isPublished(article)))
+
+function normalizeArticleStatus(status: unknown): 0 | 1 {
+  return Number(status) > 0 ? 1 : 0
+}
+
+function isPublished(article: ArticleItem): boolean {
+  return normalizeArticleStatus(article.status) === 1
+}
 
 function openCreatePage(): void {
   void router.push('/articles/new')
@@ -276,10 +350,43 @@ watch(currentPage, async (page, previous) => {
   font-size: 14px;
 }
 
+.article-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.section-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  color: #c8d3ea;
+}
+
+.section-head h2 {
+  margin: 0;
+  font-size: 18px;
+  color: #eef4ff;
+}
+
+.section-head span {
+  font-size: 13px;
+  color: #aeb8cc;
+}
+
 .articles-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(290px, 1fr));
   gap: 16px;
+}
+
+.section-empty {
+  grid-column: 1 / -1;
+  padding: 28px 16px;
+  border: 1px dashed rgba(255, 255, 255, 0.18);
+  border-radius: 14px;
+  color: #9eabc5;
+  text-align: center;
 }
 
 .article-card,
@@ -326,6 +433,8 @@ watch(currentPage, async (page, previous) => {
 .card-footer {
   display: flex;
   align-items: flex-end;
+  justify-content: space-between;
+  gap: 8px;
   position: relative;
   z-index: 1;
 }
@@ -338,6 +447,11 @@ watch(currentPage, async (page, previous) => {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  min-width: 0;
+}
+
+.status-chip {
+  flex-shrink: 0;
 }
 
 .pagination-row {

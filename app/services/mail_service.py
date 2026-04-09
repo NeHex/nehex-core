@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session
 
 from app.models.comment import Comment
 from app.models.mail_log import MailLog, MailLogStatus
+from app.models.singlepage import SinglePage
 from app.models.setting import Setting
 
 MAIL_STATUS_FILTERS = {"all", "success", "failed"}
@@ -37,6 +38,7 @@ MAIL_SETTING_KEYS = {
     "new_comment_body_template": "mail_new_comment_body_template",
 }
 SITE_TITLE_SETTING_KEY = "site_title"
+SITE_URL_SETTING_KEY = "site_url"
 
 DEFAULT_REPLY_SUBJECT_TEMPLATE = "[{{site_title}}] 你的评论有新回复"
 DEFAULT_REPLY_BODY_TEMPLATE = (
@@ -46,6 +48,7 @@ DEFAULT_REPLY_BODY_TEMPLATE = (
     "回复者：{{reply_nickname}}\n"
     "回复内容：\n{{reply_content}}\n\n"
     "评论位置：{{target_type}} #{{target_id}}\n"
+    "直达链接：{{comment_url}}\n"
     "回复时间：{{reply_time}}\n"
 )
 DEFAULT_NEW_COMMENT_SUBJECT_TEMPLATE = "[{{site_title}}] 收到新评论提醒"
@@ -54,6 +57,7 @@ DEFAULT_NEW_COMMENT_BODY_TEMPLATE = (
     "评论者：{{comment_nickname}}\n"
     "评论者邮箱：{{comment_email}}\n"
     "评论位置：{{target_type}} #{{target_id}}\n"
+    "直达链接：{{comment_url}}\n"
     "评论时间：{{comment_time}}\n\n"
     "评论内容：\n{{comment_content}}\n"
 )
@@ -76,6 +80,7 @@ class SmtpRuntimeConfig:
 class MailNotificationSettings:
     smtp: SmtpRuntimeConfig
     site_title: str
+    site_url: str
     notify_admin_email: str
     notify_new_comment_enabled: bool
     notify_reply_enabled: bool
@@ -115,6 +120,75 @@ def _normalize_smtp_security(value: Any) -> str:
     if normalized in MAIL_SMTP_SECURITY_VALUES:
         return normalized
     return "ssl"
+
+
+def _normalize_site_url(value: Any) -> str:
+    normalized = _normalize_text(value).rstrip("/")
+    if not normalized:
+        return ""
+    if normalized.startswith("http://") or normalized.startswith("https://"):
+        return normalized
+    return f"https://{normalized.lstrip('/')}"
+
+
+def _build_target_path(
+    session: Session,
+    *,
+    target_type: str,
+    target_id: int,
+) -> str:
+    normalized_type = _normalize_text(target_type).lower()
+    normalized_id = max(0, int(target_id))
+
+    if normalized_type == "article":
+        return f"/article/{normalized_id}"
+    if normalized_type == "album":
+        return f"/album/{normalized_id}"
+    if normalized_type == "friend_page":
+        return "/friends"
+    if normalized_type == "singlepage":
+        page_key = session.execute(
+            select(SinglePage.page_key)
+            .where(SinglePage.id == normalized_id)
+            .limit(1),
+        ).scalar_one_or_none()
+        normalized_page_key = _normalize_text(page_key).strip("/")
+        if normalized_page_key:
+            return f"/{normalized_page_key}"
+        return f"/page/{normalized_id}"
+
+    return "/"
+
+
+def _join_site_url(site_url: str, path: str) -> str:
+    normalized_path = f"/{path.lstrip('/')}" if path else "/"
+    if not site_url:
+        return normalized_path
+    return f"{site_url}{normalized_path}"
+
+
+def _build_comment_anchor(comment_id: int) -> str:
+    return f"comment-{max(1, int(comment_id))}"
+
+
+def _with_comment_anchor(target_url: str, comment_id: int) -> str:
+    if not target_url:
+        return ""
+    return f"{target_url}#{_build_comment_anchor(comment_id)}"
+
+
+def _append_direct_link_if_missing(body: str, comment_url: str) -> str:
+    normalized_body = body or ""
+    normalized_comment_url = _normalize_text(comment_url)
+    if not normalized_comment_url:
+        return normalized_body
+    if normalized_comment_url in normalized_body:
+        return normalized_body
+
+    suffix = f"直达链接：{normalized_comment_url}"
+    if not normalized_body.strip():
+        return suffix
+    return f"{normalized_body.rstrip()}\n\n{suffix}\n"
 
 
 def _render_template(template: str, context: dict[str, Any]) -> str:
@@ -287,7 +361,7 @@ def _load_setting_map(session: Session, keys: set[str]) -> dict[str, Any]:
 
 
 def load_mail_notification_settings(session: Session) -> MailNotificationSettings:
-    keys = {SITE_TITLE_SETTING_KEY, *MAIL_SETTING_KEYS.values()}
+    keys = {SITE_TITLE_SETTING_KEY, SITE_URL_SETTING_KEY, *MAIL_SETTING_KEYS.values()}
     setting_map = _load_setting_map(session, keys)
     smtp = _build_smtp_runtime_config(
         smtp_host=setting_map.get(MAIL_SETTING_KEYS["smtp_host"]),
@@ -300,9 +374,11 @@ def load_mail_notification_settings(session: Session) -> MailNotificationSetting
         smtp_timeout_seconds=setting_map.get(MAIL_SETTING_KEYS["smtp_timeout_seconds"]),
     )
     site_title = _normalize_text(setting_map.get(SITE_TITLE_SETTING_KEY)) or "NeHex"
+    site_url = _normalize_site_url(setting_map.get(SITE_URL_SETTING_KEY))
     return MailNotificationSettings(
         smtp=smtp,
         site_title=site_title,
+        site_url=site_url,
         notify_admin_email=_normalize_text(setting_map.get(MAIL_SETTING_KEYS["notify_admin_email"])),
         notify_new_comment_enabled=_normalize_bool(
             setting_map.get(MAIL_SETTING_KEYS["notify_new_comment_enabled"]),
@@ -382,10 +458,26 @@ def send_comment_notification_mails(
     parent_comment: Comment | None = None,
 ) -> None:
     settings = load_mail_notification_settings(session)
+    target_path = _build_target_path(
+        session=session,
+        target_type=comment.target_type,
+        target_id=comment.target_id,
+    )
+    target_url = _join_site_url(settings.site_url, target_path)
+    comment_url = _with_comment_anchor(target_url, comment.id)
+    parent_comment_url = (
+        _with_comment_anchor(target_url, parent_comment.id)
+        if parent_comment is not None
+        else ""
+    )
+
     base_context = {
         "site_title": settings.site_title,
         "target_type": comment.target_type,
         "target_id": comment.target_id,
+        "target_url": target_url,
+        "comment_url": comment_url,
+        "parent_comment_url": parent_comment_url,
     }
 
     if settings.notify_new_comment_enabled and settings.notify_admin_email:
@@ -398,6 +490,7 @@ def send_comment_notification_mails(
         }
         subject = _render_template(settings.new_comment_subject_template, new_comment_context)
         body = _render_template(settings.new_comment_body_template, new_comment_context)
+        body = _append_direct_link_if_missing(body, comment_url)
         try:
             _send_and_record(
                 session,
@@ -430,12 +523,14 @@ def send_comment_notification_mails(
         **base_context,
         "parent_nickname": parent_comment.nickname,
         "parent_content": parent_comment.content,
+        "parent_comment_url": _with_comment_anchor(target_url, parent_comment.id),
         "reply_nickname": comment.nickname,
         "reply_content": comment.content,
         "reply_time": comment.create_time.isoformat(sep=" ", timespec="seconds"),
     }
     subject = _render_template(settings.reply_subject_template, reply_context)
     body = _render_template(settings.reply_body_template, reply_context)
+    body = _append_direct_link_if_missing(body, comment_url)
     try:
         _send_and_record(
             session,

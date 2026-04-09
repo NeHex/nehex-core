@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -13,7 +13,9 @@ from app.schemas.admin import (
     AdminAlbumUpdateRequest,
     AdminArticleCreateRequest,
     AdminArticleDetailResponse,
+    AdminArticleListResponse,
     AdminArticleUpdateRequest,
+    AdminPagination,
     AdminDailyCreateRequest,
     AdminDailyDetailResponse,
     AdminDailyUpdateRequest,
@@ -37,7 +39,9 @@ from app.services.admin_service import (
     delete_daily,
     delete_page,
     delete_project,
+    get_article_by_id,
     get_page_by_id,
+    list_articles,
     list_pages,
     list_projects,
     update_album,
@@ -49,6 +53,41 @@ from app.services.admin_service import (
 from app.services.dailies_service import get_daily_by_id
 
 router = APIRouter()
+
+
+@router.get("/articles", response_model=AdminArticleListResponse, summary="List articles")
+def admin_list_articles(
+    page: int = Query(default=1, ge=1),
+    size: int = Query(default=24, ge=1, le=100),
+    _: AdminPrincipal = Depends(require_admin_principal),
+    session: Session = Depends(get_db_session),
+) -> AdminArticleListResponse:
+    data, normalized_page, normalized_size, total, total_pages = list_articles(
+        session=session,
+        page=page,
+        size=size,
+    )
+    return AdminArticleListResponse(
+        data=data,
+        pagination=AdminPagination(
+            page=normalized_page,
+            size=normalized_size,
+            total=total,
+            total_pages=total_pages,
+        ),
+    )
+
+
+@router.get("/articles/{article_id}", response_model=AdminArticleDetailResponse, summary="Get article detail")
+def admin_get_article(
+    article_id: int,
+    _: AdminPrincipal = Depends(require_admin_principal),
+    session: Session = Depends(get_db_session),
+) -> AdminArticleDetailResponse:
+    item = get_article_by_id(session=session, article_id=article_id)
+    if item is None:
+        raise HTTPException(status_code=404, detail="Article not found")
+    return AdminArticleDetailResponse(data=item)
 
 
 @router.post("/articles", response_model=AdminArticleDetailResponse, summary="Create article")
@@ -66,6 +105,7 @@ def admin_create_article(
         like_count=payload.like_count,
         tag=payload.tag,
         top=payload.top,
+        status=payload.status,
         content=payload.content,
     )
     return AdminArticleDetailResponse(data=item)
@@ -89,6 +129,7 @@ def admin_update_article(
         like_count=data.get("like_count"),
         tag=data.get("tag"),
         top=data.get("top"),
+        status=data.get("status"),
         content=data.get("content"),
     )
     if item is None:

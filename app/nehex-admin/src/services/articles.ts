@@ -10,6 +10,7 @@ export type ArticleItem = {
   lastEditTime: string
   tag?: string | null
   top: number
+  status: number
   content?: string | null
 }
 
@@ -35,6 +36,7 @@ export type ArticleUpsertPayload = {
   like_count?: number
   tag?: string | null
   top: number
+  status: number
   content?: string | null
 }
 
@@ -60,14 +62,9 @@ export async function fetchArticles(
   params.set('page', String(Math.max(1, Math.floor(page))))
   params.set('size', String(Math.max(1, Math.floor(size))))
 
-  const response = await fetch(`/article?${params.toString()}`, {
+  const response = await adminFetch(`/admin-api/articles?${params.toString()}`, {
     method: 'GET',
-    credentials: 'same-origin',
   })
-
-  if (!response.ok) {
-    throw new Error(`Failed to request articles: ${response.status}`)
-  }
 
   const payload = await parseJson<ArticleListResponse>(response)
   if (!Array.isArray(payload?.data)) {
@@ -93,14 +90,9 @@ export async function fetchArticles(
 }
 
 export async function fetchArticleById(articleId: number): Promise<ArticleItem> {
-  const response = await fetch(`/article/${articleId}`, {
+  const response = await adminFetch(`/admin-api/articles/${articleId}`, {
     method: 'GET',
-    credentials: 'same-origin',
   })
-
-  if (!response.ok) {
-    throw new Error(`Failed to request article detail: ${response.status}`)
-  }
 
   const payload = await parseJson<ArticleDetailResponse>(response)
   if (!payload?.data) {

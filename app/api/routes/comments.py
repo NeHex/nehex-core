@@ -1,8 +1,14 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, Response
 from sqlalchemy.orm import Session
 
+from app.core.admin_security import (
+    ADMIN_PUBLIC_MARKER_COOKIE_KEY,
+    ADMIN_TOKEN_COOKIE_KEY,
+    decode_admin_token,
+    resolve_admin_account_from_public_marker,
+)
 from app.core.database import get_db_session
 from app.schemas.comment import CommentCreateRequest, CommentDetailResponse, CommentListResponse
 from app.services.comments_service import (
@@ -55,6 +61,26 @@ def _parse_liked_cookie(raw_cookie: str | None) -> list[int]:
     return result
 
 
+def _resolve_admin_comment_identity(request: Request, marker_header: str | None) -> bool:
+    marker_from_header = (marker_header or "").strip()
+    if marker_from_header and resolve_admin_account_from_public_marker(marker_from_header):
+        return True
+
+    marker_from_cookie = request.cookies.get(ADMIN_PUBLIC_MARKER_COOKIE_KEY)
+    if resolve_admin_account_from_public_marker(marker_from_cookie):
+        return True
+
+    admin_token = request.cookies.get(ADMIN_TOKEN_COOKIE_KEY)
+    if admin_token:
+        try:
+            decode_admin_token(admin_token)
+            return True
+        except Exception:
+            return False
+
+    return False
+
+
 @router.get("/comment", response_model=CommentListResponse, summary="List comments by target")
 def get_comments(
     target_type: str = Query(..., min_length=1, max_length=20),
@@ -79,6 +105,7 @@ def get_comments(
 def post_comment(
     payload: CommentCreateRequest,
     request: Request,
+    admin_marker: str | None = Header(default=None, alias="X-NeHex-Admin-Marker"),
     session: Session = Depends(get_db_session),
 ) -> CommentDetailResponse:
     if payload.target_type not in SUPPORTED_TARGET_TYPES:
@@ -89,6 +116,7 @@ def post_comment(
             session=session,
             payload=payload,
             ip_address=_resolve_client_ip(request),
+            is_admin=_resolve_admin_comment_identity(request, admin_marker),
         )
     except ValueError as error:
         message = str(error)

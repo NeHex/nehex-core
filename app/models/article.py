@@ -42,4 +42,5 @@ class Article(Base):
     )
     tag: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     top: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("0"), default=0)
+    status: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("1"), default=1)
     content: Mapped[Optional[str]] = mapped_column(Text, nullable=True)

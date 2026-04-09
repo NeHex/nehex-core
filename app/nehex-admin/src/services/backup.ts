@@ -57,6 +57,15 @@ export async function restoreAdminBackup(filename: string): Promise<string> {
   return typeof payload?.message === 'string' ? payload.message : '恢复成功'
 }
 
+export async function deleteAdminBackup(filename: string): Promise<string> {
+  const encoded = encodeURIComponent(filename)
+  const response = await adminFetch(`/admin-api/backups/${encoded}`, {
+    method: 'DELETE',
+  })
+  const payload = await parseJson<AdminActionResponse>(response)
+  return typeof payload?.message === 'string' ? payload.message : '删除成功'
+}
+
 export async function uploadAndRestoreAdminBackup(file: File): Promise<string> {
   const formData = new FormData()
   formData.append('file', file, file.name)

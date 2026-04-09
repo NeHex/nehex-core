@@ -192,7 +192,8 @@
 
           <p class="hint-text">
             可用变量：`site_title`、`target_type`、`target_id`、`comment_nickname`、`comment_email`、`comment_content`、
-            `comment_time`、`parent_nickname`、`parent_content`、`reply_nickname`、`reply_content`、`reply_time`
+            `comment_time`、`parent_nickname`、`parent_content`、`reply_nickname`、`reply_content`、`reply_time`、
+            `target_url`、`comment_url`、`parent_comment_url`
           </p>
         </v-card-text>
       </v-card>
@@ -263,13 +264,13 @@ const replyTemplatePresets: TemplatePreset[] = [
     value: 'default',
     label: '默认模板',
     subject: '[{{site_title}}] 你的评论有新回复',
-    body: '你好，{{parent_nickname}}：\n\n你在 {{site_title}} 的评论收到了新回复。\n\n原评论内容：\n{{parent_content}}\n\n回复者：{{reply_nickname}}\n回复内容：\n{{reply_content}}\n\n评论位置：{{target_type}} #{{target_id}}\n回复时间：{{reply_time}}',
+    body: '你好，{{parent_nickname}}：\n\n你在 {{site_title}} 的评论收到了新回复。\n\n原评论内容：\n{{parent_content}}\n\n回复者：{{reply_nickname}}\n回复内容：\n{{reply_content}}\n\n评论位置：{{target_type}} #{{target_id}}\n直达链接：{{comment_url}}\n回复时间：{{reply_time}}',
   },
   {
     value: 'compact',
     label: '简洁模板',
     subject: '[{{site_title}}] 评论回复提醒',
-    body: '{{reply_nickname}} 回复了你的评论：\n{{reply_content}}\n\n位置：{{target_type}} #{{target_id}}\n时间：{{reply_time}}',
+    body: '{{reply_nickname}} 回复了你的评论：\n{{reply_content}}\n\n位置：{{target_type}} #{{target_id}}\n链接：{{comment_url}}\n时间：{{reply_time}}',
   },
 ]
 
@@ -278,13 +279,13 @@ const newCommentTemplatePresets: TemplatePreset[] = [
     value: 'default',
     label: '默认模板',
     subject: '[{{site_title}}] 收到新评论提醒',
-    body: '{{site_title}} 收到了一条新评论。\n\n评论者：{{comment_nickname}}\n评论者邮箱：{{comment_email}}\n评论位置：{{target_type}} #{{target_id}}\n评论时间：{{comment_time}}\n\n评论内容：\n{{comment_content}}',
+    body: '{{site_title}} 收到了一条新评论。\n\n评论者：{{comment_nickname}}\n评论者邮箱：{{comment_email}}\n评论位置：{{target_type}} #{{target_id}}\n直达链接：{{comment_url}}\n评论时间：{{comment_time}}\n\n评论内容：\n{{comment_content}}',
   },
   {
     value: 'compact',
     label: '简洁模板',
     subject: '[{{site_title}}] 新评论提醒',
-    body: '{{comment_nickname}} 在 {{target_type}} #{{target_id}} 发表了新评论：\n{{comment_content}}\n\n时间：{{comment_time}}',
+    body: '{{comment_nickname}} 在 {{target_type}} #{{target_id}} 发表了新评论：\n{{comment_content}}\n\n链接：{{comment_url}}\n时间：{{comment_time}}',
   },
 ]
 

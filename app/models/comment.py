@@ -38,6 +38,12 @@ class Comment(Base):
         server_default=text("1"),
         default=1,
     )
+    is_admin: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        server_default=text("0"),
+        default=0,
+    )
     ip: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
     create_time: Mapped[datetime] = mapped_column(
         DateTime,

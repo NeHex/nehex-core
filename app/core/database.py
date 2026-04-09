@@ -60,18 +60,30 @@ def ensure_all_tables() -> None:
 def ensure_schema_compatibility_columns() -> None:
     inspector = inspect(engine)
 
-    if not inspector.has_table("article"):
-        return
-
-    try:
-        existing_columns = {str(column.get("name", "")) for column in inspector.get_columns("article")}
-    except Exception as error:
-        logger.warning("[startup] skip schema compatibility check for article columns: %s", error)
-        return
-
     ddl_statements: list[str] = []
-    if "like_count" not in existing_columns:
-        ddl_statements.append("ALTER TABLE article ADD COLUMN like_count INT NOT NULL DEFAULT 0")
+    if inspector.has_table("article"):
+        try:
+            existing_article_columns = {
+                str(column.get("name", ""))
+                for column in inspector.get_columns("article")
+            }
+            if "like_count" not in existing_article_columns:
+                ddl_statements.append("ALTER TABLE article ADD COLUMN like_count INT NOT NULL DEFAULT 0")
+            if "status" not in existing_article_columns:
+                ddl_statements.append("ALTER TABLE article ADD COLUMN status INT NOT NULL DEFAULT 1")
+        except Exception as error:
+            logger.warning("[startup] skip schema compatibility check for article columns: %s", error)
+
+    if inspector.has_table("comment"):
+        try:
+            existing_comment_columns = {
+                str(column.get("name", ""))
+                for column in inspector.get_columns("comment")
+            }
+            if "is_admin" not in existing_comment_columns:
+                ddl_statements.append("ALTER TABLE comment ADD COLUMN is_admin INT NOT NULL DEFAULT 0")
+        except Exception as error:
+            logger.warning("[startup] skip schema compatibility check for comment columns: %s", error)
 
     if not ddl_statements:
         return

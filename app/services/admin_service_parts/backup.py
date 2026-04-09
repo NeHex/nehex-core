@@ -245,6 +245,13 @@ def get_admin_backup_file_path(filename: str) -> Path:
     return path
 
 
+def delete_admin_backup(filename: str) -> AdminBackupItem:
+    path = get_admin_backup_file_path(filename)
+    item = _to_backup_item(path)
+    path.unlink()
+    return item
+
+
 def save_uploaded_backup_file(file_name: str, content: bytes) -> AdminBackupItem:
     _validate_uploaded_backup_file_name(file_name)
     _ensure_backup_root()

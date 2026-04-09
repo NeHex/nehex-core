@@ -233,12 +233,14 @@ def _build_site_totals(session: Session) -> dict[str, int]:
     article_count = int(session.execute(select(func.count(Article.id))).scalar_one() or 0)
     comment_count = int(session.execute(select(func.count(Comment.id))).scalar_one() or 0)
     album_count = int(session.execute(select(func.count(Album.id))).scalar_one() or 0)
+    friend_count = int(session.execute(select(func.count(Friend.id))).scalar_one() or 0)
 
     return {
         "text_count": max(0, text_count),
         "article_count": max(0, article_count),
         "comment_count": max(0, comment_count),
         "album_count": max(0, album_count),
+        "friend_count": max(0, friend_count),
     }
 
 
@@ -276,6 +278,7 @@ def get_admin_dashboard_data(session: Session) -> dict[str, Any]:
             "article_count": 0,
             "comment_count": 0,
             "album_count": 0,
+            "friend_count": 0,
         }
 
     payload = {

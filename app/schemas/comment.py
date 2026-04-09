@@ -17,6 +17,7 @@ class CommentItem(BaseModel):
     website: Optional[str] = None
     like_count: int = 0
     status: int = 1
+    is_admin: bool = False
     ip: Optional[str] = None
     create_time: datetime
     update_time: datetime

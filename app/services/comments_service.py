@@ -84,6 +84,7 @@ def _map_comment_item(row: Comment) -> CommentItem:
         website=row.website,
         like_count=row.like_count,
         status=row.status,
+        is_admin=bool(row.is_admin),
         ip=row.ip,
         create_time=row.create_time,
         update_time=row.update_time,
@@ -202,6 +203,8 @@ def create_comment(
     session: Session,
     payload: CommentCreateRequest,
     ip_address: str | None = None,
+    *,
+    is_admin: bool = False,
 ) -> CommentItem:
     parent_id = payload.parent_id if payload.parent_id > 0 else 0
     parent_row: Comment | None = None
@@ -232,6 +235,7 @@ def create_comment(
         nickname=payload.nickname.strip(),
         email=_normalize_optional_text(payload.email),
         website=_normalize_optional_text(payload.website),
+        is_admin=1 if is_admin else 0,
         ip=_normalize_optional_text(ip_address),
     )
 

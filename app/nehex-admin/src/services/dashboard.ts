@@ -15,6 +15,7 @@ export type DashboardSiteTotals = {
   article_count: number
   comment_count: number
   album_count: number
+  friend_count: number
 }
 
 export type DashboardData = {
@@ -70,6 +71,7 @@ function normalizeSiteTotals(value: unknown): DashboardSiteTotals {
     article_count: Math.max(0, Math.round(toNumber(source.article_count))),
     comment_count: Math.max(0, Math.round(toNumber(source.comment_count))),
     album_count: Math.max(0, Math.round(toNumber(source.album_count))),
+    friend_count: Math.max(0, Math.round(toNumber(source.friend_count))),
   }
 }
 

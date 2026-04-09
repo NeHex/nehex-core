@@ -53,7 +53,7 @@
 
     <div class="editor-grid">
       <section class="left-panel">
-        <v-card class="panel-card" rounded="xl">
+        <v-card class="panel-card info-card" rounded="xl">
           <v-card-title>基础信息</v-card-title>
           <v-card-text class="panel-body">
             <v-text-field
@@ -82,14 +82,67 @@
               variant="outlined"
             />
 
-            <v-textarea
-              v-model="editorForm.imageUrlsText"
-              auto-grow
-              label="图片链接（每行一个）"
-              min-rows="8"
-              placeholder="https://example.com/image-1.jpg"
-              variant="outlined"
-            />
+            <div class="image-url-editor">
+              <div class="image-url-head">
+                <span>图片链接（竖向滑动）</span>
+                <span>{{ imageUrlEntries.length > 0 ? activeImageUrlIndex + 1 : 0 }} / {{ imageUrlEntries.length }}</span>
+              </div>
+
+              <div class="image-url-actions">
+                <v-btn
+                  icon="mdi-chevron-up"
+                  size="small"
+                  variant="text"
+                  :disabled="activeImageUrlIndex <= 0"
+                  @click="moveActiveImageUrl(-1)"
+                />
+                <v-btn
+                  icon="mdi-chevron-down"
+                  size="small"
+                  variant="text"
+                  :disabled="activeImageUrlIndex >= imageUrlEntries.length - 1"
+                  @click="moveActiveImageUrl(1)"
+                />
+                <v-btn
+                  prepend-icon="mdi-plus"
+                  size="small"
+                  variant="text"
+                  @click="addImageUrlEntry"
+                >
+                  新增
+                </v-btn>
+                <v-btn
+                  color="error"
+                  prepend-icon="mdi-delete-outline"
+                  size="small"
+                  variant="text"
+                  :disabled="imageUrlEntries.length <= 1 && !currentImageUrlText"
+                  @click="removeCurrentImageUrlEntry"
+                >
+                  删除当前
+                </v-btn>
+              </div>
+
+              <div ref="imageUrlViewportRef" class="image-url-viewport">
+                <div
+                  v-for="(_, index) in imageUrlEntries"
+                  :key="`image-url-${index}`"
+                  class="image-url-row"
+                  :class="{ 'image-url-row--active': index === activeImageUrlIndex }"
+                  :data-image-url-row="index"
+                  @click="activeImageUrlIndex = index"
+                >
+                  <span class="image-url-row-index">{{ index + 1 }}</span>
+                  <v-text-field
+                    v-model="imageUrlEntries[index]"
+                    density="compact"
+                    hide-details
+                    placeholder="https://example.com/image-1.jpg"
+                    variant="outlined"
+                  />
+                </div>
+              </div>
+            </div>
           </v-card-text>
         </v-card>
 
@@ -175,7 +228,7 @@
 
         <v-card class="panel-card thumbs-card" rounded="xl">
           <v-card-title>预览图</v-card-title>
-          <v-card-text>
+          <v-card-text class="thumbs-wrap">
             <div v-if="previewImages.length > 0" class="thumbs-list">
               <button
                 v-for="(url, index) in previewImages"
@@ -197,7 +250,7 @@
 </template>
 
 <script lang="ts" setup>
-import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useGlobalSnackbar } from '@/composables/useGlobalSnackbar'
 import {
@@ -221,7 +274,6 @@ type EditorForm = {
   className: string
   cover: string
   likeCount: number
-  imageUrlsText: string
 }
 
 const loading = ref(false)
@@ -231,7 +283,10 @@ const uploadZoneActive = ref(false)
 const errorMessage = ref('')
 const successMessage = ref('')
 const activePreviewIndex = ref(0)
+const activeImageUrlIndex = ref(0)
+const imageUrlEntries = ref<string[]>([''])
 const imageInputRef = ref<HTMLInputElement | null>(null)
+const imageUrlViewportRef = ref<HTMLElement | null>(null)
 const { showGlobalSuccess } = useGlobalSnackbar()
 
 const editorForm = reactive<EditorForm>({
@@ -239,15 +294,16 @@ const editorForm = reactive<EditorForm>({
   className: 'default',
   cover: '',
   likeCount: 0,
-  imageUrlsText: '',
 })
 
 const isEditing = computed(() => Number.isFinite(props.albumId))
 
+const normalizedImageUrls = computed(() => parseAlbumImageUrls(joinAlbumImageUrls(imageUrlEntries.value)))
+const currentImageUrlText = computed(() => imageUrlEntries.value[activeImageUrlIndex.value]?.trim() || '')
+
 const previewImages = computed(() => {
-  const parsed = parseAlbumImageUrls(editorForm.imageUrlsText)
-  if (parsed.length > 0) {
-    return parsed
+  if (normalizedImageUrls.value.length > 0) {
+    return normalizedImageUrls.value
   }
   const cover = editorForm.cover.trim()
   if (cover) {
@@ -273,6 +329,27 @@ watch(previewImages, (items) => {
   }
 })
 
+watch(imageUrlEntries, (items) => {
+  if (items.length <= 0) {
+    imageUrlEntries.value = ['']
+    activeImageUrlIndex.value = 0
+    return
+  }
+  if (activeImageUrlIndex.value >= items.length) {
+    activeImageUrlIndex.value = items.length - 1
+  }
+}, { deep: true })
+
+watch(activeImageUrlIndex, async () => {
+  await nextTick()
+  const viewport = imageUrlViewportRef.value
+  if (!viewport) {
+    return
+  }
+  const row = viewport.querySelector<HTMLElement>(`[data-image-url-row="${activeImageUrlIndex.value}"]`)
+  row?.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+})
+
 function normalizeNumber(value: number): number {
   if (!Number.isFinite(value)) {
     return 0
@@ -284,7 +361,7 @@ function buildPayload(): AlbumUpsertPayload | null {
   const title = editorForm.title.trim()
   const className = editorForm.className.trim()
   const cover = editorForm.cover.trim()
-  const parsedImages = parseAlbumImageUrls(editorForm.imageUrlsText)
+  const parsedImages = normalizedImageUrls.value
   const imgUrls = joinAlbumImageUrls(parsedImages)
 
   if (!title) {
@@ -316,7 +393,47 @@ function fillEditorForm(album: {
   editorForm.className = album.class?.trim() || 'default'
   editorForm.cover = album.cover?.trim() || ''
   editorForm.likeCount = Number.isFinite(album.like_count) ? Number(album.like_count) : 0
-  editorForm.imageUrlsText = parseAlbumImageUrls(album.img_urls).join('\n')
+  imageUrlEntries.value = parseAlbumImageUrls(album.img_urls)
+  if (imageUrlEntries.value.length <= 0) {
+    imageUrlEntries.value = ['']
+  }
+  activeImageUrlIndex.value = 0
+}
+
+function ensureImageUrlEntries(): void {
+  if (imageUrlEntries.value.length <= 0) {
+    imageUrlEntries.value = ['']
+    activeImageUrlIndex.value = 0
+  }
+}
+
+function addImageUrlEntry(): void {
+  ensureImageUrlEntries()
+  const targetIndex = activeImageUrlIndex.value + 1
+  imageUrlEntries.value.splice(targetIndex, 0, '')
+  activeImageUrlIndex.value = targetIndex
+}
+
+function removeCurrentImageUrlEntry(): void {
+  ensureImageUrlEntries()
+  if (imageUrlEntries.value.length <= 1) {
+    imageUrlEntries.value[0] = ''
+    activeImageUrlIndex.value = 0
+    return
+  }
+  imageUrlEntries.value.splice(activeImageUrlIndex.value, 1)
+  if (activeImageUrlIndex.value >= imageUrlEntries.value.length) {
+    activeImageUrlIndex.value = imageUrlEntries.value.length - 1
+  }
+}
+
+function moveActiveImageUrl(step: -1 | 1): void {
+  const total = imageUrlEntries.value.length
+  if (total <= 0) {
+    activeImageUrlIndex.value = 0
+    return
+  }
+  activeImageUrlIndex.value = Math.min(total - 1, Math.max(0, activeImageUrlIndex.value + step))
 }
 
 function selectPreview(index: number): void {
@@ -358,12 +475,12 @@ function _appendUploadedUrls(urls: string[]): void {
     return
   }
 
-  const existing = parseAlbumImageUrls(editorForm.imageUrlsText)
+  const existing = normalizedImageUrls.value
   const merged = new Set(existing)
   urls.forEach((item) => merged.add(item))
 
   const nextUrls = Array.from(merged)
-  editorForm.imageUrlsText = joinAlbumImageUrls(nextUrls) || ''
+  imageUrlEntries.value = nextUrls.length > 0 ? nextUrls : ['']
 
   if (!editorForm.cover.trim()) {
     editorForm.cover = urls[0] || ''
@@ -371,6 +488,7 @@ function _appendUploadedUrls(urls: string[]): void {
 
   const firstInserted = nextUrls.findIndex((item) => item === urls[0])
   if (firstInserted >= 0) {
+    activeImageUrlIndex.value = firstInserted
     activePreviewIndex.value = firstInserted
   }
 }
@@ -485,7 +603,9 @@ onMounted(async () => {
   display: flex;
   flex-direction: column;
   gap: 14px;
-  min-height: calc(100vh - 64px);
+  height: calc(100dvh - 120px);
+  min-height: 0;
+  overflow: hidden;
 }
 
 .editor-header {
@@ -516,30 +636,102 @@ onMounted(async () => {
   display: grid;
   grid-template-columns: minmax(320px, 44%) minmax(0, 56%);
   gap: 14px;
-  min-height: calc(100vh - 240px);
+  flex: 1;
+  min-height: 0;
 }
 
 .left-panel,
 .right-panel {
   min-width: 0;
+  min-height: 0;
+  height: 100%;
   display: flex;
   flex-direction: column;
   gap: 14px;
 }
 
 .panel-card {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
   border: 1px solid rgba(255, 255, 255, 0.1);
   background: linear-gradient(180deg, #151c2a, #121826);
 }
 
+.info-card {
+  flex: 1.15;
+}
+
 .panel-body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
   display: flex;
   flex-direction: column;
   gap: 10px;
 }
 
+.image-url-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 12px;
+  background: rgba(146, 168, 223, 0.08);
+}
+
+.image-url-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 13px;
+  color: #d5e2ff;
+}
+
+.image-url-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.image-url-viewport {
+  max-height: 220px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-right: 2px;
+}
+
+.image-url-row {
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr);
+  gap: 8px;
+  align-items: center;
+  padding: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.03);
+  transition:
+    border-color 0.2s ease,
+    background 0.2s ease;
+}
+
+.image-url-row-index {
+  text-align: center;
+  font-size: 12px;
+  color: #c7d6f4;
+}
+
+.image-url-row--active {
+  border-color: rgba(204, 220, 255, 0.82);
+  background: rgba(157, 185, 255, 0.2);
+}
+
 .upload-card {
-  flex: 1;
+  flex: 0.85;
+  min-height: 0;
 }
 
 .upload-actions {
@@ -585,17 +777,21 @@ onMounted(async () => {
 
 .preview-card {
   flex: 1;
+  min-height: 0;
 }
 
 .preview-stage-wrap {
   display: flex;
   flex-direction: column;
   gap: 10px;
+  flex: 1;
+  min-height: 0;
 }
 
 .preview-stage {
   position: relative;
-  height: 1080px;
+  flex: 1;
+  min-height: 0;
   border-radius: 16px;
   border: 1px solid rgba(255, 255, 255, 0.12);
   overflow: auto;
@@ -636,6 +832,16 @@ onMounted(async () => {
   justify-content: space-between;
   color: #adbada;
   font-size: 13px;
+}
+
+.thumbs-card {
+  flex: 0 0 210px;
+}
+
+.thumbs-wrap {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
 }
 
 .thumbs-list {
@@ -679,9 +885,14 @@ onMounted(async () => {
 }
 
 @media (max-width: 1100px) {
+  .album-editor-page {
+    height: auto;
+    overflow: visible;
+  }
+
   .editor-grid {
     grid-template-columns: 1fr;
-    min-height: 0;
+    flex: none;
   }
 }
 

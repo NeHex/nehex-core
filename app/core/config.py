@@ -26,7 +26,7 @@ def normalize_admin_manager_web_path(value: Optional[str], fallback: str = "/neh
 
 class Settings(BaseSettings):
     app_name: str = "NeHex Core API"
-    app_version: str = "v1.0.1"
+    app_version: str = "v1.0.2"
     app_env: str = "dev"
     app_port: int = 7878
     cors_allow_origins: str = "http://127.0.0.1:3000,http://localhost:3000"
@@ -35,6 +35,8 @@ class Settings(BaseSettings):
     admin_api_secret: str = "please-change-me"
     admin_api_client_id: str = "nehex-vuetify-admin"
     admin_api_token_ttl_seconds: int = 43200
+    admin_cookie_domain: str = ""
+    admin_public_cookie_domain: str = ""
     admin_manager_build_on_startup: bool = True
     simple_cache_max_entries: int = 1024
     redis_enabled: bool = True

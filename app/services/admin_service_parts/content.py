@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Optional
 
-from sqlalchemy import desc, select
+from sqlalchemy import desc, func, select
 from sqlalchemy.orm import Session
 
 from app.models.album import Album
@@ -38,6 +38,40 @@ def list_articles_by_class(session: Session, article_class: str) -> list[Article
     )
     rows = session.execute(stmt).scalars().all()
     return [_map_article_item(row) for row in rows]
+
+
+def list_articles(
+    session: Session,
+    *,
+    page: int = 1,
+    size: int = 24,
+) -> tuple[list[ArticleItem], int, int, int, int]:
+    normalized_page = max(1, int(page))
+    normalized_size = max(1, min(100, int(size)))
+    offset = (normalized_page - 1) * normalized_size
+
+    total_stmt = select(func.count(Article.id))
+    total = int(session.execute(total_stmt).scalar() or 0)
+    if total <= 0:
+        return [], normalized_page, normalized_size, 0, 0
+
+    stmt = (
+        select(Article)
+        .order_by(desc(Article.top), desc(Article.last_edit_time), desc(Article.id))
+        .offset(offset)
+        .limit(normalized_size)
+    )
+    rows = session.execute(stmt).scalars().all()
+    total_pages = (total + normalized_size - 1) // normalized_size
+    return [_map_article_item(row) for row in rows], normalized_page, normalized_size, total, total_pages
+
+
+def get_article_by_id(session: Session, article_id: int) -> Optional[ArticleItem]:
+    stmt = select(Article).where(Article.id == article_id).limit(1)
+    row = session.execute(stmt).scalars().first()
+    if row is None:
+        return None
+    return _map_article_item(row)
 
 
 def list_pages(session: Session) -> list[PageItem]:
@@ -240,6 +274,7 @@ def create_article(
     like_count: int = 0,
     tag: Optional[str] = None,
     top: int = 0,
+    status: int = 1,
     content: Optional[str] = None,
 ) -> ArticleItem:
     row = Article(
@@ -250,6 +285,7 @@ def create_article(
         like_count=max(0, int(like_count)),
         tag=_normalize_optional_text(tag),
         top=max(0, int(top)),
+        status=1 if int(status) > 0 else 0,
         content=_normalize_optional_text(content),
     )
     session.add(row)
@@ -270,6 +306,7 @@ def update_article(
     like_count: Optional[int] = None,
     tag: Optional[str] = None,
     top: Optional[int] = None,
+    status: Optional[int] = None,
     content: Optional[str] = None,
     expected_class: Optional[str] = None,
 ) -> Optional[ArticleItem]:
@@ -295,6 +332,8 @@ def update_article(
         row.tag = _normalize_optional_text(tag)
     if top is not None:
         row.top = max(0, int(top))
+    if status is not None:
+        row.status = 1 if int(status) > 0 else 0
     if content is not None:
         row.content = _normalize_optional_text(content)
 

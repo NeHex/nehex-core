@@ -18,6 +18,7 @@ class ArticleItem(BaseModel):
     lastEditTime: datetime
     tag: Optional[str] = None
     top: int
+    status: int = Field(default=1, ge=0, le=1)
     content: Optional[str] = None
 
 

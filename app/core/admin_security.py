@@ -17,6 +17,7 @@ from fastapi import Header, HTTPException, Request, status
 from app.core.config import settings
 
 ADMIN_TOKEN_COOKIE_KEY = "nehex_admin_token"
+ADMIN_PUBLIC_MARKER_COOKIE_KEY = "nehex_admin_marker"
 ADMIN_PASSWORD_SCHEME = "pbkdf2_sha256"
 ADMIN_PASSWORD_ITERATIONS = 390000
 _LEGACY_SHA256_HEX_PATTERN = re.compile(r"^[0-9a-f]{64}$")
@@ -123,6 +124,50 @@ def create_admin_token(account: str) -> tuple[str, int]:
         json.dumps(payload, ensure_ascii=True, separators=(",", ":")).encode("utf-8"),
     ).decode("utf-8")
     return token, expires_at
+
+
+def create_admin_public_marker(account: str) -> tuple[str, int]:
+    now = int(time.time())
+    expires_at = now + max(300, int(settings.admin_api_token_ttl_seconds))
+    payload = {
+        "account": account.strip(),
+        "type": "admin_public_marker",
+        "exp": expires_at,
+        "iat": now,
+        "jti": secrets.token_urlsafe(12),
+    }
+    token = _TOKEN_FERNET.encrypt(
+        json.dumps(payload, ensure_ascii=True, separators=(",", ":")).encode("utf-8"),
+    ).decode("utf-8")
+    return token, expires_at
+
+
+def resolve_admin_account_from_public_marker(marker: str | None) -> Optional[str]:
+    raw_marker = str(marker or "").strip()
+    if not raw_marker:
+        return None
+
+    try:
+        raw = _TOKEN_FERNET.decrypt(raw_marker.encode("utf-8"))
+        payload = json.loads(raw.decode("utf-8"))
+    except (InvalidToken, json.JSONDecodeError, UnicodeDecodeError):
+        return None
+
+    account = str(payload.get("account") or "").strip()
+    marker_type = str(payload.get("type") or "").strip()
+    expires_raw = payload.get("exp")
+    try:
+        expires_at = int(expires_raw)
+    except (TypeError, ValueError):
+        return None
+
+    if marker_type != "admin_public_marker":
+        return None
+    if not account:
+        return None
+    if expires_at <= int(time.time()):
+        return None
+    return account
 
 
 def decode_admin_token(token: str) -> AdminPrincipal:

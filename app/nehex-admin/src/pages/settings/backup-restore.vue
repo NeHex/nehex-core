@@ -10,7 +10,7 @@
           <v-btn
             variant="text"
             prepend-icon="mdi-upload"
-            :disabled="creating || restoring"
+            :disabled="creating || restoring || !!deletingFilename"
             @click="pickRestoreFile"
           >
             上传备份并恢复
@@ -19,6 +19,7 @@
             color="primary"
             prepend-icon="mdi-database-export-outline"
             :loading="creating"
+            :disabled="restoring || !!deletingFilename"
             @click="createBackup"
           >
             创建备份
@@ -84,10 +85,20 @@
                   color="warning"
                   prepend-icon="mdi-database-refresh-outline"
                   variant="tonal"
-                  :disabled="restoring"
+                  :disabled="restoring || !!deletingFilename"
                   @click="openRestoreDialog(item.filename)"
                 >
                   恢复
+                </v-btn>
+                <v-btn
+                  color="error"
+                  prepend-icon="mdi-delete-outline"
+                  variant="tonal"
+                  :loading="deletingFilename === item.filename"
+                  :disabled="restoring || !!deletingFilename"
+                  @click="openDeleteDialog(item.filename)"
+                >
+                  删除
                 </v-btn>
               </div>
             </v-card>
@@ -139,6 +150,41 @@
           </v-card-actions>
         </v-card>
       </v-dialog>
+
+      <v-dialog v-model="deleteDialog" max-width="520">
+        <v-card class="dialog-card" rounded="xl">
+          <v-card-title>确认删除备份</v-card-title>
+          <v-card-text>
+            <p class="dialog-tip">删除后不可恢复，请谨慎操作。</p>
+            <p class="dialog-file">目标备份：{{ pendingDeleteFilename || '-' }}</p>
+            <v-text-field
+              v-model="deleteConfirmText"
+              label="请输入“删除”以确认"
+              placeholder="删除"
+              variant="outlined"
+            />
+          </v-card-text>
+          <v-card-actions>
+            <v-spacer />
+            <v-btn
+              variant="text"
+              :disabled="!!deletingFilename"
+              @click="closeDeleteDialog"
+            >
+              取消
+            </v-btn>
+            <v-btn
+              color="error"
+              prepend-icon="mdi-delete-alert-outline"
+              :disabled="!canConfirmDelete"
+              :loading="!!deletingFilename"
+              @click="confirmDelete"
+            >
+              确认删除
+            </v-btn>
+          </v-card-actions>
+        </v-card>
+      </v-dialog>
     </section>
   </AdminLayout>
 </template>
@@ -148,6 +194,7 @@ import { computed, onMounted, ref } from 'vue'
 import AdminLayout from '@/components/admin/AdminLayout.vue'
 import {
   createAdminBackup,
+  deleteAdminBackup,
   downloadAdminBackup,
   fetchAdminBackups,
   restoreAdminBackup,
@@ -159,6 +206,7 @@ const loading = ref(false)
 const creating = ref(false)
 const restoring = ref(false)
 const downloadingFilename = ref('')
+const deletingFilename = ref('')
 const backups = ref<AdminBackupItem[]>([])
 const errorMessage = ref('')
 const successMessage = ref('')
@@ -168,13 +216,23 @@ const restoreMode = ref<'existing' | 'upload'>('existing')
 const pendingRestoreFilename = ref('')
 const pendingRestoreFile = ref<File | null>(null)
 const restoreConfirmText = ref('')
+const deleteDialog = ref(false)
+const pendingDeleteFilename = ref('')
+const deleteConfirmText = ref('')
 const uploadInput = ref<HTMLInputElement | null>(null)
 
 const canConfirmRestore = computed(() => {
-  if (restoring.value) {
+  if (restoring.value || !!deletingFilename.value) {
     return false
   }
   return restoreConfirmText.value.trim() === '覆盖' && !!pendingRestoreFilename.value
+})
+
+const canConfirmDelete = computed(() => {
+  if (deletingFilename.value || restoring.value) {
+    return false
+  }
+  return deleteConfirmText.value.trim() === '删除' && !!pendingDeleteFilename.value
 })
 
 function formatDateTime(value: string): string {
@@ -276,6 +334,18 @@ function closeRestoreDialog(): void {
   restoreConfirmText.value = ''
 }
 
+function openDeleteDialog(filename: string): void {
+  pendingDeleteFilename.value = filename
+  deleteConfirmText.value = ''
+  deleteDialog.value = true
+}
+
+function closeDeleteDialog(): void {
+  deleteDialog.value = false
+  pendingDeleteFilename.value = ''
+  deleteConfirmText.value = ''
+}
+
 async function confirmRestore(): Promise<void> {
   if (!canConfirmRestore.value) {
     return
@@ -295,6 +365,28 @@ async function confirmRestore(): Promise<void> {
     errorMessage.value = error instanceof Error ? error.message : '恢复备份失败'
   } finally {
     restoring.value = false
+  }
+}
+
+async function confirmDelete(): Promise<void> {
+  if (!canConfirmDelete.value) {
+    return
+  }
+
+  const filename = pendingDeleteFilename.value
+  deletingFilename.value = filename
+  errorMessage.value = ''
+  successMessage.value = ''
+
+  try {
+    const message = await deleteAdminBackup(filename)
+    successMessage.value = message
+    closeDeleteDialog()
+    await loadBackups()
+  } catch (error) {
+    errorMessage.value = error instanceof Error ? error.message : '删除备份失败'
+  } finally {
+    deletingFilename.value = ''
   }
 }
 

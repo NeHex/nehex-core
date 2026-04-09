@@ -8,9 +8,11 @@ from app.schemas.article import ArticleItem
 
 DEFAULT_ARTICLE_PAGE_SIZE = 20
 MAX_ARTICLE_PAGE_SIZE = 100
+PUBLISHED_ARTICLE_STATUS = 1
 
 
 def _map_article_item(row: Article) -> ArticleItem:
+    status = row.status if row.status is not None else 1
     return ArticleItem(
         id=row.id,
         title=row.title,
@@ -21,6 +23,7 @@ def _map_article_item(row: Article) -> ArticleItem:
         lastEditTime=row.last_edit_time,
         tag=row.tag,
         top=row.top,
+        status=1 if int(status) > 0 else 0,
         content=row.content,
     )
 
@@ -36,16 +39,23 @@ def list_articles(
     *,
     page: int = 1,
     size: int = DEFAULT_ARTICLE_PAGE_SIZE,
+    include_unpublished: bool = False,
 ) -> tuple[list[ArticleItem], int, int, int, int]:
     normalized_page, normalized_size = _normalize_pagination(page, size)
     offset = (normalized_page - 1) * normalized_size
 
     total_stmt = select(func.count(Article.id))
+    if not include_unpublished:
+        total_stmt = total_stmt.where(Article.status == PUBLISHED_ARTICLE_STATUS)
     total = int(session.execute(total_stmt).scalar() or 0)
     if total <= 0:
         return [], normalized_page, normalized_size, 0, 0
 
-    stmt = select(Article).order_by(
+    stmt = select(Article)
+    if not include_unpublished:
+        stmt = stmt.where(Article.status == PUBLISHED_ARTICLE_STATUS)
+
+    stmt = stmt.order_by(
         desc(Article.top),
         desc(Article.last_edit_time),
         desc(Article.id),
@@ -58,8 +68,16 @@ def list_articles(
     return mapped, normalized_page, normalized_size, total, total_pages
 
 
-def get_article_by_id(session: Session, article_id: int) -> ArticleItem | None:
-    stmt = select(Article).where(Article.id == article_id).limit(1)
+def get_article_by_id(
+    session: Session,
+    article_id: int,
+    *,
+    include_unpublished: bool = False,
+) -> ArticleItem | None:
+    stmt = select(Article).where(Article.id == article_id)
+    if not include_unpublished:
+        stmt = stmt.where(Article.status == PUBLISHED_ARTICLE_STATUS)
+    stmt = stmt.limit(1)
     result = session.execute(stmt)
     row = result.scalars().first()
     if row is None:
@@ -68,14 +86,24 @@ def get_article_by_id(session: Session, article_id: int) -> ArticleItem | None:
 
 
 def increase_article_read_count(session: Session, article_id: int) -> ArticleItem | None:
-    stmt = select(Article).where(Article.id == article_id).limit(1)
+    stmt = (
+        select(Article)
+        .where(
+            Article.id == article_id,
+            Article.status == PUBLISHED_ARTICLE_STATUS,
+        )
+        .limit(1)
+    )
     row = session.execute(stmt).scalars().first()
     if row is None:
         return None
 
     session.execute(
         update(Article)
-        .where(Article.id == article_id)
+        .where(
+            Article.id == article_id,
+            Article.status == PUBLISHED_ARTICLE_STATUS,
+        )
         .values(read_count=Article.read_count + 1),
     )
     session.commit()
@@ -87,14 +115,24 @@ def increase_article_read_count(session: Session, article_id: int) -> ArticleIte
 
 
 def increase_article_like_count(session: Session, article_id: int) -> ArticleItem | None:
-    stmt = select(Article).where(Article.id == article_id).limit(1)
+    stmt = (
+        select(Article)
+        .where(
+            Article.id == article_id,
+            Article.status == PUBLISHED_ARTICLE_STATUS,
+        )
+        .limit(1)
+    )
     row = session.execute(stmt).scalars().first()
     if row is None:
         return None
 
     session.execute(
         update(Article)
-        .where(Article.id == article_id)
+        .where(
+            Article.id == article_id,
+            Article.status == PUBLISHED_ARTICLE_STATUS,
+        )
         .values(like_count=Article.like_count + 1),
     )
     session.commit()

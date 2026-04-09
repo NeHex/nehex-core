@@ -84,6 +84,7 @@ def create_admin_comment(
         email=_normalize_optional_text(email),
         website=_normalize_optional_text(website),
         status=1 if int(status) > 0 else 0,
+        is_admin=1,
     )
     session.add(row)
     session.commit()
