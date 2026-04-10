@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from sqlalchemy.exc import SQLAlchemyError
@@ -53,20 +54,65 @@ def _is_request_secure(request: Request) -> bool:
     return request.url.scheme == "https"
 
 
-def _cookie_domain_from_setting(raw_value: str) -> str | None:
-    value = (raw_value or "").strip().lower()
-    if not value:
+def _normalize_request_host(value: Optional[str]) -> str:
+    host = str(value or "").strip().lower()
+    if not host:
+        return ""
+    if host.startswith("["):
+        end_index = host.find("]")
+        if end_index > 0:
+            return host[1:end_index]
+    if host.count(":") == 1:
+        return host.split(":", 1)[0].strip()
+    return host
+
+
+def _parse_cookie_domain_candidates(raw_value: str) -> list[str]:
+    normalized = str(raw_value or "").strip().lower()
+    if not normalized:
+        return []
+
+    parsed: list[str] = []
+    for chunk in normalized.replace(";", ",").split(","):
+        value = chunk.strip().rstrip(".")
+        if not value:
+            continue
+        if value.startswith("*."):
+            value = value[2:]
+        value = value.lstrip(".")
+        if value:
+            parsed.append(value)
+    return parsed
+
+
+def _resolve_cookie_domain(raw_setting: str, request: Request) -> str | None:
+    candidates = _parse_cookie_domain_candidates(raw_setting)
+    if not candidates:
         return None
-    return value
+
+    forwarded_host = _extract_forwarded_value(request.headers.get("x-forwarded-host"))
+    request_host = _normalize_request_host(forwarded_host) or _normalize_request_host(
+        request.url.hostname,
+    )
+    if not request_host:
+        return candidates[0]
+
+    for domain in candidates:
+        if request_host == domain or request_host.endswith(f".{domain}"):
+            return domain
+
+    # Ignore unmatched configured domains to avoid invalid Set-Cookie domain headers.
+    return None
 
 
-def _resolve_admin_cookie_domain() -> str | None:
-    return _cookie_domain_from_setting(settings.admin_cookie_domain)
+def _resolve_admin_cookie_domain(request: Request) -> str | None:
+    return _resolve_cookie_domain(settings.admin_cookie_domain, request)
 
 
-def _resolve_public_cookie_domain() -> str | None:
-    return _cookie_domain_from_setting(
+def _resolve_public_cookie_domain(request: Request) -> str | None:
+    return _resolve_cookie_domain(
         settings.admin_public_cookie_domain or settings.admin_cookie_domain,
+        request,
     )
 
 
@@ -84,7 +130,7 @@ def _set_admin_token_cookie(
         secure=_is_request_secure(request),
         samesite="lax",
         path="/",
-        domain=_resolve_admin_cookie_domain(),
+        domain=_resolve_admin_cookie_domain(request),
     )
 
 
@@ -102,7 +148,28 @@ def _set_public_marker_cookie(
         secure=_is_request_secure(request),
         samesite="lax",
         path="/",
-        domain=_resolve_public_cookie_domain(),
+        domain=_resolve_public_cookie_domain(request),
+    )
+
+
+def _delete_cookie_with_optional_domain(
+    response: Response,
+    request: Request,
+    key: str,
+    raw_domain_setting: str,
+) -> None:
+    # Clear host-only cookies first.
+    response.delete_cookie(
+        key=key,
+        path="/",
+    )
+    resolved_domain = _resolve_cookie_domain(raw_domain_setting, request)
+    if not resolved_domain:
+        return
+    response.delete_cookie(
+        key=key,
+        path="/",
+        domain=resolved_domain,
     )
 
 
@@ -291,15 +358,17 @@ def admin_public_marker(
 
 
 @router.post("/auth/logout", response_model=AdminActionResponse, summary="Admin logout")
-def admin_logout(response: Response) -> AdminActionResponse:
-    response.delete_cookie(
+def admin_logout(request: Request, response: Response) -> AdminActionResponse:
+    _delete_cookie_with_optional_domain(
+        response=response,
+        request=request,
         key=ADMIN_TOKEN_COOKIE_KEY,
-        path="/",
-        domain=_resolve_admin_cookie_domain(),
+        raw_domain_setting=settings.admin_cookie_domain,
     )
-    response.delete_cookie(
+    _delete_cookie_with_optional_domain(
+        response=response,
+        request=request,
         key=ADMIN_PUBLIC_MARKER_COOKIE_KEY,
-        path="/",
-        domain=_resolve_public_cookie_domain(),
+        raw_domain_setting=settings.admin_public_cookie_domain or settings.admin_cookie_domain,
     )
     return AdminActionResponse(message="Logged out")
