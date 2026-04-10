@@ -26,6 +26,8 @@ from app.schemas.admin import (
     AdminLoginData,
     AdminLoginRequest,
     AdminLoginResponse,
+    AdminPublicMarkerData,
+    AdminPublicMarkerResponse,
 )
 from app.services.admin_service import get_admin_credentials, update_admin_account_settings
 from app.services.install_service import bootstrap_installation, get_install_status
@@ -56,6 +58,52 @@ def _cookie_domain_from_setting(raw_value: str) -> str | None:
     if not value:
         return None
     return value
+
+
+def _resolve_admin_cookie_domain() -> str | None:
+    return _cookie_domain_from_setting(settings.admin_cookie_domain)
+
+
+def _resolve_public_cookie_domain() -> str | None:
+    return _cookie_domain_from_setting(
+        settings.admin_public_cookie_domain or settings.admin_cookie_domain,
+    )
+
+
+def _set_admin_token_cookie(
+    response: Response,
+    request: Request,
+    token: str,
+    max_age: int,
+) -> None:
+    response.set_cookie(
+        key=ADMIN_TOKEN_COOKIE_KEY,
+        value=token,
+        max_age=max_age,
+        httponly=True,
+        secure=_is_request_secure(request),
+        samesite="lax",
+        path="/",
+        domain=_resolve_admin_cookie_domain(),
+    )
+
+
+def _set_public_marker_cookie(
+    response: Response,
+    request: Request,
+    marker_token: str,
+    max_age: int,
+) -> None:
+    response.set_cookie(
+        key=ADMIN_PUBLIC_MARKER_COOKIE_KEY,
+        value=marker_token,
+        max_age=max_age,
+        httponly=False,
+        secure=_is_request_secure(request),
+        samesite="lax",
+        path="/",
+        domain=_resolve_public_cookie_domain(),
+    )
 
 
 def _map_install_status_response() -> AdminInstallStatusResponse:
@@ -182,29 +230,17 @@ def admin_login(
     marker_token, marker_expires_at = create_admin_public_marker(expected_account)
     max_age = max(60, expires_at - int(datetime.utcnow().timestamp()))
     marker_max_age = max(60, marker_expires_at - int(datetime.utcnow().timestamp()))
-    admin_cookie_domain = _cookie_domain_from_setting(settings.admin_cookie_domain)
-    public_cookie_domain = _cookie_domain_from_setting(
-        settings.admin_public_cookie_domain or settings.admin_cookie_domain,
-    )
-    response.set_cookie(
-        key=ADMIN_TOKEN_COOKIE_KEY,
-        value=token,
+    _set_admin_token_cookie(
+        response=response,
+        request=request,
+        token=token,
         max_age=max_age,
-        httponly=True,
-        secure=_is_request_secure(request),
-        samesite="lax",
-        path="/",
-        domain=admin_cookie_domain,
     )
-    response.set_cookie(
-        key=ADMIN_PUBLIC_MARKER_COOKIE_KEY,
-        value=marker_token,
+    _set_public_marker_cookie(
+        response=response,
+        request=request,
+        marker_token=marker_token,
         max_age=marker_max_age,
-        httponly=False,
-        secure=_is_request_secure(request),
-        samesite="lax",
-        path="/",
-        domain=public_cookie_domain,
     )
     return AdminLoginResponse(
         data=AdminLoginData(
@@ -225,20 +261,45 @@ def admin_me(principal: AdminPrincipal = Depends(require_admin_principal)) -> Ad
     )
 
 
+@router.get(
+    "/auth/public-marker",
+    response_model=AdminPublicMarkerResponse,
+    summary="Get admin public marker",
+)
+def admin_public_marker(
+    request: Request,
+    response: Response,
+    principal: AdminPrincipal = Depends(require_admin_principal),
+) -> AdminPublicMarkerResponse:
+    marker_token, marker_expires_at = create_admin_public_marker(principal.account)
+    marker_max_age = max(60, marker_expires_at - int(datetime.utcnow().timestamp()))
+
+    _set_public_marker_cookie(
+        response=response,
+        request=request,
+        marker_token=marker_token,
+        max_age=marker_max_age,
+    )
+
+    return AdminPublicMarkerResponse(
+        data=AdminPublicMarkerData(
+            marker=marker_token,
+            account=principal.account,
+            expires_at=datetime.utcfromtimestamp(marker_expires_at),
+        ),
+    )
+
+
 @router.post("/auth/logout", response_model=AdminActionResponse, summary="Admin logout")
 def admin_logout(response: Response) -> AdminActionResponse:
-    admin_cookie_domain = _cookie_domain_from_setting(settings.admin_cookie_domain)
-    public_cookie_domain = _cookie_domain_from_setting(
-        settings.admin_public_cookie_domain or settings.admin_cookie_domain,
-    )
     response.delete_cookie(
         key=ADMIN_TOKEN_COOKIE_KEY,
         path="/",
-        domain=admin_cookie_domain,
+        domain=_resolve_admin_cookie_domain(),
     )
     response.delete_cookie(
         key=ADMIN_PUBLIC_MARKER_COOKIE_KEY,
         path="/",
-        domain=public_cookie_domain,
+        domain=_resolve_public_cookie_domain(),
     )
     return AdminActionResponse(message="Logged out")

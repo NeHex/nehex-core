@@ -32,6 +32,16 @@ class AdminLoginResponse(BaseModel):
     data: AdminLoginData
 
 
+class AdminPublicMarkerData(BaseModel):
+    marker: str
+    account: str
+    expires_at: datetime
+
+
+class AdminPublicMarkerResponse(BaseModel):
+    data: AdminPublicMarkerData
+
+
 class AdminActionResponse(BaseModel):
     success: bool = True
     message: str

@@ -14,6 +14,8 @@ from app.schemas.admin_parts.base import (
     AdminLoginData,
     AdminLoginRequest,
     AdminLoginResponse,
+    AdminPublicMarkerData,
+    AdminPublicMarkerResponse,
     AdminSettingUpdateItem,
     AdminSettingsUpdateRequest,
 )
@@ -71,6 +73,8 @@ __all__ = [
     "AdminLoginRequest",
     "AdminLoginData",
     "AdminLoginResponse",
+    "AdminPublicMarkerData",
+    "AdminPublicMarkerResponse",
     "AdminActionResponse",
     "AdminBackupRestoreRequest",
     "AdminMailSmtpTestRequest",
