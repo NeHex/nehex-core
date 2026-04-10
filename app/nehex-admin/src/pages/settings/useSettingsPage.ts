@@ -222,7 +222,7 @@ const REI_THEME_DEFAULT_CONTENT: Record<string, unknown> = {
         'docker',
         'ubuntu',
         'linux mint',
-        'mysql',
+        'postgresql',
         'redis',
       ],
     },

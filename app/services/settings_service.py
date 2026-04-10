@@ -219,7 +219,7 @@ def _build_rei_theme_default() -> dict[str, Any]:
                     "docker",
                     "ubuntu",
                     "linux mint",
-                    "mysql",
+                    "postgresql",
                     "redis",
                 ],
             },

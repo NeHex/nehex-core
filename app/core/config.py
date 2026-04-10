@@ -47,7 +47,6 @@ class Settings(BaseSettings):
     redis_socket_connect_timeout: float = 1.0
     redis_socket_timeout: float = 1.5
 
-    db_driver: str = "postgresql"
     db_url: str = ""
     db_host: str = "127.0.0.1"
     db_port: int = 5432
@@ -78,24 +77,12 @@ class Settings(BaseSettings):
         if explicit_url:
             return explicit_url
 
-        driver = self.db_driver.strip().lower()
         encoded_user = quote_plus(self.db_user)
         encoded_password = quote_plus(self.db_password)
-
-        if driver in {"postgresql", "postgres", "psycopg", "postgresql+psycopg"}:
-            return (
-                f"postgresql+psycopg://{encoded_user}:{encoded_password}"
-                f"@{self.db_host}:{self.db_port}/{self.db_name}"
-            )
-
-        if driver in {"mysql", "pymysql", "mysql+pymysql"}:
-            return (
-                f"mysql+pymysql://{encoded_user}:{encoded_password}"
-                f"@{self.db_host}:{self.db_port}/{self.db_name}"
-                "?charset=utf8mb4"
-            )
-
-        raise ValueError(f"Unsupported DB_DRIVER: {self.db_driver}")
+        return (
+            f"postgresql+psycopg://{encoded_user}:{encoded_password}"
+            f"@{self.db_host}:{self.db_port}/{self.db_name}"
+        )
 
     @property
     def admin_manager_web_path(self) -> str:

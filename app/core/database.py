@@ -17,19 +17,14 @@ logger = logging.getLogger(__name__)
 
 def _build_engine_connect_args() -> dict[str, object]:
     backend = make_url(settings.database_url).get_backend_name().lower()
-    if backend == "postgresql":
-        return {
-            "connect_timeout": settings.db_connect_timeout,
-        }
-
-    if backend == "mysql":
-        return {
-            "connect_timeout": settings.db_connect_timeout,
-            "read_timeout": settings.db_read_timeout,
-            "write_timeout": settings.db_write_timeout,
-        }
-
-    return {}
+    if backend != "postgresql":
+        raise RuntimeError(
+            "Unsupported database backend. Only PostgreSQL is supported. "
+            "Please configure DB_URL with postgresql+psycopg or use DB_HOST/DB_PORT settings.",
+        )
+    return {
+        "connect_timeout": settings.db_connect_timeout,
+    }
 
 
 engine = create_engine(

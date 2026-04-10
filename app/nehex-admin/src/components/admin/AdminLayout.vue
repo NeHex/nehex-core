@@ -157,7 +157,11 @@ onMounted(async () => {
 async function handleLogout(): Promise<void> {
   clearAuthSession()
   resetAdminSessionCache()
-  await adminLogout().catch(() => undefined)
+  try {
+    await adminLogout()
+  } catch (error) {
+    console.warn('Admin logout request failed', error)
+  }
   await router.replace('/login')
 }
 

@@ -73,7 +73,7 @@
       <v-text-field
         v-model="editorForm.techStack"
         label="技术栈（可选）"
-        placeholder="Vue3, FastAPI, MySQL"
+        placeholder="Vue3, FastAPI, PostgreSQL"
         variant="outlined"
       />
 

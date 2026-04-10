@@ -124,7 +124,7 @@ def _build_default_theme_profiles() -> dict[str, dict[str, object]]:
                         "docker",
                         "ubuntu",
                         "linux mint",
-                        "mysql",
+                        "postgresql",
                         "redis",
                     ],
                 },

@@ -158,19 +158,28 @@ def _delete_cookie_with_optional_domain(
     key: str,
     raw_domain_setting: str,
 ) -> None:
-    # Clear host-only cookies first.
+    # Always clear host-only cookies first.
+    response.delete_cookie(key=key, path="/")
     response.delete_cookie(
         key=key,
         path="/",
+        secure=_is_request_secure(request),
     )
-    resolved_domain = _resolve_cookie_domain(raw_domain_setting, request)
-    if not resolved_domain:
-        return
-    response.delete_cookie(
-        key=key,
-        path="/",
-        domain=resolved_domain,
-    )
+
+    # Clear all configured domain variants to avoid stale multi-domain cookies.
+    candidates = _parse_cookie_domain_candidates(raw_domain_setting)
+    for domain in candidates:
+        response.delete_cookie(
+            key=key,
+            path="/",
+            domain=domain,
+        )
+        response.delete_cookie(
+            key=key,
+            path="/",
+            domain=domain,
+            secure=_is_request_secure(request),
+        )
 
 
 def _map_install_status_response() -> AdminInstallStatusResponse:
