@@ -30,3 +30,15 @@ class ThemeSettingData(BaseModel):
 
 class ThemeSettingResponse(BaseModel):
     data: ThemeSettingData
+
+
+class SiteOwnerProfileData(BaseModel):
+    avatar: str
+    nickname: str
+    homepage: str
+    email: str
+    bio: str
+
+
+class SiteOwnerProfileResponse(BaseModel):
+    data: SiteOwnerProfileData

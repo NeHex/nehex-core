@@ -37,6 +37,14 @@ export type AdminCommentListResult = {
   }
 }
 
+export type AdminCommentUpdatePayload = {
+  nickname?: string
+  email?: string | null
+  website?: string | null
+  content?: string
+  status?: number
+}
+
 async function parseJson<T>(response: Response): Promise<T> {
   return await response.json() as T
 }
@@ -86,4 +94,23 @@ export async function deleteAdminComment(commentId: number): Promise<void> {
   await adminFetch(`/admin-api/comments/${commentId}`, {
     method: 'DELETE',
   })
+}
+
+type AdminCommentDetailResponse = {
+  data: AdminCommentItem
+}
+
+export async function updateAdminComment(
+  commentId: number,
+  payload: AdminCommentUpdatePayload,
+): Promise<AdminCommentItem> {
+  const response = await adminFetch(`/admin-api/comments/${commentId}`, {
+    method: 'PUT',
+    body: JSON.stringify(payload),
+  })
+  const result = await parseJson<AdminCommentDetailResponse>(response)
+  if (!result?.data) {
+    throw new Error('Unexpected update comment response format')
+  }
+  return result.data
 }

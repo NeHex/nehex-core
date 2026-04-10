@@ -31,18 +31,26 @@
       </v-list>
 
       <div class="sidebar-footer">
-        <div class="profile-info">
-          <div class="profile-label">个人资料</div>
-          <div class="profile-name">{{ accountName || '站长' }}</div>
-        </div>
+        <v-btn
+          class="site-btn"
+          color="primary"
+          prepend-icon="mdi-open-in-new"
+          size="small"
+          variant="tonal"
+          @click="goToSite"
+        >
+          前往站点
+        </v-btn>
         <v-btn
           class="logout-btn"
           color="error"
-          icon="mdi-logout"
+          prepend-icon="mdi-logout"
           size="small"
           variant="tonal"
           @click="handleLogout"
-        />
+        >
+          登出
+        </v-btn>
       </div>
     </aside>
 
@@ -61,7 +69,7 @@ import { computed, onMounted, ref, useSlots } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { adminLogout, resetAdminSessionCache } from '@/services/admin-api'
 import { fetchAdminTitle, getDefaultAdminTitle } from '@/services/settings'
-import { clearAuthSession, getAuthenticatedAccount } from '@/utils/auth'
+import { clearAuthSession } from '@/utils/auth'
 
 type MenuChildItem = {
   label: string
@@ -130,7 +138,7 @@ const menuItems: MenuItem[] = [
     label: '设定',
     to: '/settings',
     children: [
-      { label: '设定', to: '/settings', parentTo: '/settings' },
+      { label: '基础设置', to: '/settings', parentTo: '/settings' },
       { label: '通知设置', to: '/settings/mail-notify' },
       { label: '邮件管理', to: '/settings/mail-management' },
       { label: '备份与恢复', to: '/settings/backup-restore' },
@@ -140,7 +148,6 @@ const menuItems: MenuItem[] = [
 
 const router = useRouter()
 const route = useRoute()
-const accountName = ref(getAuthenticatedAccount())
 const adminTitle = ref(getDefaultAdminTitle())
 const expandedMenuKey = ref<string | null>(getDefaultExpandedMenuKey())
 const slots = useSlots()
@@ -163,6 +170,10 @@ async function handleLogout(): Promise<void> {
     console.warn('Admin logout request failed', error)
   }
   await router.replace('/login')
+}
+
+function goToSite(): void {
+  window.open('/', '_blank', 'noopener')
 }
 
 function isMenuItemActive(item: MenuItem): boolean {
@@ -342,29 +353,14 @@ function hasActiveSubmenuItem(item: MenuItem): boolean {
   padding: 10px 10px;
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-end;
+  gap: 8px;
   border-radius: 14px;
   border: 1px solid rgba(255, 255, 255, 0.1);
   background: rgba(255, 255, 255, 0.03);
 }
 
-.profile-info {
-  min-width: 0;
-}
-
-.profile-label {
-  font-size: 13px;
-  color: #aeb8cd;
-}
-
-.profile-name {
-  font-size: 14px;
-  color: #f5f7ff;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
+.site-btn,
 .logout-btn {
   flex-shrink: 0;
 }

@@ -2,8 +2,13 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db_session
-from app.schemas.setting import SettingListResponse, ThemeSettingResponse
-from app.services.settings_service import list_settings, list_theme_settings
+from app.schemas.setting import (
+    SettingListResponse,
+    SiteOwnerProfileData,
+    SiteOwnerProfileResponse,
+    ThemeSettingResponse,
+)
+from app.services.settings_service import get_site_owner_profile, list_settings, list_theme_settings
 
 router = APIRouter(tags=["settings"])
 
@@ -18,3 +23,9 @@ def get_settings(session: Session = Depends(get_db_session)) -> SettingListRespo
 def get_theme_settings(session: Session = Depends(get_db_session)) -> ThemeSettingResponse:
     data = list_theme_settings(session)
     return ThemeSettingResponse(data=data)
+
+
+@router.get("/setting/site-owner", response_model=SiteOwnerProfileResponse, summary="获取站长资料")
+def get_site_owner(session: Session = Depends(get_db_session)) -> SiteOwnerProfileResponse:
+    data = get_site_owner_profile(session)
+    return SiteOwnerProfileResponse(data=SiteOwnerProfileData(**data))

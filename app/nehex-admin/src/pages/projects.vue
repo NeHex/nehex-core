@@ -42,7 +42,7 @@
           :style="getProjectCardStyle(project)"
           rounded="xl"
         >
-          <div class="project-overlay">
+          <div class="project-content">
             <div class="card-actions">
               <v-btn
                 class="icon-btn"
@@ -187,7 +187,7 @@ function getProjectCardStyle(project: ProjectItem): Record<string, string> {
 
   const safeUrl = cover.replace(/"/g, '\\"')
   return {
-    backgroundImage: `linear-gradient(180deg, rgba(9, 12, 20, 0.12), rgba(9, 12, 20, 0.68)), url("${safeUrl}")`,
+    backgroundImage: `url("${safeUrl}")`,
     backgroundPosition: 'center',
     backgroundRepeat: 'no-repeat',
     backgroundSize: 'cover',
@@ -261,7 +261,7 @@ watch(isManageRoute, async (active, previous) => {
   box-shadow: 0 16px 30px rgba(0, 0, 0, 0.28);
 }
 
-.project-overlay {
+.project-content {
   position: absolute;
   inset: 0;
   display: flex;
@@ -291,7 +291,7 @@ watch(isManageRoute, async (active, previous) => {
   font-size: 20px;
   font-weight: 700;
   color: #ffffff;
-  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.65);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.45);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -303,7 +303,7 @@ watch(isManageRoute, async (active, previous) => {
   gap: 8px;
   color: #d4dfff;
   font-size: 13px;
-  text-shadow: 0 1px 8px rgba(0, 0, 0, 0.6);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.45);
 }
 
 .add-card {

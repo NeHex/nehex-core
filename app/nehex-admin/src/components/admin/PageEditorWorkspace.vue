@@ -3,14 +3,10 @@
     <header class="editor-header">
       <div class="header-text">
         <h1>{{ isEditing ? '编辑独立页' : '新增独立页' }}</h1>
-        <p>左侧编辑 Markdown，右侧实时预览；拖动中间分割线可调整宽度。</p>
+        <p>与文章编辑器一致：左侧 Markdown 编辑，右侧独立信息卡片。</p>
       </div>
       <div class="header-actions">
-        <v-btn
-          prepend-icon="mdi-arrow-left"
-          variant="text"
-          @click="goManage"
-        >
+        <v-btn prepend-icon="mdi-arrow-left" variant="text" @click="goManage">
           返回管理
         </v-btn>
         <v-btn
@@ -34,16 +30,6 @@
       {{ errorMessage }}
     </v-alert>
 
-    <v-alert
-      v-if="successMessage"
-      class="mb-4"
-      density="comfortable"
-      type="success"
-      variant="tonal"
-    >
-      {{ successMessage }}
-    </v-alert>
-
     <v-progress-linear
       v-if="loading"
       class="mb-4"
@@ -51,55 +37,45 @@
       indeterminate
     />
 
-    <div class="meta-grid">
-      <v-text-field
-        v-model="editorForm.title"
-        label="页面标题"
-        variant="outlined"
-      />
-
-      <v-text-field
-        v-model="editorForm.pageKey"
-        label="页面路径（page_key）"
-        placeholder="about"
-        variant="outlined"
-      />
-
-      <v-text-field
-        v-model="editorForm.coverImage"
-        label="封面图片链接（可选）"
-        variant="outlined"
-      />
-
-      <v-text-field
-        v-model.number="editorForm.sort"
-        label="排序（sort）"
-        type="number"
-        variant="outlined"
-      />
-
-      <v-select
-        v-model.number="editorForm.status"
-        :items="statusOptions"
-        item-title="label"
-        item-value="value"
-        label="状态（status）"
-        variant="outlined"
-      />
-    </div>
-
-    <div class="split-panel" ref="splitPanelRef">
+    <div class="workspace-grid">
       <section
-        class="panel panel-left panel-left-markdown"
-        :style="{ width: `${leftPaneWidth}%` }"
+        class="editor-card"
         @dragenter.prevent="onDragEnter"
         @dragover.prevent="onDragOver"
         @dragleave.prevent="onDragLeave"
         @drop.prevent="onDropImage"
       >
-        <header class="panel-head panel-head-main">
-          <span>Markdown</span>
-          <div class="panel-tools">
+        <header class="editor-card-head">
+          <div class="editor-title-wrap">
+            <span class="editor-card-title">Markdown</span>
+            <span class="editor-card-subtitle">支持拖拽/粘贴上传图片与快捷格式插入</span>
+          </div>
+
+          <div class="editor-toolbar">
+            <v-btn density="comfortable" size="small" variant="text" prepend-icon="mdi-format-header-1" @click="insertHeading(1)">
+              H1
+            </v-btn>
+            <v-btn density="comfortable" size="small" variant="text" prepend-icon="mdi-format-header-2" @click="insertHeading(2)">
+              H2
+            </v-btn>
+            <v-btn density="comfortable" size="small" variant="text" prepend-icon="mdi-format-bold" @click="insertBold">
+              粗体
+            </v-btn>
+            <v-btn density="comfortable" size="small" variant="text" prepend-icon="mdi-format-italic" @click="insertItalic">
+              斜体
+            </v-btn>
+            <v-btn density="comfortable" size="small" variant="text" prepend-icon="mdi-format-list-bulleted" @click="insertBulletList">
+              列表
+            </v-btn>
+            <v-btn density="comfortable" size="small" variant="text" prepend-icon="mdi-format-quote-open" @click="insertQuote">
+              引用
+            </v-btn>
+            <v-btn density="comfortable" size="small" variant="text" prepend-icon="mdi-link-variant" @click="insertLink">
+              链接
+            </v-btn>
+            <v-btn density="comfortable" size="small" variant="text" prepend-icon="mdi-code-tags" @click="insertCodeBlock">
+              代码块
+            </v-btn>
             <input
               ref="imageInputRef"
               accept="image/*"
@@ -113,44 +89,94 @@
               prepend-icon="mdi-image-plus-outline"
               size="small"
               :loading="uploadingImage"
-              variant="text"
+              variant="tonal"
               @click="triggerImageSelect"
             >
-              上传图片
+              插入图片
             </v-btn>
           </div>
         </header>
-        <textarea
-          ref="markdownInputRef"
-          v-model="editorForm.content"
-          class="markdown-input"
-          placeholder="在这里输入 Markdown 内容..."
-          spellcheck="false"
-        />
-        <div v-if="dragOver" class="drop-overlay">松开鼠标上传图片并插入 Markdown</div>
+
+        <div class="editor-surface" @paste="onPasteImage">
+          <textarea
+            v-if="!previewMode"
+            ref="markdownInputRef"
+            v-model="editorForm.content"
+            class="markdown-input"
+            placeholder="在这里输入 Markdown 内容..."
+            spellcheck="false"
+          />
+          <article
+            v-else
+            class="markdown-preview"
+            v-html="renderedMarkdown"
+          />
+
+          <div v-if="dragOver" class="drop-overlay">松开鼠标上传图片并插入 Markdown</div>
+
+          <v-btn
+            class="preview-toggle"
+            color="primary"
+            size="small"
+            variant="elevated"
+            :prepend-icon="previewMode ? 'mdi-pencil' : 'mdi-eye-outline'"
+            @click="togglePreviewMode"
+          >
+            {{ previewMode ? '返回编辑' : '预览' }}
+          </v-btn>
+        </div>
       </section>
 
-      <div
-        class="splitter"
-        @pointerdown="startResize"
-        @pointermove="moveResize"
-        @pointerup="stopResize"
-        @pointercancel="stopResize"
-      >
-        <div class="splitter-handle" />
-      </div>
+      <aside class="settings-card">
+        <header class="settings-head">
+          <h2>页面设置</h2>
+          <p>基础信息与展示状态</p>
+        </header>
 
-      <section class="panel panel-right" :style="{ width: `${100 - leftPaneWidth}%` }">
-        <header class="panel-head">预览</header>
-        <article class="markdown-preview" v-html="renderedMarkdown" />
-      </section>
+        <div class="settings-form">
+          <v-text-field
+            v-model="editorForm.title"
+            label="页面标题"
+            variant="outlined"
+          />
+
+          <v-text-field
+            v-model="editorForm.pageKey"
+            label="页面路径（page_key）"
+            placeholder="about"
+            variant="outlined"
+          />
+
+          <v-text-field
+            v-model="editorForm.coverImage"
+            label="封面图片链接（可选）"
+            variant="outlined"
+          />
+
+          <v-text-field
+            v-model.number="editorForm.sort"
+            label="排序（sort）"
+            type="number"
+            variant="outlined"
+          />
+
+          <v-select
+            v-model.number="editorForm.status"
+            :items="statusOptions"
+            item-title="label"
+            item-value="value"
+            label="状态（status）"
+            variant="outlined"
+          />
+        </div>
+      </aside>
     </div>
   </section>
 </template>
 
 <script lang="ts" setup>
 import MarkdownIt from 'markdown-it'
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, nextTick, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useGlobalSnackbar } from '@/composables/useGlobalSnackbar'
 import {
@@ -172,6 +198,7 @@ const markdown = new MarkdownIt({
   breaks: true,
   typographer: true,
 })
+const { showGlobalSuccess } = useGlobalSnackbar()
 
 type EditorForm = {
   pageKey: string
@@ -180,6 +207,12 @@ type EditorForm = {
   content: string
   sort: number
   status: number
+}
+
+type SelectionTransformResult = {
+  text: string
+  selectionStart?: number
+  selectionEnd?: number
 }
 
 const statusOptions = [
@@ -191,15 +224,11 @@ const loading = ref(false)
 const submitting = ref(false)
 const uploadingImage = ref(false)
 const errorMessage = ref('')
-const successMessage = ref('')
-const leftPaneWidth = ref(50)
-const resizing = ref(false)
+const previewMode = ref(false)
 const dragOver = ref(false)
 const dragDepth = ref(0)
-const splitPanelRef = ref<HTMLElement | null>(null)
 const markdownInputRef = ref<HTMLTextAreaElement | null>(null)
 const imageInputRef = ref<HTMLInputElement | null>(null)
-const { showGlobalSuccess } = useGlobalSnackbar()
 
 const editorForm = reactive<EditorForm>({
   pageKey: '',
@@ -215,56 +244,10 @@ const isEditing = computed(() => Number.isFinite(props.pageId))
 const renderedMarkdown = computed(() => {
   const content = editorForm.content.trim()
   if (!content) {
-    return '<p class="preview-empty">暂无内容，左侧输入 Markdown 开始编辑。</p>'
+    return '<p class="preview-empty">暂无内容，输入 Markdown 后点击右下角预览。</p>'
   }
   return markdown.render(content)
 })
-
-function clampPercent(value: number): number {
-  return Math.min(75, Math.max(25, value))
-}
-
-function updatePaneWidth(clientX: number): void {
-  const panel = splitPanelRef.value
-  if (!panel) {
-    return
-  }
-
-  const rect = panel.getBoundingClientRect()
-  if (rect.width <= 0) {
-    return
-  }
-
-  const ratio = ((clientX - rect.left) / rect.width) * 100
-  leftPaneWidth.value = clampPercent(ratio)
-}
-
-function startResize(event: PointerEvent): void {
-  if (event.button !== 0) {
-    return
-  }
-
-  const currentTarget = event.currentTarget as HTMLElement | null
-  if (!currentTarget) {
-    return
-  }
-
-  currentTarget.setPointerCapture(event.pointerId)
-  resizing.value = true
-  updatePaneWidth(event.clientX)
-  event.preventDefault()
-}
-
-function moveResize(event: PointerEvent): void {
-  if (!resizing.value) {
-    return
-  }
-  updatePaneWidth(event.clientX)
-}
-
-function stopResize(): void {
-  resizing.value = false
-}
 
 function normalizeSort(value: number): number {
   if (!Number.isFinite(value)) {
@@ -281,15 +264,145 @@ function normalizePageKey(value: string): string {
   return value.trim().replace(/^\/+|\/+$/g, '')
 }
 
-function triggerImageSelect(): void {
-  imageInputRef.value?.click()
+function ensureEditMode(callback: () => void): void {
+  if (!previewMode.value) {
+    callback()
+    return
+  }
+
+  previewMode.value = false
+  nextTick(() => {
+    callback()
+  })
 }
 
-function _escapeMarkdownText(value: string): string {
+function updateSelection(transform: (selectedText: string) => SelectionTransformResult): void {
+  const content = editorForm.content
+  const input = markdownInputRef.value
+
+  const start = input?.selectionStart ?? content.length
+  const end = input?.selectionEnd ?? start
+  const selectedText = content.slice(start, end)
+  const result = transform(selectedText)
+
+  editorForm.content = `${content.slice(0, start)}${result.text}${content.slice(end)}`
+
+  requestAnimationFrame(() => {
+    const latestInput = markdownInputRef.value
+    if (!latestInput) {
+      return
+    }
+
+    latestInput.focus()
+    const selectionStart = start + (result.selectionStart ?? result.text.length)
+    const selectionEnd = start + (result.selectionEnd ?? selectionStart - start)
+    latestInput.setSelectionRange(selectionStart, selectionEnd)
+  })
+}
+
+function wrapSelection(before: string, after: string, placeholder: string): void {
+  ensureEditMode(() => {
+    updateSelection((selectedText) => {
+      if (selectedText) {
+        return { text: `${before}${selectedText}${after}` }
+      }
+      const text = `${before}${placeholder}${after}`
+      return {
+        text,
+        selectionStart: before.length,
+        selectionEnd: before.length + placeholder.length,
+      }
+    })
+  })
+}
+
+function prefixSelectionLines(prefix: string, placeholder: string): void {
+  ensureEditMode(() => {
+    updateSelection((selectedText) => {
+      if (!selectedText) {
+        const text = `${prefix}${placeholder}`
+        return {
+          text,
+          selectionStart: prefix.length,
+          selectionEnd: prefix.length + placeholder.length,
+        }
+      }
+
+      const text = selectedText
+        .split('\n')
+        .map((line) => `${prefix}${line}`)
+        .join('\n')
+      return { text }
+    })
+  })
+}
+
+function insertHeading(level: 1 | 2): void {
+  const prefix = `${'#'.repeat(level)} `
+  const placeholder = level === 1 ? '一级标题' : '二级标题'
+  prefixSelectionLines(prefix, placeholder)
+}
+
+function insertBold(): void {
+  wrapSelection('**', '**', '粗体文本')
+}
+
+function insertItalic(): void {
+  wrapSelection('*', '*', '斜体文本')
+}
+
+function insertQuote(): void {
+  prefixSelectionLines('> ', '引用内容')
+}
+
+function insertBulletList(): void {
+  prefixSelectionLines('- ', '列表项')
+}
+
+function insertLink(): void {
+  ensureEditMode(() => {
+    updateSelection((selectedText) => {
+      const linkText = selectedText || '链接文字'
+      const text = `[${linkText}](https://example.com)`
+      const urlStart = text.indexOf('https://example.com')
+      return {
+        text,
+        selectionStart: urlStart,
+        selectionEnd: urlStart + 'https://example.com'.length,
+      }
+    })
+  })
+}
+
+function insertCodeBlock(): void {
+  ensureEditMode(() => {
+    updateSelection((selectedText) => {
+      const codeText = selectedText || 'code'
+      const text = `\n\`\`\`\n${codeText}\n\`\`\`\n`
+      return {
+        text,
+        selectionStart: 5,
+        selectionEnd: 5 + codeText.length,
+      }
+    })
+  })
+}
+
+function togglePreviewMode(): void {
+  previewMode.value = !previewMode.value
+}
+
+function triggerImageSelect(): void {
+  ensureEditMode(() => {
+    imageInputRef.value?.click()
+  })
+}
+
+function escapeMarkdownText(value: string): string {
   return value.replace(/[\[\]\(\)]/g, '')
 }
 
-function _pickFirstImage(files: FileList | null): File | null {
+function pickFirstImage(files: FileList | null): File | null {
   if (!files || files.length <= 0) {
     return null
   }
@@ -301,38 +414,41 @@ function _pickFirstImage(files: FileList | null): File | null {
   return null
 }
 
-function _insertMarkdownImage(url: string, fileName: string): void {
-  const altText = _escapeMarkdownText(fileName.replace(/\.[^.]+$/, '').trim()) || 'image'
+function pickClipboardImage(event: ClipboardEvent): File | null {
+  const items = event.clipboardData?.items
+  if (!items) {
+    return null
+  }
+  for (const item of Array.from(items)) {
+    if (item.kind !== 'file' || !item.type.startsWith('image/')) {
+      continue
+    }
+    return item.getAsFile()
+  }
+  return null
+}
+
+function insertMarkdownImage(url: string, fileName: string): void {
+  const altText = escapeMarkdownText(fileName.replace(/\.[^.]+$/, '').trim()) || 'image'
   const snippet = `\n![${altText}](${url})\n`
 
-  const input = markdownInputRef.value
-  if (!input) {
-    editorForm.content = `${editorForm.content}${snippet}`
-    return
-  }
-
-  const start = input.selectionStart ?? editorForm.content.length
-  const end = input.selectionEnd ?? start
-  editorForm.content = `${editorForm.content.slice(0, start)}${snippet}${editorForm.content.slice(end)}`
-
-  requestAnimationFrame(() => {
-    const cursor = start + snippet.length
-    input.focus()
-    input.setSelectionRange(cursor, cursor)
+  ensureEditMode(() => {
+    updateSelection(() => ({ text: snippet }))
   })
 }
 
-async function _uploadImageAndInsert(file: File): Promise<void> {
+async function uploadImageAndInsert(file: File): Promise<void> {
   if (uploadingImage.value) {
     return
   }
 
   uploadingImage.value = true
   errorMessage.value = ''
+
   try {
     const imageUrl = await uploadMarkdownImage(file)
-    _insertMarkdownImage(imageUrl, file.name)
-    successMessage.value = '图片上传成功'
+    insertMarkdownImage(imageUrl, file.name)
+    showGlobalSuccess('图片上传成功')
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : '图片上传失败'
   } finally {
@@ -342,14 +458,14 @@ async function _uploadImageAndInsert(file: File): Promise<void> {
 
 async function handleImageInputChange(event: Event): Promise<void> {
   const target = event.target as HTMLInputElement | null
-  const imageFile = _pickFirstImage(target?.files || null)
+  const imageFile = pickFirstImage(target?.files || null)
   if (target) {
     target.value = ''
   }
   if (!imageFile) {
     return
   }
-  await _uploadImageAndInsert(imageFile)
+  await uploadImageAndInsert(imageFile)
 }
 
 function onDragEnter(): void {
@@ -358,7 +474,7 @@ function onDragEnter(): void {
 }
 
 function onDragOver(event: DragEvent): void {
-  const imageFile = _pickFirstImage(event.dataTransfer?.files || null)
+  const imageFile = pickFirstImage(event.dataTransfer?.files || null)
   if (imageFile) {
     event.dataTransfer!.dropEffect = 'copy'
     dragOver.value = true
@@ -375,11 +491,20 @@ function onDragLeave(): void {
 async function onDropImage(event: DragEvent): Promise<void> {
   dragDepth.value = 0
   dragOver.value = false
-  const imageFile = _pickFirstImage(event.dataTransfer?.files || null)
+  const imageFile = pickFirstImage(event.dataTransfer?.files || null)
   if (!imageFile) {
     return
   }
-  await _uploadImageAndInsert(imageFile)
+  await uploadImageAndInsert(imageFile)
+}
+
+async function onPasteImage(event: ClipboardEvent): Promise<void> {
+  const imageFile = pickClipboardImage(event)
+  if (!imageFile) {
+    return
+  }
+  event.preventDefault()
+  await uploadImageAndInsert(imageFile)
 }
 
 function buildPayload(): StandalonePageUpsertPayload | null {
@@ -439,7 +564,6 @@ async function loadPageDetail(): Promise<void> {
 }
 
 async function submitEditor(): Promise<void> {
-  successMessage.value = ''
   errorMessage.value = ''
 
   const payload = buildPayload()
@@ -478,7 +602,9 @@ onMounted(async () => {
   display: flex;
   flex-direction: column;
   gap: 14px;
-  min-height: calc(100vh - 64px);
+  height: calc(100vh - 64px);
+  min-height: 0;
+  overflow: hidden;
 }
 
 .editor-header {
@@ -505,62 +631,73 @@ onMounted(async () => {
   flex-shrink: 0;
 }
 
-.meta-grid {
+.workspace-grid {
+  flex: 1;
+  min-height: 0;
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 10px;
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 340px);
+  gap: 14px;
 }
 
-.split-panel {
-  min-height: 560px;
-  height: calc(100vh - 320px);
-  display: flex;
+.editor-card {
+  min-width: 0;
+  min-height: 0;
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 16px;
-  overflow: hidden;
   background: #111826;
-}
-
-.panel {
-  min-width: 0;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
 }
 
-.panel-head {
+.editor-card-head {
   padding: 10px 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.05);
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.editor-title-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.editor-card-title {
   font-size: 13px;
   font-weight: 700;
-  letter-spacing: 0.4px;
   color: #dbe7ff;
-  background: rgba(255, 255, 255, 0.05);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  letter-spacing: 0.4px;
 }
 
-.panel-head-main {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
+.editor-card-subtitle {
+  color: #9fb0d4;
+  font-size: 12px;
 }
 
-.panel-tools {
+.editor-toolbar {
   display: flex;
   align-items: center;
-  gap: 8px;
+  flex-wrap: wrap;
+  gap: 4px;
 }
 
 .upload-input {
   display: none;
 }
 
-.panel-left-markdown {
+.editor-surface {
   position: relative;
+  flex: 1;
+  min-height: 0;
 }
 
 .markdown-input {
-  flex: 1;
   width: 100%;
+  height: 100%;
   border: 0;
   background: #0f1624;
   color: #f4f7ff;
@@ -572,9 +709,17 @@ onMounted(async () => {
   font-family: 'Cascadia Code', 'Consolas', 'Monaco', monospace;
 }
 
+.markdown-preview {
+  height: 100%;
+  overflow: auto;
+  padding: 16px;
+  color: #dde6fb;
+  line-height: 1.75;
+}
+
 .drop-overlay {
   position: absolute;
-  inset: 46px 10px 10px 10px;
+  inset: 10px;
   display: grid;
   place-items: center;
   border: 2px dashed rgba(115, 164, 255, 0.88);
@@ -586,31 +731,48 @@ onMounted(async () => {
   pointer-events: none;
 }
 
-.markdown-preview {
-  flex: 1;
-  overflow: auto;
-  padding: 16px;
-  color: #dde6fb;
-  line-height: 1.75;
+.preview-toggle {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
 }
 
-.splitter {
-  width: 12px;
-  cursor: col-resize;
+.settings-card {
+  min-width: 0;
+  min-height: 0;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 16px;
+  background: #111826;
   display: flex;
-  align-items: center;
-  justify-content: center;
-  background: linear-gradient(180deg, rgba(38, 48, 71, 0.9), rgba(25, 34, 51, 0.9));
-  border-left: 1px solid rgba(255, 255, 255, 0.08);
-  border-right: 1px solid rgba(255, 255, 255, 0.08);
-  touch-action: none;
+  flex-direction: column;
+  overflow: hidden;
 }
 
-.splitter-handle {
-  width: 4px;
-  height: 48px;
-  border-radius: 999px;
-  background: rgba(205, 218, 255, 0.6);
+.settings-head {
+  padding: 14px 14px 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.settings-head h2 {
+  margin: 0;
+  font-size: 18px;
+  color: #edf3ff;
+}
+
+.settings-head p {
+  margin: 6px 0 0;
+  color: #9fb0d4;
+  font-size: 13px;
+}
+
+.settings-form {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 }
 
 :deep(.markdown-preview p) {
@@ -665,9 +827,14 @@ onMounted(async () => {
   color: #97a4bf;
 }
 
-@media (max-width: 1120px) {
-  .meta-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+@media (max-width: 1100px) {
+  .page-editor-page {
+    height: auto;
+    overflow: visible;
+  }
+
+  .workspace-grid {
+    grid-template-columns: 1fr;
   }
 }
 
@@ -689,38 +856,8 @@ onMounted(async () => {
     flex: 1;
   }
 
-  .meta-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .split-panel {
+  .editor-card-head {
     flex-direction: column;
-    height: auto;
-    min-height: 0;
-  }
-
-  .panel-left,
-  .panel-right {
-    width: 100% !important;
-  }
-
-  .splitter {
-    width: 100%;
-    height: 12px;
-    cursor: row-resize;
-  }
-
-  .splitter-handle {
-    width: 48px;
-    height: 4px;
-  }
-
-  .markdown-input {
-    min-height: 300px;
-  }
-
-  .markdown-preview {
-    min-height: 300px;
   }
 }
 </style>

@@ -20,7 +20,7 @@
       </v-alert>
 
       <v-card class="section-card" rounded="xl">
-        <v-card-text>
+        <v-card-text class="section-card-body">
           <v-tabs v-model="statusTab" color="primary">
             <v-tab value="failed">发送失败</v-tab>
             <v-tab value="success">发送成功</v-tab>
@@ -193,6 +193,9 @@ onMounted(async () => {
   display: flex;
   flex-direction: column;
   gap: 14px;
+  height: calc(100dvh - 108px);
+  min-height: 0;
+  overflow: hidden;
 }
 
 .page-header {
@@ -217,6 +220,18 @@ onMounted(async () => {
   border: 1px solid rgba(255, 255, 255, 0.08);
   background: linear-gradient(180deg, rgba(24, 30, 41, 0.96), rgba(19, 24, 34, 0.96));
   color: #edf1ff;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.section-card-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
 .list-head {
@@ -229,6 +244,10 @@ onMounted(async () => {
   display: flex;
   flex-direction: column;
   gap: 10px;
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding-right: 2px;
 }
 
 .log-item {
@@ -284,6 +303,11 @@ onMounted(async () => {
 }
 
 @media (max-width: 980px) {
+  .mail-management-page {
+    height: auto;
+    overflow: visible;
+  }
+
   .page-header {
     flex-direction: column;
     align-items: flex-start;

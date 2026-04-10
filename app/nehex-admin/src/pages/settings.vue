@@ -2,7 +2,7 @@
   <AdminLayout v-if="isRootSettingsRoute">
     <template #secondary-nav>
       <div class="settings-subnav">
-        <div class="subnav-title">设定</div>
+        <div class="subnav-title">基础设置</div>
         <v-list class="subnav-list" density="comfortable" nav>
           <v-list-item
             v-for="item in sections"
@@ -65,6 +65,18 @@
                   variant="outlined"
                 />
                 <div v-if="adminManagerWebHint" class="path-hint">{{ adminManagerWebHint }}</div>
+              </div>
+
+              <v-divider class="my-4" />
+
+              <div class="stack-block">
+                <div class="block-title">后台登录页背景</div>
+                <v-text-field
+                  v-model="nehexForm.adminLoginBackground"
+                  label="后台登录页背景（admin_login_background）"
+                  placeholder="/images/background-2k.png"
+                  variant="outlined"
+                />
               </div>
 
               <v-divider class="my-4" />
@@ -458,6 +470,48 @@
           </v-card>
         </v-window-item>
 
+        <v-window-item value="owner">
+          <v-card class="section-card" rounded="xl">
+            <v-card-title>站长资料</v-card-title>
+            <v-card-text>
+              <div class="form-grid">
+                <v-text-field
+                  v-model="ownerForm.avatar"
+                  label="头像（site_owner_avatar）"
+                  placeholder="/images/head.jpg"
+                  variant="outlined"
+                />
+                <v-text-field
+                  v-model="ownerForm.nickname"
+                  label="昵称（site_owner_nickname）"
+                  variant="outlined"
+                />
+                <v-text-field
+                  v-model="ownerForm.homepage"
+                  label="主页（site_owner_homepage）"
+                  placeholder="https://example.com"
+                  variant="outlined"
+                />
+                <v-text-field
+                  v-model="ownerForm.email"
+                  label="邮箱（site_owner_email）"
+                  placeholder="owner@example.com"
+                  variant="outlined"
+                />
+              </div>
+
+              <v-textarea
+                v-model="ownerForm.bio"
+                auto-grow
+                class="mt-2"
+                label="简介（site_owner_bio）"
+                min-rows="4"
+                variant="outlined"
+              />
+            </v-card-text>
+          </v-card>
+        </v-window-item>
+
         <v-window-item value="theme">
           <v-card class="section-card" rounded="xl">
             <v-card-title>主题配置</v-card-title>
@@ -489,10 +543,10 @@
 
               <v-textarea
                 v-model="themeEditorJson"
-                auto-grow
                 class="theme-json-editor"
                 label="主题 JSON"
-                min-rows="16"
+                rows="18"
+                no-resize
                 spellcheck="false"
                 variant="outlined"
               />
@@ -580,6 +634,7 @@ const {
   accountForm,
 
   siteForm,
+  ownerForm,
   storageForm,
   storageProviderOptions,
   showLocalStorageFields,

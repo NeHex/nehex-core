@@ -91,7 +91,7 @@
 import { nextTick, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { adminLogin, fetchAdminSession } from '@/services/admin-api'
-import { fetchThemeBackgroundUrl } from '@/services/settings'
+import { fetchAdminLoginBackgroundUrl } from '@/services/settings'
 import { setAuthSession } from '@/utils/auth'
 
 const route = useRoute()
@@ -240,7 +240,7 @@ onMounted(() => {
     .catch(() => undefined)
 
   refreshCaptcha()
-  void fetchThemeBackgroundUrl()
+  void fetchAdminLoginBackgroundUrl()
     .then((url) => {
       if (!url) {
         return

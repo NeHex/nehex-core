@@ -29,6 +29,8 @@ export type ArticleClassOption = {
 const DEFAULT_ADMIN_TITLE = 'NeHex Admin'
 const ADMIN_TITLE_SUFFIX = '后台管理'
 const THEME_BACKGROUND_KEY = 'theme_background'
+const ADMIN_LOGIN_BACKGROUND_KEY = 'admin_login_background'
+const DEFAULT_ADMIN_LOGIN_BACKGROUND = '/images/background-2k.png'
 const ARTICLE_CLASS_SETTING_KEY = 'nehex_article_class'
 const DEFAULT_ARTICLE_CLASS_OPTIONS: ArticleClassOption[] = [
   {
@@ -154,6 +156,15 @@ export async function fetchThemeBackgroundUrl(): Promise<string> {
 
   const settingsMap = await fetchSettingsMap()
   return String(settingsMap.get(THEME_BACKGROUND_KEY) ?? '').trim()
+}
+
+export async function fetchAdminLoginBackgroundUrl(): Promise<string> {
+  const settingsMap = await fetchSettingsMap()
+  const value = String(settingsMap.get(ADMIN_LOGIN_BACKGROUND_KEY) ?? '').trim()
+  if (value) {
+    return value
+  }
+  return DEFAULT_ADMIN_LOGIN_BACKGROUND
 }
 
 export async function fetchBackendVersion(): Promise<string> {

@@ -581,6 +581,11 @@ onMounted(async () => {
   display: flex;
   flex-direction: column;
   gap: 10px;
+  padding-top: 6px;
+}
+
+:deep(.template-tabs + .v-window) {
+  overflow: visible;
 }
 
 .hint-text {

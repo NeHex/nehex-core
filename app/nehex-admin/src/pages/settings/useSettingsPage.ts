@@ -21,10 +21,11 @@ import { fetchBackendVersion } from '@/services/settings'
 import { normalizeBasePath } from '@/utils/path'
 import { getAuthenticatedAccount } from '@/utils/auth'
 
-type SectionKey = 'nehex' | 'site' | 'storage' | 'theme'
+type SectionKey = 'nehex' | 'site' | 'owner' | 'storage' | 'theme'
 
 type NehexForm = {
   adminManagerWeb: string
+  adminLoginBackground: string
 }
 
 type SiteForm = {
@@ -73,6 +74,14 @@ type AccountForm = {
   confirmPassword: string
 }
 
+type OwnerForm = {
+  avatar: string
+  nickname: string
+  homepage: string
+  email: string
+  bio: string
+}
+
 type SectionMeta = {
   key: SectionKey
   label: string
@@ -93,6 +102,7 @@ type ThemeSnapshot = {
 }
 
 type StorageSnapshot = StorageForm
+type OwnerSnapshot = OwnerForm
 
 type LatestRelease = {
   tagName: string
@@ -115,6 +125,12 @@ const sections: SectionMeta[] = [
     description: '站点标题、副标题、地址、关键词、ICP备案、描述与 favicon。',
   },
   {
+    key: 'owner',
+    label: '站长资料',
+    icon: 'mdi-account-circle-outline',
+    description: '用于前端评论识别站长身份展示，可配置头像、昵称、主页、邮箱与简介。',
+  },
+  {
     key: 'storage',
     label: '存储设置',
     icon: 'mdi-cloud-upload-outline',
@@ -133,6 +149,7 @@ const defaultSection: SectionMeta = sections[0]!
 const githubLatestReleaseApi = 'https://api.github.com/repos/nehex/nehex-core/releases/latest'
 const REI_THEME_FILE = 'rei.json'
 const CREATE_THEME_OPTION_VALUE = '__create_theme_template__'
+const DEFAULT_ADMIN_LOGIN_BACKGROUND = '/images/background-2k.png'
 const DEFAULT_STORAGE_LOCAL_ROOT = 'storage'
 const DEFAULT_STORAGE_LOCAL_PATH_RULE = '/{year}-{month}/{day}/{random_name}.{file_type}'
 const storageProviderOptions: Array<{ label: string, value: StorageProvider }> = [
@@ -496,6 +513,7 @@ export function useSettingsPage() {
 
   const nehexForm = reactive<NehexForm>({
     adminManagerWeb: '/nehex-admin',
+    adminLoginBackground: DEFAULT_ADMIN_LOGIN_BACKGROUND,
   })
 
   const nehexClasses = ref<ArticleClassItem[]>([])
@@ -511,6 +529,14 @@ export function useSettingsPage() {
     siteIcp: '',
     siteDescription: '',
     siteFavicon: '',
+  })
+
+  const ownerForm = reactive<OwnerForm>({
+    avatar: '/images/head.jpg',
+    nickname: '站长',
+    homepage: '',
+    email: '',
+    bio: '',
   })
 
   const storageForm = reactive<StorageForm>({
@@ -567,6 +593,7 @@ export function useSettingsPage() {
 
   const nehexSnapshot = ref<NehexSnapshot>(getNehexSnapshotData())
   const siteSnapshot = ref<SiteForm>(getSiteFormData())
+  const ownerSnapshot = ref<OwnerSnapshot>(getOwnerFormData())
   const storageSnapshot = ref<StorageSnapshot>(getStorageFormData())
   const themeSnapshot = ref<ThemeSnapshot>(getThemeSnapshotData())
 
@@ -867,6 +894,7 @@ export function useSettingsPage() {
     return {
       form: {
         adminManagerWeb: nehexForm.adminManagerWeb,
+        adminLoginBackground: nehexForm.adminLoginBackground,
       },
       classes: nehexClasses.value.map((item) => ({ ...item })),
       extraConfig: { ...nehexExtraConfig.value },
@@ -883,6 +911,16 @@ export function useSettingsPage() {
       siteIcp: siteForm.siteIcp,
       siteDescription: siteForm.siteDescription,
       siteFavicon: siteForm.siteFavicon,
+    }
+  }
+
+  function getOwnerFormData(): OwnerSnapshot {
+    return {
+      avatar: ownerForm.avatar,
+      nickname: ownerForm.nickname,
+      homepage: ownerForm.homepage,
+      email: ownerForm.email,
+      bio: ownerForm.bio,
     }
   }
 
@@ -926,6 +964,7 @@ export function useSettingsPage() {
 
   function applyNehexSnapshot(snapshot: NehexSnapshot): void {
     nehexForm.adminManagerWeb = normalizeAdminManagerWebPath(snapshot.form.adminManagerWeb)
+    nehexForm.adminLoginBackground = snapshot.form.adminLoginBackground || DEFAULT_ADMIN_LOGIN_BACKGROUND
     nehexClasses.value = snapshot.classes.map((item) => ({ ...item }))
     nehexExtraConfig.value = { ...snapshot.extraConfig }
     accountForm.account = snapshot.account
@@ -935,6 +974,10 @@ export function useSettingsPage() {
 
   function applySiteFormData(data: SiteForm): void {
     Object.assign(siteForm, data)
+  }
+
+  function applyOwnerFormData(data: OwnerSnapshot): void {
+    Object.assign(ownerForm, data)
   }
 
   function applyStorageFormData(data: StorageSnapshot): void {
@@ -979,6 +1022,7 @@ export function useSettingsPage() {
   function updateSnapshots(): void {
     nehexSnapshot.value = getNehexSnapshotData()
     siteSnapshot.value = getSiteFormData()
+    ownerSnapshot.value = getOwnerFormData()
     storageSnapshot.value = getStorageFormData()
     themeSnapshot.value = getThemeSnapshotData()
   }
@@ -987,6 +1031,7 @@ export function useSettingsPage() {
     const settingsMap = getSettingsMap(items)
 
     nehexForm.adminManagerWeb = normalizeAdminManagerWebPath(readSetting(settingsMap, 'admin_manager_web') || '/nehex-admin')
+    nehexForm.adminLoginBackground = readSetting(settingsMap, 'admin_login_background') || DEFAULT_ADMIN_LOGIN_BACKGROUND
 
     const parsedClass = parseArticleClassPayload(settingsMap.get('nehex_article_class'))
     nehexClasses.value = parsedClass.items
@@ -999,6 +1044,12 @@ export function useSettingsPage() {
     siteForm.siteIcp = readSetting(settingsMap, 'site_icp')
     siteForm.siteDescription = readSetting(settingsMap, 'site_description')
     siteForm.siteFavicon = readSetting(settingsMap, 'site_favicon')
+
+    ownerForm.avatar = readSetting(settingsMap, 'site_owner_avatar') || '/images/head.jpg'
+    ownerForm.nickname = readSetting(settingsMap, 'site_owner_nickname') || '站长'
+    ownerForm.homepage = readSetting(settingsMap, 'site_owner_homepage')
+    ownerForm.email = readSetting(settingsMap, 'site_owner_email')
+    ownerForm.bio = readSetting(settingsMap, 'site_owner_bio')
 
     storageForm.provider = normalizeStorageProvider(readSetting(settingsMap, STORAGE_SETTING_KEYS.provider))
     storageForm.enabled = parseBooleanSetting(readSetting(settingsMap, STORAGE_SETTING_KEYS.enabled), true)
@@ -1197,6 +1248,11 @@ export function useSettingsPage() {
     if (section === 'nehex') {
       return [
         { setting_key: 'admin_manager_web', setting_content: adminManagerWebNormalized.value, setting_type: 'string' },
+        {
+          setting_key: 'admin_login_background',
+          setting_content: nehexForm.adminLoginBackground.trim() || DEFAULT_ADMIN_LOGIN_BACKGROUND,
+          setting_type: 'string',
+        },
         { setting_key: 'nehex_article_class', setting_content: buildArticleClassSettingContent(), setting_type: 'json' },
       ]
     }
@@ -1210,6 +1266,16 @@ export function useSettingsPage() {
         { setting_key: 'site_icp', setting_content: siteForm.siteIcp.trim(), setting_type: 'string' },
         { setting_key: 'site_description', setting_content: siteForm.siteDescription, setting_type: 'string' },
         { setting_key: 'site_favicon', setting_content: siteForm.siteFavicon.trim(), setting_type: 'string' },
+      ]
+    }
+
+    if (section === 'owner') {
+      return [
+        { setting_key: 'site_owner_avatar', setting_content: ownerForm.avatar.trim(), setting_type: 'string' },
+        { setting_key: 'site_owner_nickname', setting_content: ownerForm.nickname.trim(), setting_type: 'string' },
+        { setting_key: 'site_owner_homepage', setting_content: ownerForm.homepage.trim(), setting_type: 'string' },
+        { setting_key: 'site_owner_email', setting_content: ownerForm.email.trim(), setting_type: 'string' },
+        { setting_key: 'site_owner_bio', setting_content: ownerForm.bio, setting_type: 'string' },
       ]
     }
 
@@ -1240,6 +1306,8 @@ export function useSettingsPage() {
       applyNehexSnapshot(nehexSnapshot.value)
     } else if (section === 'site') {
       applySiteFormData(siteSnapshot.value)
+    } else if (section === 'owner') {
+      applyOwnerFormData(ownerSnapshot.value)
     } else if (section === 'storage') {
       applyStorageFormData(storageSnapshot.value)
     } else if (section === 'theme') {
@@ -1328,6 +1396,7 @@ export function useSettingsPage() {
     accountForm,
 
     siteForm,
+    ownerForm,
     storageForm,
     storageProviderOptions,
     showLocalStorageFields,

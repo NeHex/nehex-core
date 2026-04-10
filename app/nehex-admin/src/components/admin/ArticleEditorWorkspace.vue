@@ -557,7 +557,7 @@ async function _uploadImageAndInsert(file: File): Promise<void> {
   try {
     const imageUrl = await uploadMarkdownImage(file)
     _insertMarkdownImage(imageUrl, file.name)
-    successMessage.value = '图片上传成功'
+    showGlobalSuccess('图片上传成功')
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : '图片上传失败'
   } finally {

@@ -20,6 +20,14 @@ SETTINGS_WITH_THEME_DETAILS_CACHE_KEY = "settings:list:with-theme-details"
 SETTINGS_CACHE_TTL_SECONDS = 60
 USER_HEADPIC_KEY = "user_headpic"
 DEFAULT_HEAD_PIC = "/images/head.jpg"
+ADMIN_LOGIN_BACKGROUND_KEY = "admin_login_background"
+DEFAULT_ADMIN_LOGIN_BACKGROUND = "/images/background-2k.png"
+SITE_OWNER_AVATAR_KEY = "site_owner_avatar"
+SITE_OWNER_NICKNAME_KEY = "site_owner_nickname"
+SITE_OWNER_HOMEPAGE_KEY = "site_owner_homepage"
+SITE_OWNER_EMAIL_KEY = "site_owner_email"
+SITE_OWNER_BIO_KEY = "site_owner_bio"
+DEFAULT_SITE_OWNER_NICKNAME = "站长"
 PUBLIC_VISIBLE_SETTING_KEYS = {
     "site_title",
     "site_sub_title",
@@ -39,6 +47,7 @@ PUBLIC_VISIBLE_SETTING_KEYS = {
     "nehex_article_class",
     "user_social_link",
     USER_HEADPIC_KEY,
+    ADMIN_LOGIN_BACKGROUND_KEY,
 }
 COMPAT_SETTING_DEFAULTS: dict[str, tuple[SettingType, Any]] = {
     "site_title": (SettingType.string, ""),
@@ -49,6 +58,7 @@ COMPAT_SETTING_DEFAULTS: dict[str, tuple[SettingType, Any]] = {
     "theme_nav": (SettingType.json, {}),
     "user_social_link": (SettingType.json, []),
     USER_HEADPIC_KEY: (SettingType.string, DEFAULT_HEAD_PIC),
+    ADMIN_LOGIN_BACKGROUND_KEY: (SettingType.string, DEFAULT_ADMIN_LOGIN_BACKGROUND),
 }
 COMPAT_SETTING_ALIASES: dict[str, str] = {
     "site_desc": "site_description",
@@ -519,3 +529,44 @@ def _with_compatibility_keys(items: list[SettingItem]) -> list[SettingItem]:
         )
 
     return sorted(item_map.values(), key=lambda item: item.setting_key)
+
+
+def _normalize_site_owner_text(value: Any) -> str:
+    if value is None:
+        return ""
+    return str(value).strip()
+
+
+def get_site_owner_profile(session: Session) -> dict[str, str]:
+    keys = {
+        SITE_OWNER_AVATAR_KEY,
+        SITE_OWNER_NICKNAME_KEY,
+        SITE_OWNER_HOMEPAGE_KEY,
+        SITE_OWNER_EMAIL_KEY,
+        SITE_OWNER_BIO_KEY,
+        "site_url",
+    }
+    stmt = select(Setting).where(Setting.setting_key.in_(keys))
+    rows = session.execute(stmt).scalars().all()
+
+    row_map = {row.setting_key: row for row in rows}
+
+    def read_text(key: str, fallback: str = "") -> str:
+        row = row_map.get(key)
+        if row is None:
+            return fallback
+        parsed = parse_setting_content(row.setting_type, row.setting_content)
+        text = _normalize_site_owner_text(parsed)
+        return text or fallback
+
+    homepage = read_text(SITE_OWNER_HOMEPAGE_KEY)
+    if not homepage:
+        homepage = read_text("site_url")
+
+    return {
+        "avatar": read_text(SITE_OWNER_AVATAR_KEY, DEFAULT_HEAD_PIC),
+        "nickname": read_text(SITE_OWNER_NICKNAME_KEY, DEFAULT_SITE_OWNER_NICKNAME),
+        "homepage": homepage,
+        "email": read_text(SITE_OWNER_EMAIL_KEY),
+        "bio": read_text(SITE_OWNER_BIO_KEY),
+    }

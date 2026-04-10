@@ -184,6 +184,8 @@
 :deep(.theme-json-editor textarea) {
   font-family: Consolas, 'SFMono-Regular', Menlo, monospace;
   line-height: 1.5;
+  max-height: min(62vh, 760px);
+  overflow-y: auto !important;
 }
 
 @media (max-width: 980px) {
