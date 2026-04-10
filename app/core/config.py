@@ -1,4 +1,5 @@
 from typing import Optional
+from urllib.parse import quote_plus
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -46,12 +47,13 @@ class Settings(BaseSettings):
     redis_socket_connect_timeout: float = 1.0
     redis_socket_timeout: float = 1.5
 
+    db_driver: str = "postgresql"
+    db_url: str = ""
     db_host: str = "127.0.0.1"
-    db_port: int = 3306
+    db_port: int = 5432
     db_name: str = "nehex_dtbs"
     db_user: str = "nehex_dtbs"
     db_password: str = ""
-    db_charset: str = "utf8mb4"
 
     db_pool_size: int = 10
     db_max_overflow: int = 20
@@ -72,11 +74,28 @@ class Settings(BaseSettings):
 
     @property
     def database_url(self) -> str:
-        return (
-            f"mysql+pymysql://{self.db_user}:{self.db_password}"
-            f"@{self.db_host}:{self.db_port}/{self.db_name}"
-            f"?charset={self.db_charset}"
-        )
+        explicit_url = self.db_url.strip()
+        if explicit_url:
+            return explicit_url
+
+        driver = self.db_driver.strip().lower()
+        encoded_user = quote_plus(self.db_user)
+        encoded_password = quote_plus(self.db_password)
+
+        if driver in {"postgresql", "postgres", "psycopg", "postgresql+psycopg"}:
+            return (
+                f"postgresql+psycopg://{encoded_user}:{encoded_password}"
+                f"@{self.db_host}:{self.db_port}/{self.db_name}"
+            )
+
+        if driver in {"mysql", "pymysql", "mysql+pymysql"}:
+            return (
+                f"mysql+pymysql://{encoded_user}:{encoded_password}"
+                f"@{self.db_host}:{self.db_port}/{self.db_name}"
+                "?charset=utf8mb4"
+            )
+
+        raise ValueError(f"Unsupported DB_DRIVER: {self.db_driver}")
 
     @property
     def admin_manager_web_path(self) -> str:

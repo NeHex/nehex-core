@@ -14,6 +14,8 @@ from typing import Any
 from typing import BinaryIO
 
 from sqlalchemy import inspect, select
+from sqlalchemy import text
+from sqlalchemy.sql.sqltypes import BigInteger, Integer, SmallInteger
 from sqlalchemy.orm import Session
 
 import app.models  # noqa: F401
@@ -344,15 +346,30 @@ def _restore_database(snapshot_root: Path) -> None:
     table_map = {table.name: table for table in app_tables}
 
     with engine.begin() as connection:
-        is_mysql = engine.dialect.name == "mysql"
+        dialect_name = engine.dialect.name
+        is_mysql = dialect_name == "mysql"
+        is_postgresql = dialect_name == "postgresql"
+        identifier_preparer = connection.dialect.identifier_preparer
+
         if is_mysql:
             connection.exec_driver_sql("SET FOREIGN_KEY_CHECKS=0")
+        elif is_postgresql:
+            table_names = [
+                identifier_preparer.quote(table.name)
+                for table in app_tables
+                if table.name not in MYSQL_SYSTEM_LOG_TABLES
+            ]
+            if table_names:
+                connection.exec_driver_sql(
+                    f"TRUNCATE TABLE {', '.join(table_names)} RESTART IDENTITY CASCADE",
+                )
 
         try:
-            for table in reversed(app_tables):
-                if table.name in MYSQL_SYSTEM_LOG_TABLES:
-                    continue
-                connection.execute(table.delete())
+            if not is_postgresql:
+                for table in reversed(app_tables):
+                    if table.name in MYSQL_SYSTEM_LOG_TABLES:
+                        continue
+                    connection.execute(table.delete())
 
             for table_payload in raw_tables:
                 if not isinstance(table_payload, dict):
@@ -382,6 +399,36 @@ def _restore_database(snapshot_root: Path) -> None:
 
                 if rows:
                     connection.execute(table.insert(), rows)
+
+            if is_postgresql:
+                for table in app_tables:
+                    quoted_table = identifier_preparer.quote(table.name)
+                    if table.schema:
+                        quoted_table = f"{identifier_preparer.quote(table.schema)}.{quoted_table}"
+                    for column in table.columns:
+                        if not column.primary_key:
+                            continue
+                        if not isinstance(column.type, (SmallInteger, Integer, BigInteger)):
+                            continue
+
+                        sequence_name = connection.execute(
+                            text("SELECT pg_get_serial_sequence(:table_name, :column_name)"),
+                            {
+                                "table_name": quoted_table,
+                                "column_name": column.name,
+                            },
+                        ).scalar()
+                        if not sequence_name:
+                            continue
+
+                        quoted_column = identifier_preparer.quote(column.name)
+                        connection.execute(
+                            text(
+                                "SELECT setval(CAST(:seq_name AS regclass), "
+                                f"COALESCE((SELECT MAX({quoted_column}) FROM {quoted_table}), 0) + 1, false)",
+                            ),
+                            {"seq_name": sequence_name},
+                        )
         finally:
             if is_mysql:
                 connection.exec_driver_sql("SET FOREIGN_KEY_CHECKS=1")

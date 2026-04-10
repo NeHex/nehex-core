@@ -2,6 +2,7 @@ from collections.abc import Generator
 import logging
 
 from sqlalchemy import inspect, text
+from sqlalchemy.engine.url import make_url
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy import create_engine
 
@@ -14,6 +15,23 @@ import app.models  # noqa: F401
 logger = logging.getLogger(__name__)
 
 
+def _build_engine_connect_args() -> dict[str, object]:
+    backend = make_url(settings.database_url).get_backend_name().lower()
+    if backend == "postgresql":
+        return {
+            "connect_timeout": settings.db_connect_timeout,
+        }
+
+    if backend == "mysql":
+        return {
+            "connect_timeout": settings.db_connect_timeout,
+            "read_timeout": settings.db_read_timeout,
+            "write_timeout": settings.db_write_timeout,
+        }
+
+    return {}
+
+
 engine = create_engine(
     settings.database_url,
     pool_pre_ping=True,
@@ -23,11 +41,7 @@ engine = create_engine(
     pool_timeout=settings.db_pool_timeout,
     pool_use_lifo=True,
     pool_reset_on_return="rollback",
-    connect_args={
-        "connect_timeout": settings.db_connect_timeout,
-        "read_timeout": settings.db_read_timeout,
-        "write_timeout": settings.db_write_timeout,
-    },
+    connect_args=_build_engine_connect_args(),
     echo=False,
     future=True,
 )
@@ -122,58 +136,40 @@ def ensure_performance_indexes() -> None:
         ("mail_log", "idx_mail_log_comment", "trigger_comment_id,created_at,id", False),
     ]
 
-    check_table_sql = text(
-        """
-        SELECT COUNT(1)
-        FROM information_schema.tables
-        WHERE table_schema = :schema_name
-          AND table_name = :table_name
-        """.strip(),
-    )
-
-    check_exists_sql = text(
-        """
-        SELECT COUNT(1)
-        FROM information_schema.statistics
-        WHERE table_schema = :schema_name
-          AND table_name = :table_name
-          AND index_name = :index_name
-        """.strip(),
-    )
-
     with engine.begin() as conn:
+        inspector = inspect(conn)
+        identifier_preparer = conn.dialect.identifier_preparer
+
         for table_name, index_name, columns_sql, is_unique in index_specs:
-            table_exists = int(
-                conn.execute(
-                    check_table_sql,
-                    {
-                        "schema_name": settings.db_name,
-                        "table_name": table_name,
-                    },
-                ).scalar()
-                or 0,
-            )
-            if table_exists <= 0:
+            if not inspector.has_table(table_name):
                 continue
 
-            exists = int(
-                conn.execute(
-                    check_exists_sql,
-                    {
-                        "schema_name": settings.db_name,
-                        "table_name": table_name,
-                        "index_name": index_name,
-                    },
-                ).scalar()
-                or 0,
-            )
-            if exists > 0:
+            existing_names: set[str] = set()
+            for item in inspector.get_indexes(table_name):
+                raw_name = str(item.get("name") or "").strip()
+                if raw_name:
+                    existing_names.add(raw_name)
+            for item in inspector.get_unique_constraints(table_name):
+                raw_name = str(item.get("name") or "").strip()
+                if raw_name:
+                    existing_names.add(raw_name)
+            if index_name in existing_names:
                 continue
 
             ddl_prefix = "CREATE UNIQUE INDEX" if is_unique else "CREATE INDEX"
+            quoted_index = identifier_preparer.quote(index_name)
+            quoted_table = identifier_preparer.quote(table_name)
+            quoted_columns = ",".join(
+                identifier_preparer.quote(item.strip())
+                for item in columns_sql.split(",")
+                if item.strip()
+            )
+            if not quoted_columns:
+                continue
+
             try:
                 conn.execute(
-                    text(f"{ddl_prefix} {index_name} ON {table_name} ({columns_sql})"),
+                    text(f"{ddl_prefix} {quoted_index} ON {quoted_table} ({quoted_columns})"),
                 )
             except Exception as error:
                 # Continue with remaining indexes to avoid blocking startup due to a single bad index.

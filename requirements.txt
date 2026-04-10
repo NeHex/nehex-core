@@ -49,8 +49,12 @@ pydantic-core==2.41.5
     # via pydantic
 pydantic-settings==2.13.1
     # via -r requirements.in
-pymysql==1.1.2
-    # via -r requirements.in
+psycopg==3.2.12
+    # via
+    #   -r requirements.in
+    #   psycopg-binary
+psycopg-binary==3.2.12
+    # via psycopg
 python-dateutil==2.9.0.post0
     # via botocore
 python-dotenv==1.2.2
