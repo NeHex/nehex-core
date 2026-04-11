@@ -18,7 +18,7 @@
   >
     <input
       ref="inputRef"
-      accept="image/*"
+      :accept="accept"
       class="image-upload-input"
       :multiple="multiple"
       type="file"
@@ -33,7 +33,12 @@
         size="18"
         width="2"
       />
-      <v-icon v-else color="#9fb4de" icon="mdi-image-plus-outline" size="18" />
+      <v-icon
+        v-else
+        color="#9fb4de"
+        :icon="fileFilterMode === 'any' ? 'mdi-upload-outline' : 'mdi-image-plus-outline'"
+        size="18"
+      />
     </div>
 
     <div class="image-upload-text">
@@ -53,6 +58,8 @@ const props = withDefaults(defineProps<{
   loadingTitle?: string
   multiple?: boolean
   disabled?: boolean
+  accept?: string
+  fileFilterMode?: 'image' | 'any'
 }>(), {
   title: '上传图片',
   hint: '拖动图片到卡片，或点击选择图片',
@@ -60,6 +67,8 @@ const props = withDefaults(defineProps<{
   loadingTitle: '正在上传图片...',
   multiple: false,
   disabled: false,
+  accept: 'image/*',
+  fileFilterMode: 'image',
 })
 
 const emit = defineEmits<{
@@ -69,13 +78,26 @@ const emit = defineEmits<{
 const inputRef = ref<HTMLInputElement | null>(null)
 const dragOver = ref(false)
 const dragDepth = ref(0)
+const IMAGE_EXTENSION_PATTERN = /\.(jpg|jpeg|png|webp|gif|svg|bmp|avif)$/i
 
-function pickImages(files: FileList | null): File[] {
+function isImageFile(file: File): boolean {
+  if (file.type.startsWith('image/')) {
+    return true
+  }
+  const name = (file.name || '').trim().toLowerCase()
+  return IMAGE_EXTENSION_PATTERN.test(name)
+}
+
+function pickFiles(files: FileList | null): File[] {
   if (!files || files.length <= 0) {
     return []
   }
 
-  return Array.from(files).filter((file) => file.type.startsWith('image/'))
+  const selected = Array.from(files)
+  if (props.fileFilterMode === 'any') {
+    return selected
+  }
+  return selected.filter((file) => isImageFile(file))
 }
 
 function triggerPick(): void {
@@ -87,7 +109,7 @@ function triggerPick(): void {
 
 function onInputChange(event: Event): void {
   const target = event.target as HTMLInputElement | null
-  const files = pickImages(target?.files || null)
+  const files = pickFiles(target?.files || null)
   if (target) {
     target.value = ''
   }
@@ -129,7 +151,7 @@ function onDrop(event: DragEvent): void {
     return
   }
 
-  const files = pickImages(event.dataTransfer?.files || null)
+  const files = pickFiles(event.dataTransfer?.files || null)
   if (files.length <= 0) {
     return
   }

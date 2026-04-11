@@ -170,7 +170,7 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, reactive, ref } from 'vue'
+import { onMounted, reactive, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import {
   fetchInstallStatus,
@@ -179,6 +179,7 @@ import {
   type InstallArticleClassItem,
 } from '@/services/install'
 import { adminLogout, resetAdminSessionCache } from '@/services/admin-api'
+import { useGlobalSnackbar } from '@/composables/useGlobalSnackbar'
 import { resetSettingsCache } from '@/services/settings'
 import { clearAuthSession } from '@/utils/auth'
 import { getAdminBasePath, normalizeBasePath } from '@/utils/path'
@@ -193,6 +194,7 @@ const loading = ref(false)
 const currentStep = ref<1 | 2 | 3>(1)
 const errorMessage = ref('')
 const successMessage = ref('')
+const { showGlobalSuccess } = useGlobalSnackbar()
 
 const steps: StepItem[] = [
   { value: 1, label: '管理员账号' },
@@ -380,6 +382,14 @@ onMounted(async () => {
   } catch {
     adminForm.adminManagerWeb = '/nehex-admin'
   }
+})
+
+watch(successMessage, (nextMessage) => {
+  const text = nextMessage.trim()
+  if (!text) {
+    return
+  }
+  showGlobalSuccess(text)
 })
 </script>
 

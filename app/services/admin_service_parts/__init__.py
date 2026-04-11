@@ -47,6 +47,18 @@ from app.services.admin_service_parts.friends import (
     update_admin_friend_apply_status,
 )
 from app.services.admin_service_parts.mail import list_admin_mail_logs, test_admin_mail_smtp
+from app.services.admin_service_parts.media import (
+    create_media_folder,
+    delete_media_folder,
+    delete_media_image,
+    list_media_folders_with_counts,
+    list_media_images_by_folder,
+    list_uncategorized_media_images,
+    media_folder_exists,
+    move_media_images_to_folder,
+    rename_media_folder,
+    upload_media_image,
+)
 from app.services.admin_service_parts.settings import (
     get_admin_credentials,
     list_admin_settings,
@@ -101,4 +113,14 @@ __all__ = [
     "delete_admin_comment",
     "list_admin_mail_logs",
     "test_admin_mail_smtp",
+    "list_media_folders_with_counts",
+    "list_uncategorized_media_images",
+    "list_media_images_by_folder",
+    "media_folder_exists",
+    "create_media_folder",
+    "delete_media_folder",
+    "rename_media_folder",
+    "upload_media_image",
+    "move_media_images_to_folder",
+    "delete_media_image",
 ]

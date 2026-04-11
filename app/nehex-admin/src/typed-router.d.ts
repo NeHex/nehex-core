@@ -32,6 +32,7 @@ declare module 'vue-router/auto-routes' {
     '/friends': RouteRecordInfo<'/friends', '/friends', Record<never, never>, Record<never, never>>,
     '/install': RouteRecordInfo<'/install', '/install', Record<never, never>, Record<never, never>>,
     '/login': RouteRecordInfo<'/login', '/login', Record<never, never>, Record<never, never>>,
+    '/media': RouteRecordInfo<'/media', '/media', Record<never, never>, Record<never, never>>,
     '/pages': RouteRecordInfo<'/pages', '/pages', Record<never, never>, Record<never, never>, '/pages/edit/[id]' | '/pages/new'>,
     '/pages/edit/[id]': RouteRecordInfo<'/pages/edit/[id]', '/pages/edit/:id', { id: ParamValue<true> }, { id: ParamValue<false> }>,
     '/pages/new': RouteRecordInfo<'/pages/new', '/pages/new', Record<never, never>, Record<never, never>>,
@@ -109,6 +110,10 @@ declare module 'vue-router/auto-routes' {
     }
     'src/pages/login.vue': {
       routes: '/login'
+      views: never
+    }
+    'src/pages/media.vue': {
+      routes: '/media'
       views: never
     }
     'src/pages/pages.vue': {

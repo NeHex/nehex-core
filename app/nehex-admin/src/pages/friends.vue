@@ -345,8 +345,9 @@
 </template>
 
 <script lang="ts" setup>
-import { onMounted, reactive, ref } from 'vue'
+import { onMounted, reactive, ref, watch } from 'vue'
 import AdminLayout from '@/components/admin/AdminLayout.vue'
+import { useGlobalSnackbar } from '@/composables/useGlobalSnackbar'
 import {
   createAdminFriend,
   deleteAdminFriend,
@@ -364,6 +365,7 @@ import {
 const activeTab = ref<'friends' | 'applications'>('friends')
 const errorMessage = ref('')
 const successMessage = ref('')
+const { showGlobalSuccess } = useGlobalSnackbar()
 
 const friendsLoading = ref(false)
 const applicationsLoading = ref(false)
@@ -700,6 +702,14 @@ onMounted(async () => {
     loadFriends(),
     loadApplications(),
   ])
+})
+
+watch(successMessage, (nextMessage) => {
+  const text = nextMessage.trim()
+  if (!text) {
+    return
+  }
+  showGlobalSuccess(text)
 })
 </script>
 

@@ -249,3 +249,32 @@ class AdminInstallRequest(BaseModel):
 class AdminInstallResponse(BaseModel):
     data: AdminInstallStatusData
     message: str = "Installation completed"
+
+
+class AdminMediaFolderCreateRequest(BaseModel):
+    name: str = Field(min_length=1, max_length=120)
+
+    @field_validator("name")
+    @classmethod
+    def normalize_name(cls, value: str) -> str:
+        normalized = value.strip()
+        if not normalized:
+            raise ValueError("name is required")
+        return normalized
+
+
+class AdminMediaFolderRenameRequest(BaseModel):
+    name: str = Field(min_length=1, max_length=120)
+
+    @field_validator("name")
+    @classmethod
+    def normalize_name(cls, value: str) -> str:
+        normalized = value.strip()
+        if not normalized:
+            raise ValueError("name is required")
+        return normalized
+
+
+class AdminMediaImageMoveRequest(BaseModel):
+    ids: list[int] = Field(min_length=1, max_length=2000)
+    folder_id: Optional[int] = Field(default=None, ge=1)

@@ -609,13 +609,15 @@
 </template>
 
 <script lang="ts" setup>
-import { computed } from 'vue'
+import { computed, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import AdminLayout from '@/components/admin/AdminLayout.vue'
+import { useGlobalSnackbar } from '@/composables/useGlobalSnackbar'
 import { useSettingsPage } from '@/pages/settings/useSettingsPage'
 
 const route = useRoute()
 const isRootSettingsRoute = computed(() => route.path === '/settings')
+const { showGlobalSuccess } = useGlobalSnackbar()
 
 const {
   sections,
@@ -673,6 +675,14 @@ const {
   resetCurrentSection,
   saveCurrentSection,
 } = useSettingsPage()
+
+watch(successMessage, (nextMessage) => {
+  const text = nextMessage.trim()
+  if (!text) {
+    return
+  }
+  showGlobalSuccess(text)
+})
 </script>
 
 <style scoped src="./settings/style.scss"></style>

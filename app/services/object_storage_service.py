@@ -22,6 +22,7 @@ DEFAULT_LOCAL_ROOT = "storage"
 DEFAULT_LOCAL_PATH_RULE = "/{year}-{month}/{day}/{random_name}.{file_type}"
 DEFAULT_LOCAL_URL_PREFIX = "/storage"
 MAX_IMAGE_SIZE_BYTES = 20 * 1024 * 1024
+MAX_MEDIA_SIZE_BYTES = 200 * 1024 * 1024
 
 STORAGE_PROVIDER_KEY = "object_storage_provider"
 STORAGE_ENABLED_KEY = "object_storage_enabled"
@@ -97,6 +98,73 @@ IMAGE_MIME_TO_EXT = {
     "image/avif": "avif",
 }
 ALLOWED_IMAGE_EXTENSIONS = set(IMAGE_MIME_TO_EXT.values()) | {"jpeg", "jpg", "png", "webp", "gif", "svg", "bmp", "avif"}
+MIME_TO_EXT = {
+    **IMAGE_MIME_TO_EXT,
+    "video/mp4": "mp4",
+    "video/webm": "webm",
+    "video/ogg": "ogv",
+    "video/quicktime": "mov",
+    "video/x-matroska": "mkv",
+    "audio/mpeg": "mp3",
+    "audio/wav": "wav",
+    "audio/ogg": "ogg",
+    "audio/flac": "flac",
+    "audio/aac": "aac",
+    "application/pdf": "pdf",
+    "text/plain": "txt",
+    "text/markdown": "md",
+    "text/csv": "csv",
+    "application/json": "json",
+    "application/zip": "zip",
+    "application/x-zip-compressed": "zip",
+    "application/x-rar-compressed": "rar",
+    "application/vnd.rar": "rar",
+    "application/x-7z-compressed": "7z",
+    "application/msword": "doc",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document": "docx",
+    "application/vnd.ms-excel": "xls",
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": "xlsx",
+    "application/vnd.ms-powerpoint": "ppt",
+    "application/vnd.openxmlformats-officedocument.presentationml.presentation": "pptx",
+}
+BLOCKED_FILE_EXTENSIONS = {
+    "html",
+    "htm",
+    "js",
+    "mjs",
+    "cjs",
+    "ts",
+    "tsx",
+    "jsx",
+    "php",
+    "py",
+    "sh",
+    "bash",
+    "zsh",
+    "bat",
+    "cmd",
+    "ps1",
+    "exe",
+    "dll",
+    "msi",
+    "apk",
+    "jar",
+    "war",
+    "com",
+    "scr",
+}
+BLOCKED_CONTENT_TYPES = {
+    "text/html",
+    "application/xhtml+xml",
+    "application/javascript",
+    "text/javascript",
+    "application/x-javascript",
+    "application/x-msdownload",
+    "application/x-msdos-program",
+    "application/x-sh",
+    "application/x-php",
+}
+SAFE_EXTENSION_RE = re.compile(r"^[a-z0-9]{1,16}$")
 
 
 @dataclass(frozen=True)
@@ -301,18 +369,27 @@ class _FormatDict(dict[str, str]):
         return ""
 
 
+def _normalize_extension(ext: str) -> str:
+    normalized = ext.lower().lstrip(".").strip()
+    if not normalized:
+        return ""
+    if not SAFE_EXTENSION_RE.match(normalized):
+        return ""
+    if normalized == "jpeg":
+        return "jpg"
+    return normalized
+
+
 def _guess_file_extension(file_name: str, content_type: str) -> str:
-    ext = Path(file_name).suffix.lower().lstrip(".")
-    if ext in ALLOWED_IMAGE_EXTENSIONS:
-        if ext == "jpeg":
-            return "jpg"
+    ext = _normalize_extension(Path(file_name).suffix)
+    if ext:
         return ext
 
-    mapped = IMAGE_MIME_TO_EXT.get(content_type.lower())
+    mapped = MIME_TO_EXT.get(content_type.lower())
     if mapped:
         return mapped
 
-    return "jpg"
+    return "bin"
 
 
 def _build_object_key(path_rule: str, file_name: str, content_type: str) -> str:
@@ -367,6 +444,21 @@ def _validate_image_file(file_name: str, content_type: str, content: bytes) -> N
         return
 
     raise ValueError("仅支持图片文件上传")
+
+
+def _validate_media_file(file_name: str, content_type: str, content: bytes) -> None:
+    if not content:
+        raise ValueError("上传文件为空")
+    if len(content) > MAX_MEDIA_SIZE_BYTES:
+        raise ValueError("文件大小不能超过 200MB")
+
+    normalized_content_type = _normalize_text(content_type).lower()
+    if normalized_content_type in BLOCKED_CONTENT_TYPES:
+        raise ValueError("不支持该文件类型上传")
+
+    extension = _normalize_extension(Path(file_name).suffix)
+    if extension in BLOCKED_FILE_EXTENSIONS:
+        raise ValueError("不支持该文件类型上传")
 
 
 def _upload_local_file(config: ObjectStorageConfig, object_key: str, content: bytes) -> str:
@@ -660,20 +752,13 @@ def _upload_aliyun_oss_file(
     )
 
 
-def upload_image_to_object_storage(
-    session: Session,
+def _upload_object_to_provider(
+    config: ObjectStorageConfig,
     *,
-    file_name: str,
+    object_key: str,
     content_type: str,
     content: bytes,
-) -> dict[str, str]:
-    config = get_object_storage_config(session)
-    if not config.enabled:
-        raise ValueError("存储设置未启用")
-
-    _validate_image_file(file_name, content_type, content)
-    object_key = _build_object_key(config.local_path_rule, file_name=file_name, content_type=content_type)
-
+) -> str:
     if config.provider == "local":
         url = _upload_local_file(config, object_key=object_key, content=content)
     elif config.provider == "r2":
@@ -704,6 +789,55 @@ def upload_image_to_object_storage(
             content_type=content_type,
             content=content,
         )
+    return url
+
+
+def upload_image_to_object_storage(
+    session: Session,
+    *,
+    file_name: str,
+    content_type: str,
+    content: bytes,
+) -> dict[str, str]:
+    config = get_object_storage_config(session)
+    if not config.enabled:
+        raise ValueError("存储设置未启用")
+
+    _validate_image_file(file_name, content_type, content)
+    object_key = _build_object_key(config.local_path_rule, file_name=file_name, content_type=content_type)
+    url = _upload_object_to_provider(
+        config,
+        object_key=object_key,
+        content_type=content_type,
+        content=content,
+    )
+
+    return {
+        "provider": config.provider,
+        "key": object_key,
+        "url": url,
+    }
+
+
+def upload_file_to_object_storage(
+    session: Session,
+    *,
+    file_name: str,
+    content_type: str,
+    content: bytes,
+) -> dict[str, str]:
+    config = get_object_storage_config(session)
+    if not config.enabled:
+        raise ValueError("存储设置未启用")
+
+    _validate_media_file(file_name, content_type, content)
+    object_key = _build_object_key(config.local_path_rule, file_name=file_name, content_type=content_type)
+    url = _upload_object_to_provider(
+        config,
+        object_key=object_key,
+        content_type=content_type,
+        content=content,
+    )
 
     return {
         "provider": config.provider,

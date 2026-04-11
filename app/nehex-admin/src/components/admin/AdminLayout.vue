@@ -80,6 +80,7 @@
 
         <v-list class="menu-list" density="comfortable" nav>
           <template v-for="item in menuItems" :key="item.to">
+            <hr v-if="item.dividerBefore" class="menu-divider">
             <v-list-item
               class="menu-item"
               :append-icon="item.children?.length ? (isSubmenuExpanded(item) ? 'mdi-chevron-down' : 'mdi-chevron-right') : undefined"
@@ -136,6 +137,7 @@
 
       <v-list class="menu-list" density="comfortable" nav>
         <template v-for="item in menuItems" :key="item.to">
+          <hr v-if="item.dividerBefore" class="menu-divider">
           <v-list-item
             class="menu-item"
             :prepend-icon="item.icon"
@@ -237,6 +239,7 @@ type MenuItem = {
   icon: string
   label: string
   to: string
+  dividerBefore?: boolean
   children?: MenuChildItem[]
 }
 
@@ -246,6 +249,7 @@ const menuItems: MenuItem[] = [
     icon: 'mdi-post-outline',
     label: '文章管理',
     to: '/articles',
+    dividerBefore: true,
     children: [
       { label: '管理', to: '/articles', parentTo: '/articles' },
       { label: '新增', to: '/articles/new' },
@@ -288,6 +292,12 @@ const menuItems: MenuItem[] = [
       { label: '管理', to: '/projects', parentTo: '/projects' },
       { label: '新增', to: '/projects/new' },
     ],
+  },
+  {
+    icon: 'mdi-folder-image',
+    label: '媒体库',
+    to: '/media',
+    dividerBefore: true,
   },
   {
     icon: 'mdi-cog-outline',
@@ -568,6 +578,19 @@ function closeMobileDrawers(): void {
   overscroll-behavior: contain;
   -webkit-overflow-scrolling: touch;
   padding-bottom: 8px;
+}
+
+.menu-divider {
+  border: 0;
+  height: 1px;
+  margin: 6px 8px 10px;
+  background: linear-gradient(
+    90deg,
+    rgba(120, 138, 183, 0) 0%,
+    rgba(154, 176, 228, 0.38) 18%,
+    rgba(154, 176, 228, 0.38) 82%,
+    rgba(120, 138, 183, 0) 100%
+  );
 }
 
 :deep(.menu-item .v-list-item-title) {

@@ -205,6 +205,7 @@
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import AdminLayout from '@/components/admin/AdminLayout.vue'
+import { useGlobalSnackbar } from '@/composables/useGlobalSnackbar'
 import {
   fetchAdminSettings,
   type AdminSettingItem,
@@ -234,6 +235,7 @@ const testEmail = ref('')
 const activeTemplateTab = ref<'reply' | 'new-comment'>('reply')
 const selectedReplyPreset = ref('default')
 const selectedNewCommentPreset = ref('default')
+const { showGlobalSuccess } = useGlobalSnackbar()
 
 const form = reactive({
   smtpHost: '',
@@ -507,6 +509,14 @@ watch(
     selectedNewCommentPreset.value = detectPreset(subject || '', body || '', newCommentTemplatePresets)
   },
 )
+
+watch(successMessage, (nextMessage) => {
+  const text = nextMessage.trim()
+  if (!text) {
+    return
+  }
+  showGlobalSuccess(text)
+})
 
 onMounted(async () => {
   await loadSettings()

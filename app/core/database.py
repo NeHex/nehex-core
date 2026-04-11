@@ -10,6 +10,8 @@ from app.core.config import settings
 from app.models.base import Base
 from app.models.friend_apply import FriendApply
 from app.models.mail_log import MailLog
+from app.models.media_folder import MediaFolder
+from app.models.media_image import MediaImage
 import app.models  # noqa: F401
 
 logger = logging.getLogger(__name__)
@@ -59,7 +61,16 @@ def check_database_connection() -> None:
 
 
 def ensure_system_tables() -> None:
-    Base.metadata.create_all(bind=engine, tables=[FriendApply.__table__, MailLog.__table__], checkfirst=True)
+    Base.metadata.create_all(
+        bind=engine,
+        tables=[
+            FriendApply.__table__,
+            MailLog.__table__,
+            MediaFolder.__table__,
+            MediaImage.__table__,
+        ],
+        checkfirst=True,
+    )
 
 
 def ensure_all_tables() -> None:
@@ -129,6 +140,8 @@ def ensure_performance_indexes() -> None:
         ("friends", "uq_friends_url", "url", True),
         ("mail_log", "idx_mail_log_status_time", "status,created_at,id", False),
         ("mail_log", "idx_mail_log_comment", "trigger_comment_id,created_at,id", False),
+        ("media_folder", "idx_media_folder_create_time", "create_time,id", False),
+        ("media_image", "idx_media_image_folder_time", "folder_id,create_time,id", False),
     ]
 
     with engine.begin() as conn:

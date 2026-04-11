@@ -145,8 +145,9 @@
 
 <script lang="ts" setup>
 import MarkdownIt from 'markdown-it'
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
+import { useGlobalSnackbar } from '@/composables/useGlobalSnackbar'
 import {
   createProject,
   fetchProjectById,
@@ -183,6 +184,7 @@ const statusOptions = [
   { label: '启用', value: 1 },
   { label: '禁用', value: 0 },
 ]
+const { showGlobalSuccess } = useGlobalSnackbar()
 
 const loading = ref(false)
 const submitting = ref(false)
@@ -366,6 +368,14 @@ async function goManage(): Promise<void> {
 
 onMounted(async () => {
   await loadProjectDetail()
+})
+
+watch(successMessage, (nextMessage) => {
+  const text = nextMessage.trim()
+  if (!text) {
+    return
+  }
+  showGlobalSuccess(text)
 })
 </script>
 

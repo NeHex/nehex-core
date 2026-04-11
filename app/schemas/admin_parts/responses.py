@@ -156,3 +156,45 @@ class AdminStorageUploadData(BaseModel):
 
 class AdminStorageUploadResponse(BaseModel):
     data: AdminStorageUploadData
+
+
+class AdminMediaFolderItem(BaseModel):
+    id: int
+    name: str
+    image_count: int = Field(ge=0, default=0)
+    create_time: datetime
+    update_time: datetime
+
+
+class AdminMediaImageItem(BaseModel):
+    id: int
+    folder_id: int | None = None
+    media_type: str = "file"
+    provider: str
+    key: str
+    url: str
+    file_name: str | None = None
+    content_type: str | None = None
+    size_bytes: int = Field(ge=0, default=0)
+    create_time: datetime
+
+
+class AdminMediaLibraryData(BaseModel):
+    folders: list[AdminMediaFolderItem]
+    uncategorized: list[AdminMediaImageItem]
+
+
+class AdminMediaLibraryResponse(BaseModel):
+    data: AdminMediaLibraryData
+
+
+class AdminMediaFolderDetailResponse(BaseModel):
+    data: AdminMediaFolderItem
+
+
+class AdminMediaImageDetailResponse(BaseModel):
+    data: AdminMediaImageItem
+
+
+class AdminMediaImageListResponse(BaseModel):
+    data: list[AdminMediaImageItem]

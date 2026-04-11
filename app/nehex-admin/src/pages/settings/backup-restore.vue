@@ -190,8 +190,9 @@
 </template>
 
 <script lang="ts" setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import AdminLayout from '@/components/admin/AdminLayout.vue'
+import { useGlobalSnackbar } from '@/composables/useGlobalSnackbar'
 import {
   createAdminBackup,
   deleteAdminBackup,
@@ -210,6 +211,7 @@ const deletingFilename = ref('')
 const backups = ref<AdminBackupItem[]>([])
 const errorMessage = ref('')
 const successMessage = ref('')
+const { showGlobalSuccess } = useGlobalSnackbar()
 
 const restoreDialog = ref(false)
 const restoreMode = ref<'existing' | 'upload'>('existing')
@@ -392,6 +394,14 @@ async function confirmDelete(): Promise<void> {
 
 onMounted(async () => {
   await loadBackups()
+})
+
+watch(successMessage, (nextMessage) => {
+  const text = nextMessage.trim()
+  if (!text) {
+    return
+  }
+  showGlobalSuccess(text)
 })
 </script>
 
