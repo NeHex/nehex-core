@@ -16,6 +16,7 @@ declare module 'vue' {
     AlbumEditorWorkspace: typeof import('./components/admin/AlbumEditorWorkspace.vue')['default']
     ArticleEditorWorkspace: typeof import('./components/admin/ArticleEditorWorkspace.vue')['default']
     DailyEditorWorkspace: typeof import('./components/admin/DailyEditorWorkspace.vue')['default']
+    ImageUploadHintCard: typeof import('./components/admin/ImageUploadHintCard.vue')['default']
     PageEditorWorkspace: typeof import('./components/admin/PageEditorWorkspace.vue')['default']
     ProjectEditorWorkspace: typeof import('./components/admin/ProjectEditorWorkspace.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']

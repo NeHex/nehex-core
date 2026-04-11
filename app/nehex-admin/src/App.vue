@@ -7,7 +7,7 @@
     <v-snackbar
       v-model="snackbarModel"
       class="publish-snackbar"
-      color="success"
+      :color="snackbarColor"
       location="top end"
       :timeout="-1"
       transition="fade-transition"
@@ -18,6 +18,7 @@
         class="publish-snackbar__progress"
         color="white"
         height="3"
+        :indeterminate="snackbarProgressIndeterminate"
         :model-value="snackbarProgress"
       />
     </v-snackbar>
@@ -32,6 +33,8 @@ const {
   visible: snackbarVisible,
   message: snackbarMessage,
   progress: snackbarProgress,
+  color: snackbarColor,
+  progressIndeterminate: snackbarProgressIndeterminate,
   hideGlobalSnackbar,
 } = useGlobalSnackbar()
 
@@ -51,6 +54,13 @@ const snackbarModel = computed({
 .publish-snackbar :deep(.v-snackbar__wrapper) {
   min-width: 280px;
   max-width: 420px;
+}
+
+@media (max-width: 760px) {
+  .publish-snackbar :deep(.v-snackbar__wrapper) {
+    min-width: auto;
+    width: min(92vw, 420px);
+  }
 }
 
 .publish-snackbar__message {

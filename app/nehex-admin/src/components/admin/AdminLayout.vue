@@ -1,6 +1,135 @@
 <template>
-  <div class="admin-layout" :class="{ 'admin-layout--with-subnav': hasSecondaryNav }">
-    <aside class="sidebar">
+  <div
+    class="admin-layout"
+    :class="{
+      'admin-layout--with-subnav': hasSecondaryNav && !isMobile,
+      'admin-layout--mobile': isMobile,
+    }"
+  >
+    <v-app-bar
+      v-if="isMobile"
+      class="mobile-topbar"
+      color="#161b24"
+      density="comfortable"
+      flat
+    >
+      <v-btn
+        aria-label="打开导航菜单"
+        icon="mdi-menu"
+        variant="text"
+        @click="toggleMainDrawer"
+      />
+
+      <v-app-bar-title class="mobile-topbar-title">{{ adminTitle }}</v-app-bar-title>
+
+      <v-spacer />
+
+      <v-btn
+        v-if="hasSecondaryNav"
+        aria-label="打开二级导航"
+        icon="mdi-tune-variant"
+        variant="text"
+        @click="toggleSecondaryDrawer"
+      />
+
+      <v-menu location="bottom end">
+        <template #activator="{ props }">
+          <v-btn
+            v-bind="props"
+            aria-label="更多操作"
+            icon="mdi-dots-vertical"
+            variant="text"
+          />
+        </template>
+
+        <v-list density="comfortable" min-width="170">
+          <v-list-item
+            prepend-icon="mdi-open-in-new"
+            title="前往站点"
+            @click="handleGoToSiteFromMenu"
+          />
+          <v-list-item
+            prepend-icon="mdi-logout"
+            title="登出"
+            @click="handleLogout"
+          />
+        </v-list>
+      </v-menu>
+    </v-app-bar>
+
+    <v-navigation-drawer
+      v-if="isMobile"
+      v-model="mobileMainDrawer"
+      class="mobile-drawer mobile-drawer--main"
+      location="left"
+      :scrim="true"
+      temporary
+      width="288"
+    >
+      <div class="mobile-drawer-content">
+        <div class="sidebar-header sidebar-header--mobile">
+          <div class="site-name">{{ adminTitle }}</div>
+          <v-btn
+            aria-label="关闭导航菜单"
+            icon="mdi-close"
+            size="small"
+            variant="text"
+            @click="mobileMainDrawer = false"
+          />
+        </div>
+
+        <v-list class="menu-list" density="comfortable" nav>
+          <template v-for="item in menuItems" :key="item.to">
+            <v-list-item
+              class="menu-item"
+              :append-icon="item.children?.length ? (isSubmenuExpanded(item) ? 'mdi-chevron-down' : 'mdi-chevron-right') : undefined"
+              :prepend-icon="item.icon"
+              rounded="lg"
+              :title="item.label"
+              :active="isMenuItemActive(item)"
+              @click="handleMenuItemClick(item)"
+            />
+
+            <div v-if="item.children?.length && isSubmenuExpanded(item)" class="submenu-wrap">
+              <v-list-item
+                v-for="child in item.children"
+                :key="child.to"
+                class="submenu-item"
+                rounded="lg"
+                :title="child.label"
+                :active="isSubmenuItemActive(child)"
+                @click="handleSubmenuItemClick(child)"
+              />
+            </div>
+          </template>
+        </v-list>
+
+        <div class="sidebar-footer sidebar-footer--mobile">
+          <v-btn
+            class="site-btn"
+            block
+            color="primary"
+            prepend-icon="mdi-open-in-new"
+            variant="tonal"
+            @click="handleGoToSiteFromMenu"
+          >
+            前往站点
+          </v-btn>
+          <v-btn
+            class="logout-btn"
+            block
+            color="error"
+            prepend-icon="mdi-logout"
+            variant="tonal"
+            @click="handleLogout"
+          >
+            登出
+          </v-btn>
+        </div>
+      </div>
+    </v-navigation-drawer>
+
+    <aside v-else class="sidebar">
       <div class="sidebar-header">
         <div class="site-name">{{ adminTitle }}</div>
       </div>
@@ -54,21 +183,48 @@
       </div>
     </aside>
 
-    <aside v-if="hasSecondaryNav" class="sub-sidebar">
+    <v-navigation-drawer
+      v-if="isMobile && hasSecondaryNav"
+      v-model="mobileSecondaryDrawer"
+      class="mobile-drawer mobile-drawer--secondary"
+      location="right"
+      :scrim="true"
+      temporary
+      width="288"
+    >
+      <div class="mobile-secondary-nav">
+        <div class="mobile-secondary-head">
+          <div class="mobile-secondary-title">页面导航</div>
+          <v-btn
+            aria-label="关闭二级导航"
+            icon="mdi-close"
+            size="small"
+            variant="text"
+            @click="mobileSecondaryDrawer = false"
+          />
+        </div>
+        <div class="mobile-secondary-body">
+          <slot name="secondary-nav" />
+        </div>
+      </div>
+    </v-navigation-drawer>
+
+    <aside v-if="hasSecondaryNav && !isMobile" class="sub-sidebar">
       <slot name="secondary-nav" />
     </aside>
 
-    <main class="content-wrap">
+    <main class="content-wrap" :class="{ 'content-wrap--mobile': isMobile }">
       <slot />
     </main>
   </div>
 </template>
 
 <script lang="ts" setup>
-import { computed, onMounted, ref, useSlots } from 'vue'
+import { computed, onMounted, ref, useSlots, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { useDisplay } from 'vuetify'
 import { adminLogout, resetAdminSessionCache } from '@/services/admin-api'
-import { fetchAdminTitle, getDefaultAdminTitle } from '@/services/settings'
+import { fetchAdminTitle, fetchSiteUrl, getDefaultAdminTitle } from '@/services/settings'
 import { clearAuthSession } from '@/utils/auth'
 
 type MenuChildItem = {
@@ -148,10 +304,15 @@ const menuItems: MenuItem[] = [
 
 const router = useRouter()
 const route = useRoute()
+const display = useDisplay()
+
 const adminTitle = ref(getDefaultAdminTitle())
 const expandedMenuKey = ref<string | null>(getDefaultExpandedMenuKey())
 const slots = useSlots()
 const hasSecondaryNav = computed(() => Boolean(slots['secondary-nav']))
+const isMobile = computed(() => display.mdAndDown.value)
+const mobileMainDrawer = ref(false)
+const mobileSecondaryDrawer = ref(false)
 
 onMounted(async () => {
   try {
@@ -161,7 +322,22 @@ onMounted(async () => {
   }
 })
 
+watch(
+  () => route.fullPath,
+  () => {
+    closeMobileDrawers()
+  },
+)
+
+watch(isMobile, (nextMobile) => {
+  if (!nextMobile) {
+    mobileMainDrawer.value = false
+    mobileSecondaryDrawer.value = false
+  }
+})
+
 async function handleLogout(): Promise<void> {
+  closeMobileDrawers()
   clearAuthSession()
   resetAdminSessionCache()
   try {
@@ -172,8 +348,32 @@ async function handleLogout(): Promise<void> {
   await router.replace('/login')
 }
 
-function goToSite(): void {
-  window.open('/', '_blank', 'noopener')
+async function goToSite(): Promise<void> {
+  let targetUrl = '/'
+
+  try {
+    const siteUrl = await fetchSiteUrl()
+    if (siteUrl) {
+      targetUrl = siteUrl
+    }
+  } catch (error) {
+    console.warn('Failed to load site_url from /setting', error)
+  }
+
+  window.open(targetUrl, '_blank', 'noopener')
+}
+
+function handleGoToSiteFromMenu(): void {
+  closeMobileDrawers()
+  void goToSite()
+}
+
+function toggleMainDrawer(): void {
+  mobileMainDrawer.value = !mobileMainDrawer.value
+}
+
+function toggleSecondaryDrawer(): void {
+  mobileSecondaryDrawer.value = !mobileSecondaryDrawer.value
 }
 
 function isMenuItemActive(item: MenuItem): boolean {
@@ -199,18 +399,24 @@ function handleMenuItemClick(item: MenuItem): void {
 
     if (route.path !== item.to) {
       void router.push(item.to)
+      return
     }
+
+    closeMobileDrawers()
     return
   }
 
   if (route.path === item.to) {
+    closeMobileDrawers()
     return
   }
+
   void router.push(item.to)
 }
 
 function handleSubmenuItemClick(item: MenuChildItem): void {
   if (route.path === item.to) {
+    closeMobileDrawers()
     return
   }
   void router.push(item.to)
@@ -243,6 +449,14 @@ function hasActiveSubmenuItem(item: MenuItem): boolean {
   }
   return item.children.some((child) => isSubmenuItemActive(child))
 }
+
+function closeMobileDrawers(): void {
+  if (!isMobile.value) {
+    return
+  }
+  mobileMainDrawer.value = false
+  mobileSecondaryDrawer.value = false
+}
 </script>
 
 <style scoped>
@@ -255,6 +469,21 @@ function hasActiveSubmenuItem(item: MenuItem): boolean {
 
 .admin-layout--with-subnav {
   grid-template-columns: 244px 224px minmax(0, 1fr);
+}
+
+.mobile-topbar {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(10px);
+}
+
+.mobile-topbar-title {
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  color: #f2f5ff;
 }
 
 .sidebar {
@@ -272,8 +501,37 @@ function hasActiveSubmenuItem(item: MenuItem): boolean {
   background: linear-gradient(180deg, #141a24 0%, #111722 100%);
 }
 
+.mobile-drawer-content,
+.mobile-secondary-nav {
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px 14px 14px;
+  background: linear-gradient(180deg, #161b24 0%, #131821 100%);
+  overflow: hidden;
+}
+
+.mobile-secondary-nav {
+  background: linear-gradient(180deg, #141a24 0%, #111722 100%);
+}
+
+.mobile-secondary-title {
+  padding: 4px 8px;
+  font-size: 15px;
+  font-weight: 700;
+  color: #f2f5ff;
+}
+
 .sidebar-header {
   padding: 6px 8px 2px;
+}
+
+.sidebar-header--mobile {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
 }
 
 .site-name {
@@ -283,10 +541,33 @@ function hasActiveSubmenuItem(item: MenuItem): boolean {
   letter-spacing: 0.4px;
 }
 
+.mobile-secondary-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.mobile-secondary-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
 .menu-list {
   padding: 6px 0 0;
   flex: 1;
   background: transparent;
+}
+
+.mobile-drawer-content .menu-list {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: 8px;
 }
 
 :deep(.menu-item .v-list-item-title) {
@@ -360,6 +641,13 @@ function hasActiveSubmenuItem(item: MenuItem): boolean {
   background: rgba(255, 255, 255, 0.03);
 }
 
+.sidebar-footer--mobile {
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-start;
+  flex-shrink: 0;
+}
+
 .site-btn,
 .logout-btn {
   flex-shrink: 0;
@@ -372,31 +660,17 @@ function hasActiveSubmenuItem(item: MenuItem): boolean {
 
 @media (max-width: 980px) {
   .admin-layout,
-  .admin-layout--with-subnav {
-    grid-template-columns: 1fr;
-  }
-
-  .sidebar {
-    position: sticky;
-    top: 0;
-    z-index: 6;
-    border-right: 0;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-  }
-
-  .sub-sidebar {
-    position: static;
-    border-right: 0;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-    padding: 12px 14px;
-  }
-
-  .menu-list {
+  .admin-layout--with-subnav,
+  .admin-layout--mobile {
     display: block;
   }
 
-  :deep(.menu-item) {
-    margin-bottom: 0;
+  .content-wrap {
+    padding: 16px 12px;
+  }
+
+  .content-wrap--mobile {
+    padding-bottom: max(16px, env(safe-area-inset-bottom));
   }
 
   :deep(.submenu-item) {

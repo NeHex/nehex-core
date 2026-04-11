@@ -1,4 +1,4 @@
-const ADMIN_API_CLIENT_ID = 'nehex-vuetify-admin'
+export const ADMIN_API_CLIENT_ID = 'nehex-vuetify-admin'
 
 type AdminLoginResponse = {
   data?: {

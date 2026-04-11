@@ -147,24 +147,13 @@
             >
               代码块
             </v-btn>
-            <input
-              ref="imageInputRef"
-              accept="image/*"
-              class="upload-input"
-              type="file"
-              @change="handleImageInputChange"
-            >
-            <v-btn
-              color="primary"
-              density="comfortable"
-              prepend-icon="mdi-image-plus-outline"
-              size="small"
+            <ImageUploadHintCard
+              class="editor-upload-card"
               :loading="uploadingImage"
-              variant="tonal"
-              @click="triggerImageSelect"
-            >
-              插入图片
-            </v-btn>
+              title="上传并插入图片"
+              hint="拖动到卡片或点击选择图片"
+              @select-files="handleUploadCardFiles"
+            />
           </div>
         </header>
 
@@ -276,6 +265,7 @@ import {
 import { useGlobalSnackbar } from '@/composables/useGlobalSnackbar'
 import { fetchArticleClassOptions, type ArticleClassOption } from '@/services/settings'
 import { uploadMarkdownImage } from '@/services/storage'
+import ImageUploadHintCard from '@/components/admin/ImageUploadHintCard.vue'
 
 const props = defineProps<{
   articleId?: number | null
@@ -326,10 +316,14 @@ const previewMode = ref(false)
 const dragOver = ref(false)
 const dragDepth = ref(0)
 const markdownInputRef = ref<HTMLTextAreaElement | null>(null)
-const imageInputRef = ref<HTMLInputElement | null>(null)
 
 const classOptions = ref<ArticleClassOption[]>(DEFAULT_CLASS_OPTIONS)
-const { showGlobalSuccess } = useGlobalSnackbar()
+const {
+  showGlobalSuccess,
+  showGlobalProgress,
+  updateGlobalProgress,
+  hideGlobalSnackbar,
+} = useGlobalSnackbar()
 
 const editorForm = reactive<EditorForm>({
   title: '',
@@ -379,12 +373,6 @@ function normalizeNumber(value: number): number {
 
 function normalizeStatus(value: number): 0 | 1 {
   return Number(value) > 0 ? 1 : 0
-}
-
-function triggerImageSelect(): void {
-  ensureEditMode(() => {
-    imageInputRef.value?.click()
-  })
 }
 
 function _escapeMarkdownText(value: string): string {
@@ -555,22 +543,25 @@ async function _uploadImageAndInsert(file: File): Promise<void> {
   errorMessage.value = ''
 
   try {
-    const imageUrl = await uploadMarkdownImage(file)
+    showGlobalProgress('图片上传中 0%', 0)
+
+    const imageUrl = await uploadMarkdownImage(file, {
+      onProgress: ({ percent }) => {
+        updateGlobalProgress(`图片上传中 ${percent}%`, percent)
+      },
+    })
     _insertMarkdownImage(imageUrl, file.name)
     showGlobalSuccess('图片上传成功')
   } catch (error) {
+    hideGlobalSnackbar()
     errorMessage.value = error instanceof Error ? error.message : '图片上传失败'
   } finally {
     uploadingImage.value = false
   }
 }
 
-async function handleImageInputChange(event: Event): Promise<void> {
-  const target = event.target as HTMLInputElement | null
-  const imageFile = _pickFirstImage(target?.files || null)
-  if (target) {
-    target.value = ''
-  }
+async function handleUploadCardFiles(files: File[]): Promise<void> {
+  const imageFile = files[0] || null
   if (!imageFile) {
     return
   }
@@ -837,8 +828,9 @@ onMounted(async () => {
   gap: 6px;
 }
 
-.upload-input {
-  display: none;
+.editor-upload-card {
+  margin-left: auto;
+  width: min(320px, 100%);
 }
 
 .editor-surface {

@@ -32,6 +32,7 @@ const THEME_BACKGROUND_KEY = 'theme_background'
 const ADMIN_LOGIN_BACKGROUND_KEY = 'admin_login_background'
 const DEFAULT_ADMIN_LOGIN_BACKGROUND = '/images/background-2k.png'
 const ARTICLE_CLASS_SETTING_KEY = 'nehex_article_class'
+const SITE_URL_KEY = 'site_url'
 const DEFAULT_ARTICLE_CLASS_OPTIONS: ArticleClassOption[] = [
   {
     value: 'default',
@@ -121,6 +122,28 @@ export async function fetchAdminTitle(): Promise<string> {
 
 export function getDefaultAdminTitle(): string {
   return DEFAULT_ADMIN_TITLE
+}
+
+function normalizeSiteUrl(value: unknown): string {
+  const normalized = String(value ?? '').trim().replace(/\/+$/, '')
+  if (!normalized) {
+    return ''
+  }
+
+  if (normalized.startsWith('http://') || normalized.startsWith('https://')) {
+    return normalized
+  }
+
+  if (normalized.startsWith('/')) {
+    return normalized
+  }
+
+  return `https://${normalized.replace(/^\/+/, '')}`
+}
+
+export async function fetchSiteUrl(): Promise<string> {
+  const settingsMap = await fetchSettingsMap()
+  return normalizeSiteUrl(settingsMap.get(SITE_URL_KEY))
 }
 
 function pickThemeBackground(value: unknown): string {

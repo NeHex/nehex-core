@@ -79,24 +79,13 @@
         <header class="panel-head panel-head-main">
           <span>Markdown</span>
           <div class="panel-tools">
-            <input
-              ref="imageInputRef"
-              accept="image/*"
-              class="upload-input"
-              type="file"
-              @change="handleImageInputChange"
-            >
-            <v-btn
-              color="primary"
-              density="comfortable"
-              prepend-icon="mdi-image-plus-outline"
-              size="small"
+            <ImageUploadHintCard
+              class="daily-upload-card"
               :loading="uploadingImage"
-              variant="text"
-              @click="triggerImageSelect"
-            >
-              上传图片
-            </v-btn>
+              title="上传并插入图片"
+              hint="拖到卡片或点击选择"
+              @select-files="handleUploadCardFiles"
+            />
           </div>
         </header>
         <textarea
@@ -139,6 +128,7 @@ import {
   type DailyUpsertPayload,
 } from '@/services/dailies'
 import { uploadMarkdownImage } from '@/services/storage'
+import ImageUploadHintCard from '@/components/admin/ImageUploadHintCard.vue'
 
 const props = defineProps<{
   dailyId?: number | null
@@ -169,8 +159,12 @@ const dragOver = ref(false)
 const dragDepth = ref(0)
 const splitPanelRef = ref<HTMLElement | null>(null)
 const markdownInputRef = ref<HTMLTextAreaElement | null>(null)
-const imageInputRef = ref<HTMLInputElement | null>(null)
-const { showGlobalSuccess } = useGlobalSnackbar()
+const {
+  showGlobalSuccess,
+  showGlobalProgress,
+  updateGlobalProgress,
+  hideGlobalSnackbar,
+} = useGlobalSnackbar()
 
 const editorForm = reactive<EditorForm>({
   title: '',
@@ -251,10 +245,6 @@ function buildPayload(): DailyUpsertPayload | null {
   }
 }
 
-function triggerImageSelect(): void {
-  imageInputRef.value?.click()
-}
-
 function _escapeMarkdownText(value: string): string {
   return value.replace(/[\[\]\(\)]/g, '')
 }
@@ -300,22 +290,24 @@ async function _uploadImageAndInsert(file: File): Promise<void> {
   uploadingImage.value = true
   errorMessage.value = ''
   try {
-    const imageUrl = await uploadMarkdownImage(file)
+    showGlobalProgress('图片上传中 0%', 0)
+    const imageUrl = await uploadMarkdownImage(file, {
+      onProgress: ({ percent }) => {
+        updateGlobalProgress(`图片上传中 ${percent}%`, percent)
+      },
+    })
     _insertMarkdownImage(imageUrl, file.name)
     showGlobalSuccess('图片上传成功')
   } catch (error) {
+    hideGlobalSnackbar()
     errorMessage.value = error instanceof Error ? error.message : '图片上传失败'
   } finally {
     uploadingImage.value = false
   }
 }
 
-async function handleImageInputChange(event: Event): Promise<void> {
-  const target = event.target as HTMLInputElement | null
-  const imageFile = _pickFirstImage(target?.files || null)
-  if (target) {
-    target.value = ''
-  }
+async function handleUploadCardFiles(files: File[]): Promise<void> {
+  const imageFile = files[0] || null
   if (!imageFile) {
     return
   }
@@ -492,8 +484,8 @@ onMounted(async () => {
   gap: 8px;
 }
 
-.upload-input {
-  display: none;
+.daily-upload-card {
+  width: min(280px, 100%);
 }
 
 .panel-left-markdown {

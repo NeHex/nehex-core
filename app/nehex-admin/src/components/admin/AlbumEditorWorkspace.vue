@@ -53,36 +53,14 @@
             </v-btn>
           </v-card-title>
           <v-card-text class="link-editor-body">
-            <div class="upload-tools">
-              <input
-                ref="imageInputRef"
-                accept="image/*"
-                class="upload-input"
-                multiple
-                type="file"
-                @change="handleImageInputChange"
-              >
-              <v-btn
-                color="primary"
-                prepend-icon="mdi-image-plus-outline"
-                size="small"
-                :loading="uploadingImage"
-                @click="triggerImageSelect"
-              >
-                选择图片上传
-              </v-btn>
-            </div>
-
-            <div
-              class="upload-tip"
-              :class="{ 'upload-tip--active': uploadZoneActive }"
-              @dragenter.prevent="uploadZoneActive = true"
-              @dragover.prevent="uploadZoneActive = true"
-              @dragleave.prevent="uploadZoneActive = false"
-              @drop.prevent="handleDropFiles"
-            >
-              可将图片拖动到此处上传，或使用 Ctrl+V 粘贴剪贴板中的图片。
-            </div>
+            <ImageUploadHintCard
+              class="album-upload-card"
+              :loading="uploadingImage"
+              :multiple="true"
+              title="上传图片到相册"
+              hint="拖动图片到卡片，或点击选择图片（支持多选与粘贴）"
+              @select-files="handleUploadCardFiles"
+            />
 
             <div class="url-rows">
               <div
@@ -212,13 +190,19 @@ import {
   type AlbumUpsertPayload,
 } from '@/services/albums'
 import { uploadMarkdownImage } from '@/services/storage'
+import ImageUploadHintCard from '@/components/admin/ImageUploadHintCard.vue'
 
 const props = defineProps<{
   albumId?: number | null
 }>()
 
 const router = useRouter()
-const { showGlobalSuccess } = useGlobalSnackbar()
+const {
+  showGlobalSuccess,
+  showGlobalProgress,
+  updateGlobalProgress,
+  hideGlobalSnackbar,
+} = useGlobalSnackbar()
 
 type EditorForm = {
   title: string
@@ -230,9 +214,7 @@ type EditorForm = {
 const loading = ref(false)
 const submitting = ref(false)
 const uploadingImage = ref(false)
-const uploadZoneActive = ref(false)
 const errorMessage = ref('')
-const imageInputRef = ref<HTMLInputElement | null>(null)
 const imageUrlEntries = ref<string[]>([''])
 const draggingPreviewIndex = ref<number | null>(null)
 const hoverPreviewIndex = ref<number | null>(null)
@@ -336,17 +318,6 @@ function fillEditorForm(album: {
   imageUrlEntries.value = parsed.length > 0 ? parsed : ['']
 }
 
-function triggerImageSelect(): void {
-  imageInputRef.value?.click()
-}
-
-function pickImageFiles(files: FileList | null): File[] {
-  if (!files || files.length <= 0) {
-    return []
-  }
-  return Array.from(files).filter((file) => file.type.startsWith('image/'))
-}
-
 function pickClipboardImages(event: ClipboardEvent): File[] {
   const items = event.clipboardData?.items
   if (!items || items.length <= 0) {
@@ -389,20 +360,43 @@ async function uploadImages(files: File[]): Promise<void> {
 
   const uploadedUrls: string[] = []
   const failedFiles: string[] = []
+  const total = files.length
 
   try {
-    for (const file of files) {
+    showGlobalProgress(`图片上传中 0/${total} (0%)`, 0)
+
+    for (let index = 0; index < files.length; index += 1) {
+      const file = files[index]
+      if (!file) {
+        continue
+      }
+      const finishedBeforeCurrent = index
+
       try {
-        const url = await uploadMarkdownImage(file)
+        const url = await uploadMarkdownImage(file, {
+          onProgress: ({ percent }) => {
+            const overall = ((finishedBeforeCurrent + (percent / 100)) / total) * 100
+            updateGlobalProgress(
+              `图片上传中 ${finishedBeforeCurrent + 1}/${total} (${Math.round(overall)}%)`,
+              overall,
+            )
+          },
+        })
         uploadedUrls.push(url)
       } catch {
         failedFiles.push(file.name || 'unknown')
       }
+
+      const finished = index + 1
+      const overall = (finished / total) * 100
+      updateGlobalProgress(`图片上传中 ${finished}/${total} (${Math.round(overall)}%)`, overall)
     }
 
     if (uploadedUrls.length > 0) {
       appendUploadedUrls(uploadedUrls)
       showGlobalSuccess(`成功上传 ${uploadedUrls.length} 张图片`)
+    } else {
+      hideGlobalSnackbar()
     }
 
     if (failedFiles.length > 0) {
@@ -417,18 +411,7 @@ async function uploadImages(files: File[]): Promise<void> {
   }
 }
 
-async function handleImageInputChange(event: Event): Promise<void> {
-  const target = event.target as HTMLInputElement | null
-  const files = pickImageFiles(target?.files || null)
-  if (target) {
-    target.value = ''
-  }
-  await uploadImages(files)
-}
-
-async function handleDropFiles(event: DragEvent): Promise<void> {
-  uploadZoneActive.value = false
-  const files = pickImageFiles(event.dataTransfer?.files || null)
+async function handleUploadCardFiles(files: File[]): Promise<void> {
   await uploadImages(files)
 }
 
@@ -617,29 +600,8 @@ onMounted(async () => {
   gap: 10px;
 }
 
-.upload-tools {
-  display: flex;
-  align-items: center;
-  justify-content: flex-start;
-}
-
-.upload-input {
-  display: none;
-}
-
-.upload-tip {
-  border: 1px dashed rgba(171, 192, 245, 0.55);
-  border-radius: 12px;
-  padding: 10px 12px;
-  color: #b8c6e6;
-  font-size: 13px;
-  background: rgba(144, 166, 219, 0.08);
-  transition: border-color 0.2s ease, background 0.2s ease;
-}
-
-.upload-tip--active {
-  border-color: rgba(191, 210, 255, 0.9);
-  background: rgba(144, 166, 219, 0.18);
+.album-upload-card {
+  width: 100%;
 }
 
 .url-rows {
