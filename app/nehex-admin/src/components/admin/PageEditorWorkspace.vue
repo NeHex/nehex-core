@@ -20,16 +20,6 @@
       </div>
     </header>
 
-    <v-alert
-      v-if="errorMessage"
-      class="mb-4"
-      density="comfortable"
-      type="error"
-      variant="tonal"
-    >
-      {{ errorMessage }}
-    </v-alert>
-
     <v-progress-linear
       v-if="loading"
       class="mb-4"
@@ -219,6 +209,7 @@ const dragDepth = ref(0)
 const markdownInputRef = ref<HTMLTextAreaElement | null>(null)
 const {
   showGlobalSuccess,
+  showGlobalError,
   showGlobalProgress,
   updateGlobalProgress,
   hideGlobalSnackbar,
@@ -444,7 +435,9 @@ async function uploadImageAndInsert(file: File): Promise<void> {
     showGlobalSuccess('图片上传成功')
   } catch (error) {
     hideGlobalSnackbar()
-    errorMessage.value = error instanceof Error ? error.message : '图片上传失败'
+    const message = error instanceof Error ? error.message : '图片上传失败'
+    errorMessage.value = message
+    showGlobalError(message)
   } finally {
     uploadingImage.value = false
   }
@@ -503,10 +496,12 @@ function buildPayload(): StandalonePageUpsertPayload | null {
 
   if (!title) {
     errorMessage.value = '页面标题不能为空'
+    showGlobalError('页面标题不能为空')
     return null
   }
   if (!pageKey) {
     errorMessage.value = '页面路径不能为空'
+    showGlobalError('页面路径不能为空')
     return null
   }
 
@@ -547,7 +542,9 @@ async function loadPageDetail(): Promise<void> {
     const page = await fetchStandalonePageById(props.pageId)
     fillEditorForm(page)
   } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : '加载页面详情失败'
+    const message = error instanceof Error ? error.message : '加载页面详情失败'
+    errorMessage.value = message
+    showGlobalError(message)
   } finally {
     loading.value = false
   }
@@ -572,7 +569,9 @@ async function submitEditor(): Promise<void> {
     showGlobalSuccess('独立页发布成功')
     await router.push('/pages')
   } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : '保存页面失败'
+    const message = error instanceof Error ? error.message : '保存页面失败'
+    errorMessage.value = message
+    showGlobalError(message)
   } finally {
     submitting.value = false
   }

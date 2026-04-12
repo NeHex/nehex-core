@@ -24,26 +24,6 @@
       </div>
     </header>
 
-    <v-alert
-      v-if="errorMessage"
-      class="mb-4"
-      density="comfortable"
-      type="error"
-      variant="tonal"
-    >
-      {{ errorMessage }}
-    </v-alert>
-
-    <v-alert
-      v-if="successMessage"
-      class="mb-4"
-      density="comfortable"
-      type="success"
-      variant="tonal"
-    >
-      {{ successMessage }}
-    </v-alert>
-
     <v-progress-linear
       v-if="loading"
       class="mb-4"
@@ -161,6 +141,7 @@ const splitPanelRef = ref<HTMLElement | null>(null)
 const markdownInputRef = ref<HTMLTextAreaElement | null>(null)
 const {
   showGlobalSuccess,
+  showGlobalError,
   showGlobalProgress,
   updateGlobalProgress,
   hideGlobalSnackbar,
@@ -234,6 +215,7 @@ function buildPayload(): DailyUpsertPayload | null {
   const title = editorForm.title.trim()
   if (!title) {
     errorMessage.value = '日常标题不能为空'
+    showGlobalError('日常标题不能为空')
     return null
   }
 
@@ -300,7 +282,9 @@ async function _uploadImageAndInsert(file: File): Promise<void> {
     showGlobalSuccess('图片上传成功')
   } catch (error) {
     hideGlobalSnackbar()
-    errorMessage.value = error instanceof Error ? error.message : '图片上传失败'
+    const message = error instanceof Error ? error.message : '图片上传失败'
+    errorMessage.value = message
+    showGlobalError(message)
   } finally {
     uploadingImage.value = false
   }
@@ -366,7 +350,9 @@ async function loadDailyDetail(): Promise<void> {
     const daily = await fetchDailyById(props.dailyId)
     fillEditorForm(daily)
   } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : '加载日常详情失败'
+    const message = error instanceof Error ? error.message : '加载日常详情失败'
+    errorMessage.value = message
+    showGlobalError(message)
   } finally {
     loading.value = false
   }
@@ -392,7 +378,9 @@ async function submitEditor(): Promise<void> {
     showGlobalSuccess('日常发布成功')
     await router.push('/dailies')
   } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : '保存日常失败'
+    const message = error instanceof Error ? error.message : '保存日常失败'
+    errorMessage.value = message
+    showGlobalError(message)
   } finally {
     submitting.value = false
   }

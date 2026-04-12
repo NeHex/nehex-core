@@ -8,26 +8,6 @@
         </div>
       </header>
 
-      <v-alert
-        v-if="errorMessage"
-        class="mb-2"
-        density="comfortable"
-        type="error"
-        variant="tonal"
-      >
-        {{ errorMessage }}
-      </v-alert>
-
-      <v-alert
-        v-if="successMessage"
-        class="mb-2"
-        density="comfortable"
-        type="success"
-        variant="tonal"
-      >
-        {{ successMessage }}
-      </v-alert>
-
       <v-tabs v-model="activeTab" color="primary" grow>
         <v-tab value="friends">友链列表</v-tab>
         <v-tab value="applications">申请处理</v-tab>
@@ -365,7 +345,7 @@ import {
 const activeTab = ref<'friends' | 'applications'>('friends')
 const errorMessage = ref('')
 const successMessage = ref('')
-const { showGlobalSuccess } = useGlobalSnackbar()
+const { showGlobalSuccess, showGlobalError } = useGlobalSnackbar()
 
 const friendsLoading = ref(false)
 const applicationsLoading = ref(false)
@@ -455,22 +435,26 @@ function buildFriendPayload(): AdminFriendUpsertPayload | null {
   const category = friendForm.category.trim() || 'default'
   if (!title) {
     errorMessage.value = '友链名称不能为空'
+    showGlobalError('友链名称不能为空')
     return null
   }
   if (!urlInput) {
     errorMessage.value = '友链地址不能为空'
+    showGlobalError('友链地址不能为空')
     return null
   }
 
   const url = normalizeHttpUrl(urlInput)
   if (!url) {
     errorMessage.value = '友链地址格式错误，请输入 http:// 或 https:// 地址'
+    showGlobalError('友链地址格式错误，请输入 http:// 或 https:// 地址')
     return null
   }
 
   const favicon = faviconInput ? normalizeHttpUrl(faviconInput) : null
   if (faviconInput && !favicon) {
     errorMessage.value = '图标地址格式错误，请输入 http:// 或 https:// 地址'
+    showGlobalError('图标地址格式错误，请输入 http:// 或 https:// 地址')
     return null
   }
 
@@ -511,7 +495,9 @@ async function loadFriends(): Promise<void> {
   try {
     friends.value = await fetchAdminFriends(friendKeyword.value)
   } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : '加载友链失败'
+    const message = error instanceof Error ? error.message : '加载友链失败'
+    errorMessage.value = message
+    showGlobalError(message)
   } finally {
     friendsLoading.value = false
   }
@@ -526,7 +512,9 @@ async function loadApplications(): Promise<void> {
       keyword: applyKeyword.value,
     })
   } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : '加载申请失败'
+    const message = error instanceof Error ? error.message : '加载申请失败'
+    errorMessage.value = message
+    showGlobalError(message)
   } finally {
     applicationsLoading.value = false
   }
@@ -595,7 +583,9 @@ async function confirmOverwriteCreate(): Promise<void> {
     successMessage.value = '检测到重复 URL，已覆盖原友链'
     await loadFriends()
   } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : '覆盖友链失败'
+    const message = error instanceof Error ? error.message : '覆盖友链失败'
+    errorMessage.value = message
+    showGlobalError(message)
   } finally {
     friendSubmitting.value = false
   }
@@ -626,7 +616,9 @@ async function submitFriendForm(): Promise<void> {
       overwriteDialog.value = true
       return
     }
-    errorMessage.value = error instanceof Error ? error.message : '保存友链失败'
+    const message = error instanceof Error ? error.message : '保存友链失败'
+    errorMessage.value = message
+    showGlobalError(message)
   } finally {
     friendSubmitting.value = false
   }
@@ -659,7 +651,9 @@ async function confirmDelete(): Promise<void> {
     successMessage.value = '友链已删除'
     await loadFriends()
   } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : '删除友链失败'
+    const message = error instanceof Error ? error.message : '删除友链失败'
+    errorMessage.value = message
+    showGlobalError(message)
   } finally {
     deleting.value = false
   }
@@ -689,7 +683,9 @@ async function changeApplyStatus(
       await loadFriends()
     }
   } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : '更新申请状态失败'
+    const message = error instanceof Error ? error.message : '更新申请状态失败'
+    errorMessage.value = message
+    showGlobalError(message)
   } finally {
     const nextMap = { ...applyActionLoading.value }
     delete nextMap[applyId]

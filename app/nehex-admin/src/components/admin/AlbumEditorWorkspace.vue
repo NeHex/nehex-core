@@ -20,16 +20,6 @@
       </div>
     </header>
 
-    <v-alert
-      v-if="errorMessage"
-      class="mb-4"
-      density="comfortable"
-      type="error"
-      variant="tonal"
-    >
-      {{ errorMessage }}
-    </v-alert>
-
     <v-progress-linear
       v-if="loading"
       class="mb-4"
@@ -199,6 +189,7 @@ const props = defineProps<{
 const router = useRouter()
 const {
   showGlobalSuccess,
+  showGlobalError,
   showGlobalProgress,
   updateGlobalProgress,
   hideGlobalSnackbar,
@@ -285,11 +276,11 @@ function buildPayload(): AlbumUpsertPayload | null {
   const imgUrls = joinAlbumImageUrls(parsedImages)
 
   if (!title) {
-    errorMessage.value = '相册标题不能为空'
+    showGlobalError('相册标题不能为空')
     return null
   }
   if (!className) {
-    errorMessage.value = '相册分类不能为空'
+    showGlobalError('相册分类不能为空')
     return null
   }
 
@@ -400,11 +391,11 @@ async function uploadImages(files: File[]): Promise<void> {
     }
 
     if (failedFiles.length > 0) {
-      errorMessage.value = `有 ${failedFiles.length} 张图片上传失败`
+      showGlobalError(`有 ${failedFiles.length} 张图片上传失败`)
     }
 
     if (uploadedUrls.length <= 0 && failedFiles.length <= 0) {
-      errorMessage.value = '未检测到可上传的图片文件'
+      showGlobalError('未检测到可上传的图片文件')
     }
   } finally {
     uploadingImage.value = false
@@ -479,7 +470,9 @@ async function loadAlbumDetail(): Promise<void> {
     const album = await fetchAlbumById(props.albumId)
     fillEditorForm(album)
   } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : '加载相册详情失败'
+    const message = error instanceof Error ? error.message : '加载相册详情失败'
+    errorMessage.value = message
+    showGlobalError(message)
   } finally {
     loading.value = false
   }
@@ -503,7 +496,9 @@ async function submitEditor(): Promise<void> {
     showGlobalSuccess('相册发布成功')
     await router.push('/albums')
   } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : '保存相册失败'
+    const message = error instanceof Error ? error.message : '保存相册失败'
+    errorMessage.value = message
+    showGlobalError(message)
   } finally {
     submitting.value = false
   }

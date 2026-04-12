@@ -33,26 +33,6 @@
       </div>
     </header>
 
-    <v-alert
-      v-if="errorMessage"
-      class="mb-4"
-      density="comfortable"
-      type="error"
-      variant="tonal"
-    >
-      {{ errorMessage }}
-    </v-alert>
-
-    <v-alert
-      v-if="successMessage"
-      class="mb-4"
-      density="comfortable"
-      type="success"
-      variant="tonal"
-    >
-      {{ successMessage }}
-    </v-alert>
-
     <v-progress-linear
       v-if="loading"
       class="mb-4"
@@ -320,6 +300,7 @@ const markdownInputRef = ref<HTMLTextAreaElement | null>(null)
 const classOptions = ref<ArticleClassOption[]>(DEFAULT_CLASS_OPTIONS)
 const {
   showGlobalSuccess,
+  showGlobalError,
   showGlobalProgress,
   updateGlobalProgress,
   hideGlobalSnackbar,
@@ -554,7 +535,9 @@ async function _uploadImageAndInsert(file: File): Promise<void> {
     showGlobalSuccess('图片上传成功')
   } catch (error) {
     hideGlobalSnackbar()
-    errorMessage.value = error instanceof Error ? error.message : '图片上传失败'
+    const message = error instanceof Error ? error.message : '图片上传失败'
+    errorMessage.value = message
+    showGlobalError(message)
   } finally {
     uploadingImage.value = false
   }
@@ -608,12 +591,14 @@ function buildPayload(statusOverride?: 0 | 1): ArticleUpsertPayload | null {
       title = '未命名草稿'
     } else {
       errorMessage.value = '文章标题不能为空'
+      showGlobalError('文章标题不能为空')
       return null
     }
   }
 
   if (!className) {
     errorMessage.value = '文章分类不能为空'
+    showGlobalError('文章分类不能为空')
     return null
   }
 
@@ -676,7 +661,9 @@ async function loadArticleDetail(): Promise<void> {
     const article = await fetchArticleById(props.articleId)
     fillEditorForm(article)
   } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : '加载文章详情失败'
+    const message = error instanceof Error ? error.message : '加载文章详情失败'
+    errorMessage.value = message
+    showGlobalError(message)
   } finally {
     loading.value = false
   }
@@ -720,7 +707,9 @@ async function submitEditor(nextStatus?: 0 | 1, stayOnPage = false): Promise<voi
       await router.push('/articles')
     }
   } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : '保存文章失败'
+    const message = error instanceof Error ? error.message : '保存文章失败'
+    errorMessage.value = message
+    showGlobalError(message)
   } finally {
     submitting.value = false
   }

@@ -5,15 +5,6 @@
       subtitle="Dashboard"
       title="仪表盘"
     >
-      <v-alert
-        v-if="errorMessage"
-        class="mb-4"
-        density="comfortable"
-        type="error"
-        variant="tonal"
-      >
-        {{ errorMessage }}
-      </v-alert>
 
       <v-progress-linear
         v-if="loading"
@@ -132,6 +123,7 @@
 <script lang="ts" setup>
 import AdminLayout from '@/components/admin/AdminLayout.vue'
 import AdminSection from '@/components/admin/AdminSection.vue'
+import { useGlobalSnackbar } from '@/composables/useGlobalSnackbar'
 import {
   fetchDashboardData,
   type DashboardData,
@@ -152,6 +144,7 @@ const errorMessage = ref('')
 const visitPeriod = ref<DashboardPeriodKey>('day')
 const apiPeriod = ref<DashboardPeriodKey>('day')
 const dashboardData = ref<DashboardData | null>(null)
+const { showGlobalError } = useGlobalSnackbar()
 
 const emptySeries: DashboardSeries = {
   labels: [],
@@ -186,7 +179,9 @@ async function loadDashboard(): Promise<void> {
   try {
     dashboardData.value = await fetchDashboardData()
   } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : '加载仪表盘数据失败'
+    const message = error instanceof Error ? error.message : '加载仪表盘数据失败'
+    errorMessage.value = message
+    showGlobalError(message)
   } finally {
     loading.value = false
   }

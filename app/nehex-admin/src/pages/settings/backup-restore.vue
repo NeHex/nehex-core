@@ -34,13 +34,6 @@
         >
       </header>
 
-      <v-alert v-if="errorMessage" density="comfortable" type="error" variant="tonal">
-        {{ errorMessage }}
-      </v-alert>
-      <v-alert v-if="successMessage" density="comfortable" type="success" variant="tonal">
-        {{ successMessage }}
-      </v-alert>
-
       <v-card class="section-card" rounded="xl">
         <v-card-text>
           <div class="list-head">共 {{ backups.length }} 个备份包</div>
@@ -211,7 +204,7 @@ const deletingFilename = ref('')
 const backups = ref<AdminBackupItem[]>([])
 const errorMessage = ref('')
 const successMessage = ref('')
-const { showGlobalSuccess } = useGlobalSnackbar()
+const { showGlobalSuccess, showGlobalError } = useGlobalSnackbar()
 
 const restoreDialog = ref(false)
 const restoreMode = ref<'existing' | 'upload'>('existing')
@@ -402,6 +395,14 @@ watch(successMessage, (nextMessage) => {
     return
   }
   showGlobalSuccess(text)
+})
+
+watch(errorMessage, (nextMessage) => {
+  const text = nextMessage.trim()
+  if (!text) {
+    return
+  }
+  showGlobalError(text)
 })
 </script>
 

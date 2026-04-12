@@ -24,26 +24,6 @@
       </div>
     </header>
 
-    <v-alert
-      v-if="errorMessage"
-      class="mb-4"
-      density="comfortable"
-      type="error"
-      variant="tonal"
-    >
-      {{ errorMessage }}
-    </v-alert>
-
-    <v-alert
-      v-if="successMessage"
-      class="mb-4"
-      density="comfortable"
-      type="success"
-      variant="tonal"
-    >
-      {{ successMessage }}
-    </v-alert>
-
     <v-progress-linear
       v-if="loading"
       class="mb-4"
@@ -184,7 +164,7 @@ const statusOptions = [
   { label: '启用', value: 1 },
   { label: '禁用', value: 0 },
 ]
-const { showGlobalSuccess } = useGlobalSnackbar()
+const { showGlobalSuccess, showGlobalError } = useGlobalSnackbar()
 
 const loading = ref(false)
 const submitting = ref(false)
@@ -278,6 +258,7 @@ function buildPayload(): ProjectUpsertPayload | null {
   const title = editorForm.title.trim()
   if (!title) {
     errorMessage.value = '项目标题不能为空'
+    showGlobalError('项目标题不能为空')
     return null
   }
 
@@ -330,7 +311,9 @@ async function loadProjectDetail(): Promise<void> {
     const project = await fetchProjectById(props.projectId)
     fillEditorForm(project)
   } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : '加载项目详情失败'
+    const message = error instanceof Error ? error.message : '加载项目详情失败'
+    errorMessage.value = message
+    showGlobalError(message)
   } finally {
     loading.value = false
   }
@@ -356,7 +339,9 @@ async function submitEditor(): Promise<void> {
       await router.replace(`/projects/edit/${created.id}`)
     }
   } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : '保存项目失败'
+    const message = error instanceof Error ? error.message : '保存项目失败'
+    errorMessage.value = message
+    showGlobalError(message)
   } finally {
     submitting.value = false
   }

@@ -5,16 +5,6 @@
         <img alt="welcome" class="welcome-image" src="/welcome_zip.png">
       </div>
 
-      <v-alert
-        v-if="errorMessage"
-        class="error-alert"
-        density="comfortable"
-        type="error"
-        variant="tonal"
-      >
-        {{ errorMessage }}
-      </v-alert>
-
       <v-form @submit.prevent="handleLogin">
         <div class="field-group">
           <div class="field-label">
@@ -92,6 +82,7 @@ import { nextTick, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { adminLogin, fetchAdminSession } from '@/services/admin-api'
 import { fetchAdminLoginBackgroundUrl } from '@/services/settings'
+import { useGlobalSnackbar } from '@/composables/useGlobalSnackbar'
 import { setAuthSession } from '@/utils/auth'
 
 const route = useRoute()
@@ -105,6 +96,7 @@ const captchaCanvas = ref<HTMLCanvasElement | null>(null)
 const loading = ref(false)
 const errorMessage = ref('')
 const loginPageStyle = ref<Record<string, string>>({})
+const { showGlobalError } = useGlobalSnackbar()
 
 function getRedirectPath(): string {
   const redirect = typeof route.query.redirect === 'string' ? route.query.redirect : '/'
@@ -202,16 +194,19 @@ async function handleLogin(): Promise<void> {
 
   if (!account.value.trim() || !password.value) {
     errorMessage.value = '请输入用户名和密码'
+    showGlobalError('请输入用户名和密码')
     return
   }
 
   if (!captchaInput.value.trim()) {
     errorMessage.value = '请输入验证码'
+    showGlobalError('请输入验证码')
     return
   }
 
   if (captchaInput.value.trim().toUpperCase() !== captchaCode.value.toUpperCase()) {
     errorMessage.value = '验证码错误，请重试'
+    showGlobalError('验证码错误，请重试')
     captchaInput.value = ''
     refreshCaptcha()
     return
@@ -223,7 +218,9 @@ async function handleLogin(): Promise<void> {
     setAuthSession(normalizedAccount)
     await router.replace(getRedirectPath())
   } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : '登录失败，请稍后重试'
+    const message = error instanceof Error ? error.message : '登录失败，请稍后重试'
+    errorMessage.value = message
+    showGlobalError(message)
     captchaInput.value = ''
     refreshCaptcha()
   } finally {

@@ -15,10 +15,6 @@
         </v-btn>
       </header>
 
-      <v-alert v-if="errorMessage" density="comfortable" type="error" variant="tonal">
-        {{ errorMessage }}
-      </v-alert>
-
       <v-card class="section-card" rounded="xl">
         <v-card-text class="section-card-body">
           <v-tabs v-model="statusTab" color="primary">
@@ -109,6 +105,7 @@
 import { onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import AdminLayout from '@/components/admin/AdminLayout.vue'
+import { useGlobalSnackbar } from '@/composables/useGlobalSnackbar'
 import {
   fetchAdminMailLogs,
   type AdminMailLogItem,
@@ -116,6 +113,7 @@ import {
 } from '@/services/mail'
 
 const router = useRouter()
+const { showGlobalError } = useGlobalSnackbar()
 const loading = ref(false)
 const errorMessage = ref('')
 const logs = ref<AdminMailLogItem[]>([])
@@ -165,7 +163,9 @@ async function loadLogs(targetPage = currentPage.value): Promise<void> {
       return
     }
   } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : '加载邮件记录失败'
+    const message = error instanceof Error ? error.message : '加载邮件记录失败'
+    errorMessage.value = message
+    showGlobalError(message)
   } finally {
     loading.value = false
   }

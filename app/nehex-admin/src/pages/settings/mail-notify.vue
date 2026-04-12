@@ -25,13 +25,6 @@
         </div>
       </header>
 
-      <v-alert v-if="errorMessage" density="comfortable" type="error" variant="tonal">
-        {{ errorMessage }}
-      </v-alert>
-      <v-alert v-if="successMessage" density="comfortable" type="success" variant="tonal">
-        {{ successMessage }}
-      </v-alert>
-
       <v-progress-linear v-if="loading" color="primary" indeterminate />
 
       <v-card class="section-card" rounded="xl">
@@ -235,7 +228,7 @@ const testEmail = ref('')
 const activeTemplateTab = ref<'reply' | 'new-comment'>('reply')
 const selectedReplyPreset = ref('default')
 const selectedNewCommentPreset = ref('default')
-const { showGlobalSuccess } = useGlobalSnackbar()
+const { showGlobalSuccess, showGlobalError } = useGlobalSnackbar()
 
 const form = reactive({
   smtpHost: '',
@@ -516,6 +509,14 @@ watch(successMessage, (nextMessage) => {
     return
   }
   showGlobalSuccess(text)
+})
+
+watch(errorMessage, (nextMessage) => {
+  const text = nextMessage.trim()
+  if (!text) {
+    return
+  }
+  showGlobalError(text)
 })
 
 onMounted(async () => {

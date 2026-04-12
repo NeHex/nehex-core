@@ -17,16 +17,6 @@
         </v-btn>
       </header>
 
-      <v-alert
-        v-if="errorMessage"
-        class="mb-4"
-        density="comfortable"
-        type="error"
-        variant="tonal"
-      >
-        {{ errorMessage }}
-      </v-alert>
-
       <v-progress-linear
         v-if="loading"
         class="mb-4"
@@ -113,6 +103,7 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { RouterView, useRoute, useRouter } from 'vue-router'
 import AdminLayout from '@/components/admin/AdminLayout.vue'
+import { useGlobalSnackbar } from '@/composables/useGlobalSnackbar'
 import {
   deleteDaily,
   fetchDailies,
@@ -122,6 +113,7 @@ import {
 const router = useRouter()
 const route = useRoute()
 const isManageRoute = computed(() => route.path === '/dailies')
+const { showGlobalSuccess, showGlobalError } = useGlobalSnackbar()
 
 const loading = ref(false)
 const deleting = ref(false)
@@ -174,7 +166,9 @@ async function loadDailies(): Promise<void> {
   try {
     dailies.value = await fetchDailies()
   } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : '加载日常失败'
+    const message = error instanceof Error ? error.message : '加载日常失败'
+    errorMessage.value = message
+    showGlobalError(message)
   } finally {
     loading.value = false
   }
@@ -190,9 +184,12 @@ async function confirmDelete(): Promise<void> {
   try {
     await deleteDaily(pendingDelete.value.id)
     closeDeleteDialog(true)
+    showGlobalSuccess('日常已删除')
     await loadDailies()
   } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : '删除日常失败'
+    const message = error instanceof Error ? error.message : '删除日常失败'
+    errorMessage.value = message
+    showGlobalError(message)
   } finally {
     deleting.value = false
   }

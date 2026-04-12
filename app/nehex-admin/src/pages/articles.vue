@@ -17,16 +17,6 @@
         </v-btn>
       </header>
 
-      <v-alert
-        v-if="errorMessage"
-        class="mb-4"
-        density="comfortable"
-        type="error"
-        variant="tonal"
-      >
-        {{ errorMessage }}
-      </v-alert>
-
       <v-progress-linear
         v-if="loading"
         class="mb-4"
@@ -182,6 +172,7 @@
 import AdminLayout from '@/components/admin/AdminLayout.vue'
 import { computed, onMounted, ref, watch } from 'vue'
 import { RouterView, useRoute, useRouter } from 'vue-router'
+import { useGlobalSnackbar } from '@/composables/useGlobalSnackbar'
 import {
   deleteArticle,
   fetchArticles,
@@ -191,6 +182,7 @@ import {
 const router = useRouter()
 const route = useRoute()
 const isManageRoute = computed(() => route.path === '/articles')
+const { showGlobalSuccess, showGlobalError } = useGlobalSnackbar()
 
 const loading = ref(false)
 const deleting = ref(false)
@@ -254,7 +246,9 @@ async function loadArticles(targetPage = currentPage.value): Promise<void> {
       return
     }
   } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : '加载文章失败'
+    const message = error instanceof Error ? error.message : '加载文章失败'
+    errorMessage.value = message
+    showGlobalError(message)
   } finally {
     loading.value = false
   }
@@ -270,9 +264,12 @@ async function confirmDelete(): Promise<void> {
   try {
     await deleteArticle(pendingDelete.value.id)
     closeDeleteDialog(true)
+    showGlobalSuccess('文章已删除')
     await loadArticles(currentPage.value)
   } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : '删除文章失败'
+    const message = error instanceof Error ? error.message : '删除文章失败'
+    errorMessage.value = message
+    showGlobalError(message)
   } finally {
     deleting.value = false
   }

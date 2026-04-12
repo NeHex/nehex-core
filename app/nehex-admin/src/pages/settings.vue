@@ -40,14 +40,6 @@
         </div>
       </header>
 
-      <v-alert v-if="errorMessage" class="mb-4" density="comfortable" type="error" variant="tonal">
-        {{ errorMessage }}
-      </v-alert>
-
-      <v-alert v-if="successMessage" class="mb-4" density="comfortable" type="success" variant="tonal">
-        {{ successMessage }}
-      </v-alert>
-
       <v-progress-linear v-if="loading" class="mb-4" color="primary" indeterminate />
 
       <v-window v-model="activeSectionKey" :touch="false" class="section-window">
@@ -617,7 +609,7 @@ import { useSettingsPage } from '@/pages/settings/useSettingsPage'
 
 const route = useRoute()
 const isRootSettingsRoute = computed(() => route.path === '/settings')
-const { showGlobalSuccess } = useGlobalSnackbar()
+const { showGlobalSuccess, showGlobalError } = useGlobalSnackbar()
 
 const {
   sections,
@@ -682,6 +674,14 @@ watch(successMessage, (nextMessage) => {
     return
   }
   showGlobalSuccess(text)
+})
+
+watch(errorMessage, (nextMessage) => {
+  const text = nextMessage.trim()
+  if (!text) {
+    return
+  }
+  showGlobalError(text)
 })
 </script>
 

@@ -219,7 +219,7 @@ const REI_THEME_DEFAULT_CONTENT: Record<string, unknown> = {
     },
     map: {
       天津: '117.200983, 39.084158',
-      山东: 'x118.000923, 36.675807',
+      山东: '118.000923, 36.675807',
     },
     slogan: {
       text: '希望',
@@ -588,7 +588,7 @@ export function useSettingsPage() {
 
   const envVersion = (
     (import.meta as ImportMeta & { env?: Record<string, string | undefined> }).env
-      ?.VITE_NEHEX_CORE_VERSION || 'v1.1.2'
+      ?.VITE_NEHEX_CORE_VERSION || '1.2.0'
   ).trim()
 
   const nehexSnapshot = ref<NehexSnapshot>(getNehexSnapshotData())

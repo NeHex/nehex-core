@@ -1,2 +1,0 @@
-"""NeHex Core backend package."""
-

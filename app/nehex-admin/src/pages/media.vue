@@ -8,15 +8,6 @@
         </div>
       </header>
 
-      <v-alert
-        v-if="errorMessage"
-        density="comfortable"
-        type="error"
-        variant="tonal"
-      >
-        {{ errorMessage }}
-      </v-alert>
-
       <v-progress-linear
         v-if="loading"
         color="primary"
@@ -330,6 +321,7 @@ type MediaTypeFilter = 'all' | 'image' | 'video' | 'audio' | 'file'
 
 const {
   showGlobalSuccess,
+  showGlobalError,
   showGlobalProgress,
   updateGlobalProgress,
   hideGlobalSnackbar,
@@ -530,7 +522,9 @@ async function reloadAll(): Promise<void> {
     await loadLibrary()
     await loadCurrentFolderImages()
   } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : '加载媒体库失败'
+    const message = error instanceof Error ? error.message : '加载媒体库失败'
+    errorMessage.value = message
+    showGlobalError(message)
   } finally {
     loading.value = false
   }
@@ -560,7 +554,9 @@ async function submitCreateFolder(): Promise<void> {
     showGlobalSuccess('分类文件夹创建成功')
     await reloadAll()
   } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : '新建分类文件夹失败'
+    const message = error instanceof Error ? error.message : '新建分类文件夹失败'
+    errorMessage.value = message
+    showGlobalError(message)
   } finally {
     creatingFolder.value = false
   }
@@ -605,7 +601,9 @@ async function submitRenameFolder(): Promise<void> {
     showGlobalSuccess('分类文件夹重命名成功')
     await reloadAll()
   } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : '重命名分类文件夹失败'
+    const message = error instanceof Error ? error.message : '重命名分类文件夹失败'
+    errorMessage.value = message
+    showGlobalError(message)
   } finally {
     renamingFolder.value = false
   }
@@ -625,7 +623,9 @@ async function submitDeleteFolder(): Promise<void> {
     showGlobalSuccess(`文件夹已删除，${movedCount} 个资源已归入未分类`)
     await reloadAll()
   } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : '删除分类文件夹失败'
+    const message = error instanceof Error ? error.message : '删除分类文件夹失败'
+    errorMessage.value = message
+    showGlobalError(message)
   } finally {
     deletingFolder.value = false
   }
@@ -644,7 +644,9 @@ async function moveImageIdsToFolder(imageIds: number[], folderId: number | null)
     showGlobalSuccess(`成功归类 ${imageIds.length} 个资源`)
     await reloadAll()
   } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : '批量归类失败'
+    const message = error instanceof Error ? error.message : '批量归类失败'
+    errorMessage.value = message
+    showGlobalError(message)
   } finally {
     movingImages.value = false
   }
@@ -751,6 +753,7 @@ async function copyPreviewAs(mode: CopyMode): Promise<void> {
     showGlobalSuccess(messageMap[mode])
   } catch {
     errorMessage.value = '复制失败，请检查浏览器权限'
+    showGlobalError('复制失败，请检查浏览器权限')
   }
 }
 
@@ -769,7 +772,9 @@ async function deletePreviewImage(): Promise<void> {
     showGlobalSuccess('图片删除成功')
     await reloadAll()
   } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : '删除图片失败'
+    const message = error instanceof Error ? error.message : '删除图片失败'
+    errorMessage.value = message
+    showGlobalError(message)
   } finally {
     deletingImage.value = false
   }
@@ -821,7 +826,9 @@ async function uploadImages(files: File[]): Promise<void> {
     }
 
     if (failedCount > 0) {
-      errorMessage.value = `有 ${failedCount} 个资源上传失败`
+      const message = `有 ${failedCount} 个资源上传失败`
+      errorMessage.value = message
+      showGlobalError(message)
     }
   } finally {
     uploadingImages.value = false

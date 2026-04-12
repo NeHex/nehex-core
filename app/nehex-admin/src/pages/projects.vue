@@ -17,16 +17,6 @@
         </v-btn>
       </header>
 
-      <v-alert
-        v-if="errorMessage"
-        class="mb-4"
-        density="comfortable"
-        type="error"
-        variant="tonal"
-      >
-        {{ errorMessage }}
-      </v-alert>
-
       <v-progress-linear
         v-if="loading"
         class="mb-4"
@@ -108,6 +98,7 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { RouterView, useRoute, useRouter } from 'vue-router'
 import AdminLayout from '@/components/admin/AdminLayout.vue'
+import { useGlobalSnackbar } from '@/composables/useGlobalSnackbar'
 import {
   deleteProject,
   fetchProjects,
@@ -117,6 +108,7 @@ import {
 const router = useRouter()
 const route = useRoute()
 const isManageRoute = computed(() => route.path === '/projects')
+const { showGlobalSuccess, showGlobalError } = useGlobalSnackbar()
 
 const loading = ref(false)
 const deleting = ref(false)
@@ -153,7 +145,9 @@ async function loadProjects(): Promise<void> {
   try {
     projects.value = await fetchProjects()
   } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : '加载项目失败'
+    const message = error instanceof Error ? error.message : '加载项目失败'
+    errorMessage.value = message
+    showGlobalError(message)
   } finally {
     loading.value = false
   }
@@ -169,9 +163,12 @@ async function confirmDelete(): Promise<void> {
   try {
     await deleteProject(pendingDelete.value.id)
     closeDeleteDialog(true)
+    showGlobalSuccess('项目已删除')
     await loadProjects()
   } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : '删除项目失败'
+    const message = error instanceof Error ? error.message : '删除项目失败'
+    errorMessage.value = message
+    showGlobalError(message)
   } finally {
     deleting.value = false
   }

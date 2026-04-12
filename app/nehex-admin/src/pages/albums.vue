@@ -17,16 +17,6 @@
         </v-btn>
       </header>
 
-      <v-alert
-        v-if="errorMessage"
-        class="mb-4"
-        density="comfortable"
-        type="error"
-        variant="tonal"
-      >
-        {{ errorMessage }}
-      </v-alert>
-
       <v-progress-linear
         v-if="loading"
         class="mb-4"
@@ -103,6 +93,7 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { RouterView, useRoute, useRouter } from 'vue-router'
 import AdminLayout from '@/components/admin/AdminLayout.vue'
+import { useGlobalSnackbar } from '@/composables/useGlobalSnackbar'
 import {
   deleteAlbum,
   fetchAlbums,
@@ -112,6 +103,7 @@ import {
 const router = useRouter()
 const route = useRoute()
 const isManageRoute = computed(() => route.path === '/albums')
+const { showGlobalSuccess, showGlobalError } = useGlobalSnackbar()
 
 const loading = ref(false)
 const deleting = ref(false)
@@ -148,7 +140,9 @@ async function loadAlbums(): Promise<void> {
   try {
     albums.value = await fetchAlbums()
   } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : '加载相册失败'
+    const message = error instanceof Error ? error.message : '加载相册失败'
+    errorMessage.value = message
+    showGlobalError(message)
   } finally {
     loading.value = false
   }
@@ -164,9 +158,12 @@ async function confirmDelete(): Promise<void> {
   try {
     await deleteAlbum(pendingDelete.value.id)
     closeDeleteDialog(true)
+    showGlobalSuccess('相册已删除')
     await loadAlbums()
   } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : '删除相册失败'
+    const message = error instanceof Error ? error.message : '删除相册失败'
+    errorMessage.value = message
+    showGlobalError(message)
   } finally {
     deleting.value = false
   }

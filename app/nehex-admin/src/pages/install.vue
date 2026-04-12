@@ -6,24 +6,6 @@
         <p>请按步骤完成基础初始化，完成后即可进入后台登录。</p>
       </header>
 
-      <v-alert
-        v-if="errorMessage"
-        class="mb-4"
-        type="error"
-        variant="tonal"
-      >
-        {{ errorMessage }}
-      </v-alert>
-
-      <v-alert
-        v-if="successMessage"
-        class="mb-4"
-        type="success"
-        variant="tonal"
-      >
-        {{ successMessage }}
-      </v-alert>
-
       <div class="step-indicator">
         <button
           v-for="item in steps"
@@ -194,7 +176,7 @@ const loading = ref(false)
 const currentStep = ref<1 | 2 | 3>(1)
 const errorMessage = ref('')
 const successMessage = ref('')
-const { showGlobalSuccess } = useGlobalSnackbar()
+const { showGlobalSuccess, showGlobalError } = useGlobalSnackbar()
 
 const steps: StepItem[] = [
   { value: 1, label: '管理员账号' },
@@ -390,6 +372,14 @@ watch(successMessage, (nextMessage) => {
     return
   }
   showGlobalSuccess(text)
+})
+
+watch(errorMessage, (nextMessage) => {
+  const text = nextMessage.trim()
+  if (!text) {
+    return
+  }
+  showGlobalError(text)
 })
 </script>
 

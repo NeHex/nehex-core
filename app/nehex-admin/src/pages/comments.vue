@@ -8,16 +8,6 @@
         </div>
       </header>
 
-      <v-alert
-        v-if="errorMessage"
-        class="mb-2"
-        density="comfortable"
-        type="error"
-        variant="tonal"
-      >
-        {{ errorMessage }}
-      </v-alert>
-
       <div class="search-row">
         <v-text-field
           v-model="searchKeyword"
@@ -56,93 +46,71 @@
           v-for="comment in comments"
           :key="comment.id"
           class="comment-card"
-          rounded="lg"
+          rounded="xl"
         >
-          <div class="comment-head">
-            <div class="meta-group">
-              <v-chip size="small" variant="tonal">#{{ comment.id }}</v-chip>
-              <v-chip size="small" variant="tonal">{{ mapTargetLabel(comment.target_type) }}:{{ comment.target_id }}</v-chip>
-              <v-chip size="small" :color="comment.parent_id > 0 ? 'warning' : 'primary'" variant="tonal">
-                {{ comment.parent_id > 0 ? '回复' : '主评论' }}
-              </v-chip>
+          <div class="comment-card-shell">
+            <div class="comment-head">
+              <div class="meta-group">
+                <v-chip size="small" variant="tonal">#{{ comment.id }}</v-chip>
+                <v-chip size="small" variant="tonal">{{ mapTargetLabel(comment.target_type) }}:{{ comment.target_id }}</v-chip>
+                <v-chip size="small" :color="comment.parent_id > 0 ? 'warning' : 'primary'" variant="tonal">
+                  {{ comment.parent_id > 0 ? '回复' : '主评论' }}
+                </v-chip>
+                <v-chip size="small" :color="Number(comment.status) > 0 ? 'success' : 'default'" variant="tonal">
+                  {{ Number(comment.status) > 0 ? '启用' : '禁用' }}
+                </v-chip>
+              </div>
+              <span class="time">{{ formatDateTime(comment.create_time) }}</span>
             </div>
-            <div class="head-actions">
+
+            <div class="comment-summary">
+              <div class="summary-item">
+                <span class="summary-label">昵称</span>
+                <span class="summary-value">{{ comment.nickname || '未填写' }}</span>
+              </div>
+              <div class="summary-item">
+                <span class="summary-label">邮箱</span>
+                <span class="summary-value">{{ comment.email || '未填写' }}</span>
+              </div>
+              <div class="summary-item">
+                <span class="summary-label">网址</span>
+                <span class="summary-value">{{ comment.website || '未填写' }}</span>
+              </div>
+            </div>
+
+            <p class="comment-preview">
+              {{ comment.content || '（空内容）' }}
+            </p>
+
+            <div class="card-actions">
               <v-btn
-                variant="text"
+                color="primary"
+                prepend-icon="mdi-pencil-outline"
                 size="small"
+                variant="tonal"
+                @click="openEditDialog(comment)"
+              >
+                编辑
+              </v-btn>
+              <v-btn
                 prepend-icon="mdi-open-in-new"
+                size="small"
+                variant="text"
                 :disabled="!buildTargetManagePath(comment)"
                 @click="goToTarget(comment)"
               >
-                跳转目标
+                跳转
               </v-btn>
-              <span class="time">{{ formatDateTime(comment.create_time) }}</span>
+              <v-btn
+                color="error"
+                prepend-icon="mdi-delete-outline"
+                size="small"
+                variant="text"
+                @click="openDeleteDialog(comment)"
+              >
+                删除
+              </v-btn>
             </div>
-          </div>
-
-          <div class="edit-grid">
-            <v-text-field
-              v-model="getEditForm(comment.id).nickname"
-              density="comfortable"
-              hide-details
-              label="昵称"
-              variant="outlined"
-            />
-            <v-text-field
-              v-model="getEditForm(comment.id).email"
-              density="comfortable"
-              hide-details
-              label="邮箱"
-              variant="outlined"
-            />
-            <v-text-field
-              v-model="getEditForm(comment.id).website"
-              density="comfortable"
-              hide-details
-              label="网址"
-              variant="outlined"
-            />
-            <v-select
-              v-model.number="getEditForm(comment.id).status"
-              :items="statusOptions"
-              density="comfortable"
-              hide-details
-              item-title="label"
-              item-value="value"
-              label="状态"
-              variant="outlined"
-            />
-          </div>
-
-          <v-textarea
-            v-model="getEditForm(comment.id).content"
-            auto-grow
-            class="content-editor"
-            hide-details
-            label="留言内容"
-            min-rows="4"
-            variant="outlined"
-          />
-
-          <div class="card-actions">
-            <v-btn
-              color="primary"
-              prepend-icon="mdi-content-save-outline"
-              size="small"
-              :loading="isSaving(comment.id)"
-              @click="saveComment(comment.id)"
-            >
-              保存
-            </v-btn>
-            <v-btn
-              color="error"
-              prepend-icon="mdi-delete-outline"
-              size="small"
-              variant="text"
-              @click="openDeleteDialog(comment)"
-            >
-              删除
-            </v-btn>
           </div>
         </v-card>
 
@@ -166,6 +134,72 @@
         />
       </div>
     </section>
+
+    <v-dialog v-model="editDialog" max-width="760">
+      <v-card class="dialog-card" rounded="xl">
+        <v-card-title class="dialog-title">
+          编辑评论 #{{ editingCommentId || '' }}
+        </v-card-title>
+        <v-card-text>
+          <div v-if="editingCommentId !== null" class="edit-panel">
+            <div class="edit-grid">
+              <v-text-field
+                v-model="getEditForm(editingCommentId).nickname"
+                density="comfortable"
+                hide-details
+                label="昵称"
+                variant="outlined"
+              />
+              <v-text-field
+                v-model="getEditForm(editingCommentId).email"
+                density="comfortable"
+                hide-details
+                label="邮箱"
+                variant="outlined"
+              />
+              <v-text-field
+                v-model="getEditForm(editingCommentId).website"
+                density="comfortable"
+                hide-details
+                label="网址"
+                variant="outlined"
+              />
+              <v-select
+                v-model.number="getEditForm(editingCommentId).status"
+                :items="statusOptions"
+                density="comfortable"
+                hide-details
+                item-title="label"
+                item-value="value"
+                label="状态"
+                variant="outlined"
+              />
+            </div>
+            <v-textarea
+              v-model="getEditForm(editingCommentId).content"
+              auto-grow
+              class="content-editor"
+              hide-details
+              label="留言内容"
+              min-rows="6"
+              variant="outlined"
+            />
+          </div>
+        </v-card-text>
+        <v-card-actions class="dialog-actions">
+          <v-spacer />
+          <v-btn variant="text" @click="closeEditDialog">取消</v-btn>
+          <v-btn
+            color="primary"
+            prepend-icon="mdi-content-save-outline"
+            :loading="isEditingSaving()"
+            @click="saveEditingComment"
+          >
+            保存
+          </v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
 
     <v-dialog v-model="deleteDialog" max-width="420">
       <v-card class="dialog-card" rounded="xl">
@@ -206,7 +240,7 @@ type EditCommentForm = {
 }
 
 const router = useRouter()
-const { showGlobalSuccess } = useGlobalSnackbar()
+const { showGlobalSuccess, showGlobalError } = useGlobalSnackbar()
 
 const loading = ref(false)
 const deleting = ref(false)
@@ -221,6 +255,8 @@ const totalPages = ref(0)
 const deleteDialog = ref(false)
 const pendingDelete = ref<AdminCommentItem | null>(null)
 const savingIds = ref<Set<number>>(new Set())
+const editDialog = ref(false)
+const editingCommentId = ref<number | null>(null)
 
 const statusOptions = [
   { label: '启用', value: 1 },
@@ -355,7 +391,9 @@ async function loadComments(targetPage = currentPage.value): Promise<void> {
       return
     }
   } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : '加载评论失败'
+    const message = error instanceof Error ? error.message : '加载评论失败'
+    errorMessage.value = message
+    showGlobalError(message)
   } finally {
     loading.value = false
   }
@@ -369,18 +407,20 @@ async function searchComments(): Promise<void> {
   await loadComments(1)
 }
 
-async function saveComment(commentId: number): Promise<void> {
+async function saveComment(commentId: number): Promise<boolean> {
   const form = getEditForm(commentId)
 
   const nickname = form.nickname.trim()
   const content = form.content.trim()
   if (!nickname) {
     errorMessage.value = '昵称不能为空'
-    return
+    showGlobalError('昵称不能为空')
+    return false
   }
   if (!content) {
     errorMessage.value = '留言内容不能为空'
-    return
+    showGlobalError('留言内容不能为空')
+    return false
   }
 
   setSaving(commentId, true)
@@ -401,10 +441,46 @@ async function saveComment(commentId: number): Promise<void> {
     }
     syncEditForms(comments.value)
     showGlobalSuccess(`评论 #${commentId} 已保存`)
+    return true
   } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : '保存评论失败'
+    const message = error instanceof Error ? error.message : '保存评论失败'
+    errorMessage.value = message
+    showGlobalError(message)
+    return false
   } finally {
     setSaving(commentId, false)
+  }
+}
+
+function openEditDialog(comment: AdminCommentItem): void {
+  editingCommentId.value = comment.id
+  getEditForm(comment.id)
+  editDialog.value = true
+}
+
+function closeEditDialog(force = false): void {
+  if (
+    editingCommentId.value !== null
+    && isSaving(editingCommentId.value)
+    && !force
+  ) {
+    return
+  }
+  editDialog.value = false
+  editingCommentId.value = null
+}
+
+function isEditingSaving(): boolean {
+  return editingCommentId.value !== null && isSaving(editingCommentId.value)
+}
+
+async function saveEditingComment(): Promise<void> {
+  if (editingCommentId.value === null) {
+    return
+  }
+  const ok = await saveComment(editingCommentId.value)
+  if (ok) {
+    closeEditDialog(true)
   }
 }
 
@@ -426,14 +502,21 @@ async function confirmDelete(): Promise<void> {
     return
   }
 
+  const deletingId = pendingDelete.value.id
   deleting.value = true
   errorMessage.value = ''
   try {
-    await deleteAdminComment(pendingDelete.value.id)
+    await deleteAdminComment(deletingId)
     closeDeleteDialog(true)
+    if (editingCommentId.value === deletingId) {
+      closeEditDialog(true)
+    }
     await loadComments(currentPage.value)
+    showGlobalSuccess(`评论 #${deletingId} 已删除`)
   } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : '删除评论失败'
+    const message = error instanceof Error ? error.message : '删除评论失败'
+    errorMessage.value = message
+    showGlobalError(message)
   } finally {
     deleting.value = false
   }
@@ -498,22 +581,37 @@ watch(currentPage, async (page, previous) => {
 }
 
 .comments-list {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 14px;
 }
 
 .comment-card {
+  display: block;
   border: 1px solid rgba(255, 255, 255, 0.1);
   background: linear-gradient(180deg, #151c2a, #121826);
+  transition:
+    transform 0.22s ease,
+    box-shadow 0.22s ease;
+}
+
+.comment-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 14px 24px rgba(0, 0, 0, 0.25);
+}
+
+.comment-card-shell {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
   padding: 12px;
 }
 
 .comment-head {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 8px;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
 }
 
 .meta-group {
@@ -522,42 +620,87 @@ watch(currentPage, async (page, previous) => {
   gap: 6px;
 }
 
-.head-actions {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
 .time {
   color: #9fb0d4;
   font-size: 12px;
   white-space: nowrap;
 }
 
-.edit-grid {
-  margin-top: 10px;
+.comment-summary {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 8px;
+  gap: 6px;
+  padding: 8px 9px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.02);
 }
 
-.content-editor {
-  margin-top: 10px;
+.summary-item {
+  display: flex;
+  gap: 8px;
+  min-width: 0;
+}
+
+.summary-label {
+  flex-shrink: 0;
+  font-size: 12px;
+  color: #8fa2c9;
+}
+
+.summary-value {
+  min-width: 0;
+  font-size: 12px;
+  color: #d5def0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.comment-preview {
+  margin: 0;
+  padding: 8px 9px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(3, 7, 16, 0.26);
+  color: #dce5f8;
+  font-size: 13px;
+  line-height: 1.56;
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 8;
 }
 
 .card-actions {
-  margin-top: 10px;
-  display: flex;
-  justify-content: flex-end;
+  margin-top: 0;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
 }
 
 .empty-card {
+  grid-column: 1 / -1;
   border: 1px dashed rgba(255, 255, 255, 0.18);
   background: rgba(18, 24, 38, 0.65);
   color: #9fb0d4;
   text-align: center;
   padding: 22px;
+}
+
+.edit-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.edit-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.content-editor {
+  margin-top: 0;
 }
 
 .dialog-card {
@@ -575,8 +718,8 @@ watch(currentPage, async (page, previous) => {
 }
 
 @media (max-width: 1200px) {
-  .edit-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+  .comments-list {
+    grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
   }
 }
 
@@ -586,14 +729,8 @@ watch(currentPage, async (page, previous) => {
     align-items: stretch;
   }
 
-  .comment-head {
-    flex-direction: column;
-    align-items: flex-start;
-  }
-
-  .head-actions {
-    width: 100%;
-    justify-content: space-between;
+  .comments-list {
+    grid-template-columns: 1fr;
   }
 
   .edit-grid {
