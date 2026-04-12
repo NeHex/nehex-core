@@ -1,7 +1,9 @@
-FROM node:22-alpine AS frontend-builder
+ARG DOCKERHUB_MIRROR=registry.cn-hangzhou.aliyuncs.com
+
+FROM ${DOCKERHUB_MIRROR}/library/node:22-alpine AS frontend-builder
 WORKDIR /app/app/nehex-admin
 
-RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.ustc.edu.cn/g' /etc/apk/repositories
+RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.aliyun.com/g' /etc/apk/repositories
 
 COPY app/nehex-admin/package.json app/nehex-admin/package-lock.json ./
 RUN npm ci --registry=https://registry.npmmirror.com
@@ -9,23 +11,29 @@ RUN npm ci --registry=https://registry.npmmirror.com
 COPY app/nehex-admin ./
 RUN npm run build
 
-FROM rust:1-bookworm AS backend-builder
+FROM ${DOCKERHUB_MIRROR}/library/rust:1-bookworm AS backend-builder
 WORKDIR /app
 
 RUN mkdir -p /usr/local/cargo/conf && \
     echo '[source.crates-io]' > /usr/local/cargo/config.toml && \
-    echo 'replace-with = "ustc"' >> /usr/local/cargo/config.toml && \
-    echo '[source.ustc]' >> /usr/local/cargo/config.toml && \
-    echo 'registry = "sparse+https://mirrors.ustc.edu.cn/crates.io-index/"' >> /usr/local/cargo/config.toml
+    echo 'replace-with = "aliyun-sparse"' >> /usr/local/cargo/config.toml && \
+    echo '[source.aliyun-sparse]' >> /usr/local/cargo/config.toml && \
+    echo 'registry = "sparse+https://mirrors.aliyun.com/crates.io-index/"' >> /usr/local/cargo/config.toml && \
+    echo '[net]' >> /usr/local/cargo/config.toml && \
+    echo 'retry = 10' >> /usr/local/cargo/config.toml && \
+    echo 'git-fetch-with-cli = true' >> /usr/local/cargo/config.toml && \
+    echo '[http]' >> /usr/local/cargo/config.toml && \
+    echo 'timeout = 120' >> /usr/local/cargo/config.toml && \
+    echo 'multiplexing = false' >> /usr/local/cargo/config.toml
 
 COPY backend-rust ./backend-rust
 RUN cd backend-rust && cargo build --release
 
-FROM debian:bookworm-slim AS runtime
+FROM ${DOCKERHUB_MIRROR}/library/debian:bookworm-slim AS runtime
 ENV ADMIN_MANAGER_BUILD_ON_STARTUP=false
 ENV APP_ENV=prod
 
-RUN sed -i "s@deb.debian.org@mirrors.ustc.edu.cn@g" /etc/apt/sources.list.d/debian.sources && \
+RUN sed -i "s@deb.debian.org@mirrors.aliyun.com@g" /etc/apt/sources.list.d/debian.sources && \
     apt-get update && \
     apt-get install -y --no-install-recommends ca-certificates curl && \
     rm -rf /var/lib/apt/lists/*

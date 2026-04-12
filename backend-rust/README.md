@@ -118,10 +118,10 @@ The server uses `.env` in repository root and expects PostgreSQL to be reachable
 
 For users in Mainland China:
 
-- workspace-level Cargo mirror is preconfigured at `../.cargo/config.toml` (`rsproxy.cn`)
+- workspace-level Cargo mirror is preconfigured at `../.cargo/config.toml` (`mirrors.aliyun.com`, sparse index)
 - if `rustup` install/update is still slow, set:
 
 ```bash
-export RUSTUP_DIST_SERVER="https://rsproxy.cn"
-export RUSTUP_UPDATE_ROOT="https://rsproxy.cn/rustup"
+export RUSTUP_DIST_SERVER="https://mirrors.aliyun.com/rustup"
+export RUSTUP_UPDATE_ROOT="https://mirrors.aliyun.com/rustup/rustup"
 ```

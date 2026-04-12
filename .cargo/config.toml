@@ -1,17 +1,13 @@
 [source.crates-io]
-replace-with = "rsproxy-sparse"
+replace-with = "aliyun-sparse"
 
-[source.rsproxy]
-registry = "https://rsproxy.cn/crates.io-index"
-
-[source.rsproxy-sparse]
-registry = "sparse+https://rsproxy.cn/index/"
-
-[registries.rsproxy]
-index = "https://rsproxy.cn/crates.io-index"
-
-[registries.rsproxy-sparse]
-index = "sparse+https://rsproxy.cn/index/"
+[source.aliyun-sparse]
+registry = "sparse+https://mirrors.aliyun.com/crates.io-index/"
 
 [net]
+retry = 10
 git-fetch-with-cli = true
+
+[http]
+timeout = 120
+multiplexing = false

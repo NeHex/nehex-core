@@ -12,9 +12,9 @@
 
 项目已内置以下国内镜像优化：
 
-- `Cargo`：`nehex-core/.cargo/config.toml` 使用 `rsproxy.cn`（sparse index）
-- `npm`：`app/nehex-admin/.npmrc` 使用 `registry.npmmirror.com`
-- `Docker`：`Dockerfile` 与 `docker-compose.yml` 默认使用 `docker.m.daocloud.io`
+- `Cargo`：`nehex-core/.cargo/config.toml` 使用阿里云 `mirrors.aliyun.com`（sparse index）
+- `npm`：`app/nehex-admin/.npmrc` 使用 `registry.npmmirror.com`（阿里系镜像）
+- `Docker`：`Dockerfile` 与 `docker-compose.yml` 默认使用阿里云容器镜像仓库 `registry.cn-hangzhou.aliyuncs.com`
 
 如需切换回官方源，可覆盖环境变量：
 
