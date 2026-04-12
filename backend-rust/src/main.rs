@@ -8,7 +8,14 @@ mod storage_local;
 
 use std::{net::SocketAddr, sync::Arc};
 
-use axum::{Router, routing::get};
+use axum::{
+    Router,
+    extract::Request,
+    http::{HeaderName, HeaderValue},
+    middleware::{self, Next},
+    response::Response,
+    routing::get,
+};
 use config::Settings;
 use error::{AppError, AppResult};
 use state::AppState;
@@ -19,6 +26,9 @@ use tower_http::{
 };
 use tracing::{info, warn};
 use tracing_subscriber::{EnvFilter, fmt};
+
+const X_ROBOTS_TAG_HEADER_NAME: &str = "x-robots-tag";
+const ADMIN_NOINDEX_HEADER_VALUE: &str = "noindex, nofollow, noarchive";
 
 #[tokio::main]
 async fn main() -> Result<(), anyhow::Error> {
@@ -68,6 +78,8 @@ async fn run() -> AppResult<()> {
     };
 
     let cors_layer = build_cors_layer(&settings);
+    let admin_api_router =
+        routes::admin_api::router().layer(middleware::from_fn(append_admin_noindex_header));
 
     let app = Router::new()
         .route("/health", get(routes::health::health))
@@ -75,7 +87,7 @@ async fn run() -> AppResult<()> {
         .merge(routes::public_api::router())
         .merge(routes::storage_files::router())
         .merge(routes::ws_online::router())
-        .nest("/admin-api", routes::admin_api::router())
+        .nest("/admin-api", admin_api_router)
         .fallback(routes::admin_static::fallback_handler)
         .layer(TraceLayer::new_for_http())
         .layer(cors_layer)
@@ -96,6 +108,15 @@ async fn run() -> AppResult<()> {
         .map_err(|error| AppError::internal(format!("HTTP server exited unexpectedly: {error}")))?;
 
     Ok(())
+}
+
+async fn append_admin_noindex_header(request: Request, next: Next) -> Response {
+    let mut response = next.run(request).await;
+    response.headers_mut().insert(
+        HeaderName::from_static(X_ROBOTS_TAG_HEADER_NAME),
+        HeaderValue::from_static(ADMIN_NOINDEX_HEADER_VALUE),
+    );
+    response
 }
 
 fn build_cors_layer(settings: &Settings) -> CorsLayer {

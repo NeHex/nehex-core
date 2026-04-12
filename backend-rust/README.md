@@ -113,3 +113,15 @@ cargo run
 ```
 
 The server uses `.env` in repository root and expects PostgreSQL to be reachable.
+
+## Mirror (CN)
+
+For users in Mainland China:
+
+- workspace-level Cargo mirror is preconfigured at `../.cargo/config.toml` (`rsproxy.cn`)
+- if `rustup` install/update is still slow, set:
+
+```bash
+export RUSTUP_DIST_SERVER="https://rsproxy.cn"
+export RUSTUP_UPDATE_ROOT="https://rsproxy.cn/rustup"
+```

@@ -23,6 +23,8 @@ use crate::{
 
 const ADMIN_BASE_PLACEHOLDER: &str = "__ADMIN_MANAGER_WEB__";
 const ADMIN_PATH_CACHE_TTL_SECONDS: u64 = 10;
+const X_ROBOTS_TAG_HEADER_NAME: &str = "x-robots-tag";
+const ADMIN_NOINDEX_HEADER_VALUE: &str = "noindex, nofollow, noarchive";
 
 static MDI_PRELOAD_LINK_RE: Lazy<Regex> = Lazy::new(|| {
     Regex::new(r#"\s*<link[^>]*rel=\"preload\"[^>]*href=\"assets/materialdesignicons-webfont[^\"]+\"[^>]*>\s*"#)
@@ -54,7 +56,9 @@ pub async fn fallback_handler(
 
     if relative_path.is_empty() && request_path != format!("{}/", admin_base_path) {
         let redirect = Redirect::permanent(&format!("{}/", admin_base_path));
-        return Ok(redirect.into_response());
+        let mut response = redirect.into_response();
+        append_noindex_header(&mut response);
+        return Ok(response);
     }
 
     if let Some(file_path) = resolve_admin_file(&state, &relative_path).await {
@@ -67,14 +71,18 @@ pub async fn fallback_handler(
 
     let html = render_admin_index(&state, &admin_base_path).await?;
     if method == Method::HEAD {
-        return Ok((
+        let mut response = (
             StatusCode::OK,
             [content_type_header("text/html; charset=utf-8")],
         )
-            .into_response());
+            .into_response();
+        append_noindex_header(&mut response);
+        return Ok(response);
     }
 
-    Ok(Html(html).into_response())
+    let mut response = Html(html).into_response();
+    append_noindex_header(&mut response);
+    Ok(response)
 }
 
 async fn serve_file(file_path: PathBuf, method: Method) -> AppResult<Response> {
@@ -99,6 +107,7 @@ async fn serve_file(file_path: PathBuf, method: Method) -> AppResult<Response> {
             HeaderValue::from_str(&metadata.len().to_string())
                 .unwrap_or_else(|_| HeaderValue::from_static("0")),
         );
+        append_noindex_header(&mut response);
         return Ok(response);
     }
 
@@ -119,6 +128,7 @@ async fn serve_file(file_path: PathBuf, method: Method) -> AppResult<Response> {
         HeaderValue::from_str(&metadata.len().to_string())
             .unwrap_or_else(|_| HeaderValue::from_static("0")),
     );
+    append_noindex_header(&mut response);
     Ok(response)
 }
 
@@ -128,6 +138,13 @@ fn content_type_header(value: &str) -> (header::HeaderName, HeaderValue) {
         HeaderValue::from_str(value)
             .unwrap_or_else(|_| HeaderValue::from_static("application/octet-stream")),
     )
+}
+
+fn append_noindex_header(response: &mut Response) {
+    response.headers_mut().insert(
+        header::HeaderName::from_static(X_ROBOTS_TAG_HEADER_NAME),
+        HeaderValue::from_static(ADMIN_NOINDEX_HEADER_VALUE),
+    );
 }
 
 async fn get_admin_manager_web_path(state: &AppState) -> String {
