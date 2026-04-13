@@ -4,6 +4,7 @@ pub mod admin_backup;
 pub mod admin_comments;
 pub mod admin_content;
 pub mod admin_dashboard;
+pub mod admin_developer;
 pub mod admin_friends;
 pub mod admin_mail;
 pub mod admin_media;
