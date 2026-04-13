@@ -66,13 +66,27 @@
             <v-btn density="comfortable" size="small" variant="text" prepend-icon="mdi-code-tags" @click="insertCodeBlock">
               代码块
             </v-btn>
-            <ImageUploadHintCard
-              class="editor-upload-card"
-              :loading="uploadingImage"
-              title="上传并插入图片"
-              hint="拖到卡片或点击选择图片"
-              @select-files="handleUploadCardFiles"
-            />
+            <div class="editor-media-actions">
+              <v-btn
+                class="editor-media-picker-btn"
+                color="primary"
+                density="comfortable"
+                size="small"
+                variant="tonal"
+                prepend-icon="mdi-folder-image"
+                :disabled="uploadingImage"
+                @click="openMediaLibraryPicker"
+              >
+                从媒体库选择
+              </v-btn>
+              <ImageUploadHintCard
+                class="editor-upload-card"
+                :loading="uploadingImage"
+                title="上传并插入图片"
+                hint="拖到卡片或点击选择图片"
+                @select-files="handleUploadCardFiles"
+              />
+            </div>
           </div>
         </header>
 
@@ -150,6 +164,10 @@
         </div>
       </aside>
     </div>
+    <MediaLibraryImagePicker
+      v-model="mediaPickerVisible"
+      @select-image="handleMediaLibrarySelect"
+    />
   </section>
 </template>
 
@@ -166,6 +184,7 @@ import {
 } from '@/services/pages'
 import { uploadMarkdownImage } from '@/services/storage'
 import ImageUploadHintCard from '@/components/admin/ImageUploadHintCard.vue'
+import MediaLibraryImagePicker from '@/components/admin/MediaLibraryImagePicker.vue'
 
 const props = defineProps<{
   pageId?: number | null
@@ -194,6 +213,11 @@ type SelectionTransformResult = {
   selectionEnd?: number
 }
 
+type SelectedMediaImage = {
+  url: string
+  fileName: string
+}
+
 const statusOptions = [
   { label: '启用', value: 1 },
   { label: '禁用', value: 0 },
@@ -202,6 +226,7 @@ const statusOptions = [
 const loading = ref(false)
 const submitting = ref(false)
 const uploadingImage = ref(false)
+const mediaPickerVisible = ref(false)
 const errorMessage = ref('')
 const previewMode = ref(false)
 const dragOver = ref(false)
@@ -451,6 +476,22 @@ async function handleUploadCardFiles(files: File[]): Promise<void> {
   await uploadImageAndInsert(imageFile)
 }
 
+function openMediaLibraryPicker(): void {
+  if (uploadingImage.value) {
+    return
+  }
+  mediaPickerVisible.value = true
+}
+
+function handleMediaLibrarySelect(payload: SelectedMediaImage): void {
+  const imageUrl = payload.url.trim()
+  if (!imageUrl) {
+    return
+  }
+  const fileName = payload.fileName.trim() || 'image'
+  insertMarkdownImage(imageUrl, fileName)
+}
+
 function onDragEnter(): void {
   dragDepth.value += 1
   dragOver.value = true
@@ -674,8 +715,20 @@ onMounted(async () => {
   gap: 4px;
 }
 
-.editor-upload-card {
+.editor-media-actions {
   margin-left: auto;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.editor-media-picker-btn {
+  white-space: nowrap;
+}
+
+.editor-upload-card {
   width: min(320px, 100%);
 }
 

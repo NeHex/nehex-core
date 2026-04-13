@@ -59,6 +59,18 @@
         <header class="panel-head panel-head-main">
           <span>Markdown</span>
           <div class="panel-tools">
+            <v-btn
+              class="daily-media-picker-btn"
+              color="primary"
+              density="comfortable"
+              size="small"
+              variant="tonal"
+              prepend-icon="mdi-folder-image"
+              :disabled="uploadingImage"
+              @click="openMediaLibraryPicker"
+            >
+              从媒体库选择
+            </v-btn>
             <ImageUploadHintCard
               class="daily-upload-card"
               :loading="uploadingImage"
@@ -93,6 +105,10 @@
         <article class="markdown-preview" v-html="renderedMarkdown" />
       </section>
     </div>
+    <MediaLibraryImagePicker
+      v-model="mediaPickerVisible"
+      @select-image="handleMediaLibrarySelect"
+    />
   </section>
 </template>
 
@@ -109,6 +125,7 @@ import {
 } from '@/services/dailies'
 import { uploadMarkdownImage } from '@/services/storage'
 import ImageUploadHintCard from '@/components/admin/ImageUploadHintCard.vue'
+import MediaLibraryImagePicker from '@/components/admin/MediaLibraryImagePicker.vue'
 
 const props = defineProps<{
   dailyId?: number | null
@@ -128,9 +145,15 @@ type EditorForm = {
   content: string
 }
 
+type SelectedMediaImage = {
+  url: string
+  fileName: string
+}
+
 const loading = ref(false)
 const submitting = ref(false)
 const uploadingImage = ref(false)
+const mediaPickerVisible = ref(false)
 const errorMessage = ref('')
 const successMessage = ref('')
 const leftPaneWidth = ref(50)
@@ -296,6 +319,22 @@ async function handleUploadCardFiles(files: File[]): Promise<void> {
     return
   }
   await _uploadImageAndInsert(imageFile)
+}
+
+function openMediaLibraryPicker(): void {
+  if (uploadingImage.value) {
+    return
+  }
+  mediaPickerVisible.value = true
+}
+
+function handleMediaLibrarySelect(payload: SelectedMediaImage): void {
+  const imageUrl = payload.url.trim()
+  if (!imageUrl) {
+    return
+  }
+  const fileName = payload.fileName.trim() || 'image'
+  _insertMarkdownImage(imageUrl, fileName)
 }
 
 function onDragEnter(): void {
@@ -470,6 +509,10 @@ onMounted(async () => {
   display: flex;
   align-items: center;
   gap: 8px;
+}
+
+.daily-media-picker-btn {
+  white-space: nowrap;
 }
 
 .daily-upload-card {

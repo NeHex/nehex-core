@@ -18,6 +18,7 @@ declare module 'vue' {
     DailyEditorWorkspace: typeof import('./components/admin/DailyEditorWorkspace.vue')['default']
     GlobalToast: typeof import('./components/common/GlobalToast.vue')['default']
     ImageUploadHintCard: typeof import('./components/admin/ImageUploadHintCard.vue')['default']
+    MediaLibraryImagePicker: typeof import('./components/admin/MediaLibraryImagePicker.vue')['default']
     PageEditorWorkspace: typeof import('./components/admin/PageEditorWorkspace.vue')['default']
     ProjectEditorWorkspace: typeof import('./components/admin/ProjectEditorWorkspace.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']
