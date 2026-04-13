@@ -140,6 +140,7 @@
           <hr v-if="item.dividerBefore" class="menu-divider">
           <v-list-item
             class="menu-item"
+            :append-icon="item.children?.length ? (isSubmenuExpanded(item) ? 'mdi-chevron-down' : 'mdi-chevron-right') : undefined"
             :prepend-icon="item.icon"
             rounded="lg"
             :title="item.label"
@@ -410,14 +411,7 @@ function isSubmenuItemActive(item: MenuChildItem): boolean {
 
 function handleMenuItemClick(item: MenuItem): void {
   if (item.children?.length) {
-    expandedMenuKey.value = item.to
-
-    if (route.path !== item.to) {
-      void router.push(item.to)
-      return
-    }
-
-    closeMobileDrawers()
+    expandedMenuKey.value = expandedMenuKey.value === item.to ? null : item.to
     return
   }
 
