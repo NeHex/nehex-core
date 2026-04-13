@@ -300,6 +300,11 @@ const menuItems: MenuItem[] = [
     dividerBefore: true,
   },
   {
+    icon: 'mdi-console',
+    label: '开发者选项',
+    to: '/developer-options',
+  },
+  {
     icon: 'mdi-cog-outline',
     label: '设定',
     to: '/settings',
