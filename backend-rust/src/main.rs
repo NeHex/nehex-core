@@ -1,6 +1,7 @@
 mod cache;
 mod config;
 mod error;
+mod log_buffer;
 mod routes;
 mod startup;
 mod state;
@@ -25,7 +26,7 @@ use tower_http::{
     trace::TraceLayer,
 };
 use tracing::{info, warn};
-use tracing_subscriber::{EnvFilter, fmt};
+use tracing_subscriber::{EnvFilter, fmt, fmt::writer::MakeWriterExt};
 
 const X_ROBOTS_TAG_HEADER_NAME: &str = "x-robots-tag";
 const ADMIN_NOINDEX_HEADER_VALUE: &str = "noindex, nofollow, noarchive";
@@ -175,9 +176,12 @@ fn build_cors_layer(settings: &Settings) -> CorsLayer {
 fn init_tracing() {
     let env_filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info"));
 
+    let log_writer = std::io::stdout.and(log_buffer::make_writer());
+
     fmt()
         .with_env_filter(env_filter)
         .with_target(false)
         .compact()
+        .with_writer(log_writer)
         .init();
 }
