@@ -481,9 +481,6 @@ function closeMobileDrawers(): void {
 }
 
 .mobile-topbar {
-  position: sticky;
-  top: 0;
-  z-index: 20;
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
   backdrop-filter: blur(10px);
 }

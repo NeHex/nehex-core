@@ -96,7 +96,7 @@
                 prepend-icon="mdi-open-in-new"
                 size="small"
                 variant="text"
-                :disabled="!buildTargetManagePath(comment)"
+                :disabled="!canJumpToTarget(comment)"
                 @click="goToTarget(comment)"
               >
                 跳转
@@ -221,7 +221,6 @@
 
 <script lang="ts" setup>
 import { onMounted, reactive, ref, watch } from 'vue'
-import { useRouter } from 'vue-router'
 import AdminLayout from '@/components/admin/AdminLayout.vue'
 import { useGlobalSnackbar } from '@/composables/useGlobalSnackbar'
 import {
@@ -230,6 +229,8 @@ import {
   updateAdminComment,
   type AdminCommentItem,
 } from '@/services/comments'
+import { fetchStandalonePageById } from '@/services/pages'
+import { fetchSiteUrl } from '@/services/settings'
 
 type EditCommentForm = {
   nickname: string
@@ -239,7 +240,6 @@ type EditCommentForm = {
   status: number
 }
 
-const router = useRouter()
 const { showGlobalSuccess, showGlobalError } = useGlobalSnackbar()
 
 const loading = ref(false)
@@ -257,6 +257,8 @@ const pendingDelete = ref<AdminCommentItem | null>(null)
 const savingIds = ref<Set<number>>(new Set())
 const editDialog = ref(false)
 const editingCommentId = ref<number | null>(null)
+const siteUrl = ref('')
+const singlePagePathCache = reactive<Record<number, string>>({})
 
 const statusOptions = [
   { label: '启用', value: 1 },
@@ -300,7 +302,21 @@ function mapTargetLabel(targetType: string): string {
   return targetType || '未知'
 }
 
-function buildTargetManagePath(comment: AdminCommentItem): string {
+function canJumpToTarget(comment: AdminCommentItem): boolean {
+  if (comment.target_type === 'friend_page') {
+    return true
+  }
+
+  const targetId = Number(comment.target_id)
+  if (!Number.isFinite(targetId) || targetId <= 0) {
+    return false
+  }
+  return comment.target_type === 'article'
+    || comment.target_type === 'album'
+    || comment.target_type === 'singlepage'
+}
+
+async function buildTargetWebPath(comment: AdminCommentItem): Promise<string> {
   if (comment.target_type === 'friend_page') {
     return '/friends'
   }
@@ -311,23 +327,57 @@ function buildTargetManagePath(comment: AdminCommentItem): string {
   }
 
   if (comment.target_type === 'article') {
-    return `/articles/edit/${targetId}`
+    return `/article/${targetId}`
   }
   if (comment.target_type === 'album') {
-    return `/albums/edit/${targetId}`
+    return `/album/${targetId}`
   }
   if (comment.target_type === 'singlepage') {
-    return `/pages/edit/${targetId}`
+    const cachedPath = singlePagePathCache[targetId]
+    if (cachedPath) {
+      return cachedPath
+    }
+    try {
+      const page = await fetchStandalonePageById(targetId)
+      const pageKey = String(page.page_key ?? '').trim().replace(/^\/+|\/+$/g, '')
+      if (pageKey) {
+        const resolvedPath = `/${pageKey}`
+        singlePagePathCache[targetId] = resolvedPath
+        return resolvedPath
+      }
+    } catch (error) {
+      console.warn('Failed to resolve standalone page path for comment target', error)
+    }
+    return `/page/${targetId}`
   }
   return ''
 }
 
-function goToTarget(comment: AdminCommentItem): void {
-  const path = buildTargetManagePath(comment)
+function joinSiteUrl(baseUrl: string, path: string): string {
+  const normalizedPath = `/${path.trim().replace(/^\/+/, '')}`
+  const normalizedBase = baseUrl.trim().replace(/\/+$/, '')
+  if (!normalizedBase) {
+    return normalizedPath
+  }
+  return `${normalizedBase}${normalizedPath}`
+}
+
+function withCommentAnchor(url: string, commentId: number): string {
+  if (!url.trim()) {
+    return ''
+  }
+  return `${url}#comment-${Math.max(1, Math.floor(commentId))}`
+}
+
+async function goToTarget(comment: AdminCommentItem): Promise<void> {
+  const path = await buildTargetWebPath(comment)
   if (!path) {
+    showGlobalError('无法生成前台页面跳转地址')
     return
   }
-  void router.push(path)
+
+  const targetUrl = withCommentAnchor(joinSiteUrl(siteUrl.value, path), comment.id)
+  window.open(targetUrl, '_blank', 'noopener')
 }
 
 function normalizeOptional(value: string): string | null {
@@ -523,6 +573,11 @@ async function confirmDelete(): Promise<void> {
 }
 
 onMounted(async () => {
+  try {
+    siteUrl.value = await fetchSiteUrl()
+  } catch (error) {
+    console.warn('Failed to load site_url for comment target jump', error)
+  }
   await loadComments(1)
 })
 
