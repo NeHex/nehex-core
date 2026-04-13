@@ -858,18 +858,18 @@ onMounted(async () => {
 .editor-media-actions {
   margin-left: auto;
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   align-items: center;
   justify-content: flex-end;
   gap: 8px;
 }
 
 .editor-upload-card {
-  width: min(320px, 100%);
+  width: 220px;
 }
 
 .editor-upload-card--picker {
-  width: min(250px, 100%);
+  width: 220px;
 }
 
 .editor-surface {

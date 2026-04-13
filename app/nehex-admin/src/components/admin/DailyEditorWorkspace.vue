@@ -504,16 +504,17 @@ onMounted(async () => {
 
 .panel-tools {
   display: flex;
+  flex-wrap: nowrap;
   align-items: center;
   gap: 8px;
 }
 
 .daily-upload-card {
-  width: min(280px, 100%);
+  width: 220px;
 }
 
 .daily-upload-card--picker {
-  width: min(250px, 100%);
+  width: 220px;
 }
 
 .panel-left-markdown {
