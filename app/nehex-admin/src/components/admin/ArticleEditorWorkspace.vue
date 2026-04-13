@@ -77,6 +77,15 @@
               density="comfortable"
               size="small"
               variant="text"
+              prepend-icon="mdi-format-header-3"
+              @click="insertHeading(3)"
+            >
+              H3
+            </v-btn>
+            <v-btn
+              density="comfortable"
+              size="small"
+              variant="text"
               prepend-icon="mdi-format-bold"
               @click="insertBold"
             >
@@ -104,10 +113,28 @@
               density="comfortable"
               size="small"
               variant="text"
+              prepend-icon="mdi-format-list-numbered"
+              @click="insertOrderedList"
+            >
+              有序
+            </v-btn>
+            <v-btn
+              density="comfortable"
+              size="small"
+              variant="text"
               prepend-icon="mdi-format-quote-open"
               @click="insertQuote"
             >
               引用
+            </v-btn>
+            <v-btn
+              density="comfortable"
+              size="small"
+              variant="text"
+              prepend-icon="mdi-format-strikethrough-variant"
+              @click="insertStrikethrough"
+            >
+              删除线
             </v-btn>
             <v-btn
               density="comfortable"
@@ -126,6 +153,24 @@
               @click="insertCodeBlock"
             >
               代码块
+            </v-btn>
+            <v-btn
+              density="comfortable"
+              size="small"
+              variant="text"
+              prepend-icon="mdi-table"
+              @click="insertTable"
+            >
+              表格
+            </v-btn>
+            <v-btn
+              density="comfortable"
+              size="small"
+              variant="text"
+              prepend-icon="mdi-minus"
+              @click="insertHorizontalRule"
+            >
+              分割线
             </v-btn>
             <div class="editor-media-actions">
               <ImageUploadHintCard
@@ -472,9 +517,13 @@ function prefixSelectionLines(prefix: string, placeholder: string): void {
   })
 }
 
-function insertHeading(level: 1 | 2): void {
+function insertHeading(level: 1 | 2 | 3): void {
   const prefix = `${'#'.repeat(level)} `
-  const placeholder = level === 1 ? '一级标题' : '二级标题'
+  const placeholder = level === 1
+    ? '一级标题'
+    : level === 2
+      ? '二级标题'
+      : '三级标题'
   prefixSelectionLines(prefix, placeholder)
 }
 
@@ -492,6 +541,10 @@ function insertQuote(): void {
 
 function insertBulletList(): void {
   prefixSelectionLines('- ', '列表项')
+}
+
+function insertOrderedList(): void {
+  prefixSelectionLines('1. ', '列表项')
 }
 
 function insertLink(): void {
@@ -519,6 +572,34 @@ function insertCodeBlock(): void {
         text,
         selectionStart,
         selectionEnd: selectionStart + codeText.length,
+      }
+    })
+  })
+}
+
+function insertStrikethrough(): void {
+  wrapSelection('~~', '~~', '删除线文本')
+}
+
+function insertHorizontalRule(): void {
+  ensureEditMode(() => {
+    updateSelection(() => ({
+      text: '\n---\n',
+      selectionStart: 5,
+      selectionEnd: 5,
+    }))
+  })
+}
+
+function insertTable(): void {
+  ensureEditMode(() => {
+    updateSelection(() => {
+      const text = '\n| 列1 | 列2 |\n| --- | --- |\n| 内容1 | 内容2 |\n'
+      const focusStart = text.indexOf('内容1')
+      return {
+        text,
+        selectionStart: focusStart,
+        selectionEnd: focusStart + '内容1'.length,
       }
     })
   })
@@ -952,6 +1033,7 @@ onMounted(async () => {
   gap: 8px;
   min-height: 0;
   overflow: auto;
+  padding-top: 6px;
   padding-right: 2px;
 }
 
