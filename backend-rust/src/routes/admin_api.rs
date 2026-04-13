@@ -4,8 +4,8 @@ use axum::{
 };
 
 use crate::routes::{
-    admin_auth, admin_backup, admin_comments, admin_content, admin_dashboard, admin_friends,
-    admin_mail, admin_media, admin_settings,
+    admin_auth, admin_backup, admin_comments, admin_content, admin_dashboard, admin_developer,
+    admin_friends, admin_mail, admin_media, admin_settings,
 };
 use crate::state::AppState;
 
@@ -115,6 +115,14 @@ pub fn router() -> Router<AppState> {
         .route(
             "/settings",
             get(admin_settings::admin_list_settings).put(admin_settings::admin_update_settings),
+        )
+        .route(
+            "/developer/cli/execute",
+            post(admin_developer::admin_execute_developer_cli),
+        )
+        .route(
+            "/developer/logs",
+            get(admin_developer::admin_list_developer_logs),
         )
         .route(
             "/settings/account",
