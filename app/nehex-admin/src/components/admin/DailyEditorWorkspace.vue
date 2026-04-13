@@ -59,18 +59,15 @@
         <header class="panel-head panel-head-main">
           <span>Markdown</span>
           <div class="panel-tools">
-            <v-btn
-              class="daily-media-picker-btn"
-              color="primary"
-              density="comfortable"
-              size="small"
-              variant="tonal"
-              prepend-icon="mdi-folder-image"
+            <ImageUploadHintCard
+              class="daily-upload-card daily-upload-card--picker"
               :disabled="uploadingImage"
-              @click="openMediaLibraryPicker"
-            >
-              从媒体库选择
-            </v-btn>
+              icon="mdi-folder-image"
+              mode="action"
+              title="从媒体库选择"
+              hint="选择媒体库内已上传图片"
+              @activate="openMediaLibraryPicker"
+            />
             <ImageUploadHintCard
               class="daily-upload-card"
               :loading="uploadingImage"
@@ -511,12 +508,12 @@ onMounted(async () => {
   gap: 8px;
 }
 
-.daily-media-picker-btn {
-  white-space: nowrap;
-}
-
 .daily-upload-card {
   width: min(280px, 100%);
+}
+
+.daily-upload-card--picker {
+  width: min(250px, 100%);
 }
 
 .panel-left-markdown {

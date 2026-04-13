@@ -67,18 +67,15 @@
               代码块
             </v-btn>
             <div class="editor-media-actions">
-              <v-btn
-                class="editor-media-picker-btn"
-                color="primary"
-                density="comfortable"
-                size="small"
-                variant="tonal"
-                prepend-icon="mdi-folder-image"
+              <ImageUploadHintCard
+                class="editor-upload-card editor-upload-card--picker"
                 :disabled="uploadingImage"
-                @click="openMediaLibraryPicker"
-              >
-                从媒体库选择
-              </v-btn>
+                icon="mdi-folder-image"
+                mode="action"
+                title="从媒体库选择"
+                hint="选择媒体库内已上传图片"
+                @activate="openMediaLibraryPicker"
+              />
               <ImageUploadHintCard
                 class="editor-upload-card"
                 :loading="uploadingImage"
@@ -724,12 +721,12 @@ onMounted(async () => {
   gap: 8px;
 }
 
-.editor-media-picker-btn {
-  white-space: nowrap;
-}
-
 .editor-upload-card {
   width: min(320px, 100%);
+}
+
+.editor-upload-card--picker {
+  width: min(250px, 100%);
 }
 
 .editor-surface {

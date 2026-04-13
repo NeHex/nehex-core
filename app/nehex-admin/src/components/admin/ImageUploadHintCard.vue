@@ -17,6 +17,7 @@
     @drop.prevent="onDrop"
   >
     <input
+      v-if="mode === 'upload'"
       ref="inputRef"
       :accept="accept"
       class="image-upload-input"
@@ -36,7 +37,7 @@
       <v-icon
         v-else
         color="#9fb4de"
-        :icon="fileFilterMode === 'any' ? 'mdi-upload-outline' : 'mdi-image-plus-outline'"
+        :icon="resolvedIcon"
         size="18"
       />
     </div>
@@ -49,13 +50,15 @@
 </template>
 
 <script lang="ts" setup>
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 
 const props = withDefaults(defineProps<{
   title?: string
   hint?: string
   loading?: boolean
   loadingTitle?: string
+  icon?: string
+  mode?: 'upload' | 'action'
   multiple?: boolean
   disabled?: boolean
   accept?: string
@@ -65,6 +68,8 @@ const props = withDefaults(defineProps<{
   hint: '拖动图片到卡片，或点击选择图片',
   loading: false,
   loadingTitle: '正在上传图片...',
+  icon: '',
+  mode: 'upload',
   multiple: false,
   disabled: false,
   accept: 'image/*',
@@ -73,12 +78,24 @@ const props = withDefaults(defineProps<{
 
 const emit = defineEmits<{
   (event: 'select-files', files: File[]): void
+  (event: 'activate'): void
 }>()
 
 const inputRef = ref<HTMLInputElement | null>(null)
 const dragOver = ref(false)
 const dragDepth = ref(0)
 const IMAGE_EXTENSION_PATTERN = /\.(jpg|jpeg|png|webp|gif|svg|bmp|avif)$/i
+
+const resolvedIcon = computed(() => {
+  if (props.icon) {
+    return props.icon
+  }
+  return props.fileFilterMode === 'any' ? 'mdi-upload-outline' : 'mdi-image-plus-outline'
+})
+
+function canHandleDrop(): boolean {
+  return props.mode === 'upload' && !props.loading && !props.disabled
+}
 
 function isImageFile(file: File): boolean {
   if (file.type.startsWith('image/')) {
@@ -104,6 +121,10 @@ function triggerPick(): void {
   if (props.loading || props.disabled) {
     return
   }
+  if (props.mode === 'action') {
+    emit('activate')
+    return
+  }
   inputRef.value?.click()
 }
 
@@ -120,7 +141,7 @@ function onInputChange(event: Event): void {
 }
 
 function onDragEnter(): void {
-  if (props.loading || props.disabled) {
+  if (!canHandleDrop()) {
     return
   }
   dragDepth.value += 1
@@ -128,7 +149,7 @@ function onDragEnter(): void {
 }
 
 function onDragOver(event: DragEvent): void {
-  if (props.loading || props.disabled) {
+  if (!canHandleDrop()) {
     return
   }
   if (event.dataTransfer) {
@@ -147,7 +168,7 @@ function onDragLeave(): void {
 function onDrop(event: DragEvent): void {
   dragDepth.value = 0
   dragOver.value = false
-  if (props.loading || props.disabled) {
+  if (!canHandleDrop()) {
     return
   }
 
