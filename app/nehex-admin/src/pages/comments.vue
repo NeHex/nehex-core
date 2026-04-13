@@ -4,7 +4,7 @@
       <header class="page-header">
         <div class="header-text">
           <h1>评论管理</h1>
-          <p>卡片化管理评论，支持跳转目标内容并直接编辑留言信息。</p>
+          <p>在这里管理评论</p>
         </div>
       </header>
 

@@ -4,7 +4,7 @@
       <header class="page-header">
         <div class="header-text">
           <h1>相册管理</h1>
-          <p>通过卡片管理相册，支持编辑、删除和新增。</p>
+          <p>在这里管理你的相册</p>
         </div>
         <v-btn
           class="quick-create-btn"

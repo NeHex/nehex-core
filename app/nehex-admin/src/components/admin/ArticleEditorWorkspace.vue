@@ -3,7 +3,7 @@
     <header class="editor-header">
       <div class="header-text">
         <h1>{{ isEditing ? '编辑文章' : '新增文章' }}</h1>
-        <p>编辑器默认全屏 Markdown 输入，右下角可切换预览。</p>
+        <p>Nehex Editor Ver1.2.1</p>
       </div>
       <div class="header-actions">
         <v-btn
@@ -51,7 +51,7 @@
         <header class="editor-card-head">
           <div class="editor-title-wrap">
             <span class="editor-card-title">Markdown</span>
-            <span class="editor-card-subtitle">支持拖拽上传图片与快捷格式插入</span>
+            <span class="editor-card-subtitle"></span>
           </div>
 
           <div class="editor-toolbar">
@@ -226,7 +226,6 @@
       <aside class="settings-card">
         <header class="settings-head">
           <h2>文章设置</h2>
-          <p>文章标题、分类与展示选项</p>
         </header>
 
         <div class="settings-form">

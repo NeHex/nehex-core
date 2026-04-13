@@ -4,12 +4,12 @@
       <header class="page-header">
         <div class="header-text">
           <h1>开发者选项</h1>
-          <p>提供受限 CLI 模拟与后端日志查看能力，仅用于排查问题与高级调试。</p>
+          <p>限制级功能，谨慎使用！</p>
         </div>
       </header>
 
       <v-card class="section-card" rounded="xl">
-        <v-card-title class="section-title">模拟 CLI</v-card-title>
+        <v-card-title class="section-title">CLI</v-card-title>
         <v-card-text class="section-body">
           <v-tabs v-model="cliEngine" color="primary">
             <v-tab value="postgresql">PostgreSQL</v-tab>
@@ -34,7 +34,7 @@
             v-model="cliCommand"
             auto-grow
             class="command-input"
-            label="命令"
+            label="COMMAND"
             max-rows="8"
             rows="3"
             variant="outlined"
@@ -47,7 +47,7 @@
               :loading="cliRunning"
               @click="runCliCommand"
             >
-              执行命令
+              RUN COMMAND
             </v-btn>
             <div v-if="cliResult" class="result-meta">
               退出码: {{ cliResult.exit_code }} | 耗时: {{ cliResult.duration_ms }}ms

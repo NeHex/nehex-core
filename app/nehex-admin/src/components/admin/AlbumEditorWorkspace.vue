@@ -31,7 +31,7 @@
       <section class="left-panel">
         <v-card class="panel-card link-editor-card" rounded="xl">
           <v-card-title class="card-title-row">
-            <span>图片链接编辑（一行一个）</span>
+            <span>图片链接编辑</span>
             <v-btn
               color="primary"
               prepend-icon="mdi-plus"
@@ -81,7 +81,7 @@
 
         <v-card class="panel-card preview-card" rounded="xl">
           <v-card-title class="card-title-row">
-            <span>图片预览与排序（拖动卡片调整顺序）</span>
+            <span>图片预览与排序</span>
             <span class="preview-count">共 {{ previewImages.length }} 张</span>
           </v-card-title>
           <v-card-text class="preview-body">

@@ -4,7 +4,7 @@
       <header class="page-header">
         <div class="header-text">
           <h1>独立页管理</h1>
-          <p>读取独立页并通过卡片快速编辑、删除和新增。</p>
+          <p>在这里管理你的独立页</p>
         </div>
         <v-btn
           class="quick-create-btn"
