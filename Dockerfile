@@ -1,4 +1,4 @@
-ARG DOCKERHUB_MIRROR=registry.cn-hangzhou.aliyuncs.com
+ARG DOCKERHUB_MIRROR=docker.io
 
 FROM ${DOCKERHUB_MIRROR}/library/node:22-alpine AS frontend-builder
 WORKDIR /app/app/nehex-admin

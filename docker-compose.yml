@@ -4,7 +4,7 @@ services:
       context: .
       dockerfile: Dockerfile
       args:
-        DOCKERHUB_MIRROR: ${DOCKERHUB_MIRROR:-registry.cn-hangzhou.aliyuncs.com}
+        DOCKERHUB_MIRROR: ${DOCKERHUB_MIRROR:-docker.io}
     container_name: nehex-core
     restart: unless-stopped
     env_file:
@@ -34,7 +34,7 @@ services:
       retries: 6
 
   postgres:
-    image: ${POSTGRES_IMAGE:-registry.cn-hangzhou.aliyuncs.com/library/postgres:16-alpine}
+    image: ${POSTGRES_IMAGE:-postgres:16-alpine}
     container_name: nehex-postgres
     restart: unless-stopped
     environment:
@@ -54,7 +54,7 @@ services:
       start_period: 20s
 
   redis:
-    image: ${REDIS_IMAGE:-registry.cn-hangzhou.aliyuncs.com/library/redis:7.2-alpine}
+    image: ${REDIS_IMAGE:-redis:7.2-alpine}
     container_name: nehex-redis
     restart: unless-stopped
     command: ["redis-server", "--appendonly", "yes", "--save", "60", "1000"]

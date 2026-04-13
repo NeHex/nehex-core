@@ -14,12 +14,12 @@
 
 - `Cargo`：`nehex-core/.cargo/config.toml` 使用阿里云 `mirrors.aliyun.com`（sparse index）
 - `npm`：`app/nehex-admin/.npmrc` 使用 `registry.npmmirror.com`（阿里系镜像）
-- `Docker`：`Dockerfile` 与 `docker-compose.yml` 默认使用阿里云容器镜像仓库 `registry.cn-hangzhou.aliyuncs.com`
+- `Docker`：`Dockerfile` 与 `docker-compose.yml` 默认使用官方仓库 `docker.io`
 
-如需切换回官方源，可覆盖环境变量：
+如需使用镜像加速，可覆盖环境变量（`DOCKERHUB_MIRROR` 仅填写 registry 域名，不要带 `http(s)://`）：
 
 ```bash
-DOCKERHUB_MIRROR=docker.io
+DOCKERHUB_MIRROR=docker.mirrors.ustc.edu.cn
 POSTGRES_IMAGE=postgres:16-alpine
 REDIS_IMAGE=redis:7.2-alpine
 ```
