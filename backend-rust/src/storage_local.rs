@@ -613,6 +613,20 @@ async fn load_storage_config(state: &AppState) -> AppResult<StorageConfig> {
         true,
     );
 
+    let hi168_endpoint_raw = setting_map
+        .get(STORAGE_HI168_S3_ENDPOINT_KEY)
+        .map(|value| value.as_str())
+        .unwrap_or("");
+    let (hi168_s3_endpoint, hi168_bucket_from_endpoint) =
+        normalize_endpoint_with_bucket_fallback(hi168_endpoint_raw);
+    let hi168_s3_bucket = normalize_text(
+        setting_map
+            .get(STORAGE_HI168_S3_BUCKET_KEY)
+            .map(|value| value.as_str()),
+    )
+    .or(hi168_bucket_from_endpoint)
+    .unwrap_or_default();
+
     Ok(StorageConfig {
         provider,
         enabled,
@@ -681,18 +695,8 @@ async fn load_storage_config(state: &AppState) -> AppResult<StorageConfig> {
         .unwrap_or_default(),
         s3_region: normalize_text(setting_map.get(STORAGE_S3_REGION_KEY).map(|v| v.as_str()))
             .unwrap_or_default(),
-        hi168_s3_endpoint: normalize_endpoint(
-            setting_map
-                .get(STORAGE_HI168_S3_ENDPOINT_KEY)
-                .map(|v| v.as_str())
-                .unwrap_or(""),
-        ),
-        hi168_s3_bucket: normalize_text(
-            setting_map
-                .get(STORAGE_HI168_S3_BUCKET_KEY)
-                .map(|v| v.as_str()),
-        )
-        .unwrap_or_default(),
+        hi168_s3_endpoint,
+        hi168_s3_bucket,
         hi168_s3_access_key_id: normalize_text(
             setting_map
                 .get(STORAGE_HI168_S3_ACCESS_KEY_ID_KEY)
@@ -777,15 +781,45 @@ fn normalize_text(value: Option<&str>) -> Option<String> {
 }
 
 fn normalize_endpoint(value: &str) -> String {
+    normalize_endpoint_with_bucket_fallback(value).0
+}
+
+fn normalize_endpoint_with_bucket_fallback(value: &str) -> (String, Option<String>) {
     let trimmed = value.trim();
     if trimmed.is_empty() {
-        return String::new();
+        return (String::new(), None);
     }
-    if trimmed.contains("://") {
+
+    let endpoint = if trimmed.contains("://") {
         trimmed.trim_end_matches('/').to_string()
     } else {
         format!("https://{}", trimmed.trim_end_matches('/'))
-    }
+    };
+
+    let Ok(parsed) = Url::parse(&endpoint) else {
+        return (endpoint, None);
+    };
+    let Some(host) = parsed.host_str() else {
+        return (endpoint, None);
+    };
+
+    let port = parsed
+        .port()
+        .map(|value| format!(":{value}"))
+        .unwrap_or_default();
+    let normalized_endpoint = format!("{}://{host}{port}", parsed.scheme());
+
+    let bucket_from_path = parsed
+        .path_segments()
+        .and_then(|segments| {
+            segments
+                .filter(|segment| !segment.trim().is_empty())
+                .map(|segment| segment.trim().to_string())
+                .next()
+        })
+        .filter(|bucket| !bucket.is_empty());
+
+    (normalized_endpoint, bucket_from_path)
 }
 
 fn normalize_base_url(value: &str) -> String {
@@ -1085,8 +1119,9 @@ mod tests {
 
     use super::{
         DEFAULT_LOCAL_URL_PREFIX, StorageProvider, build_local_public_base_url, build_object_key,
-        build_region_candidates, infer_region_from_endpoint, join_public_url, normalize_provider,
-        read_setting_with_fallback, sanitize_relative_path, validate_media_file,
+        build_region_candidates, infer_region_from_endpoint, join_public_url,
+        normalize_endpoint_with_bucket_fallback, normalize_provider, read_setting_with_fallback,
+        sanitize_relative_path, validate_media_file,
     };
     use crate::error::AppError;
 
@@ -1205,5 +1240,20 @@ mod tests {
 
         let values = build_region_candidates("", "https://custom-endpoint.local", false);
         assert_eq!(values, vec!["us-east-1".to_string()]);
+    }
+
+    #[test]
+    fn endpoint_normalization_extracts_bucket_from_path() {
+        let (endpoint, bucket) =
+            normalize_endpoint_with_bucket_fallback("https://s3.hi168.com/hi168-demo-bucket");
+        assert_eq!(endpoint, "https://s3.hi168.com".to_string());
+        assert_eq!(bucket, Some("hi168-demo-bucket".to_string()));
+    }
+
+    #[test]
+    fn endpoint_normalization_keeps_host_when_no_path_bucket() {
+        let (endpoint, bucket) = normalize_endpoint_with_bucket_fallback("s3.hi168.com");
+        assert_eq!(endpoint, "https://s3.hi168.com".to_string());
+        assert_eq!(bucket, None);
     }
 }
