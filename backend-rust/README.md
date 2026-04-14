@@ -15,6 +15,8 @@ Implemented runtime foundation:
 - CORS, logging, health/version
 - admin frontend static fallback (`/nehex-admin/...` style)
 - online presence websocket (`/ws/online`)
+- content updates websocket (`/ws/content-updates`)
+- content sync compensation APIs (`/api/sync/version`, `/api/sync/changes`)
 
 Migrated public endpoints:
 - `GET /article`
