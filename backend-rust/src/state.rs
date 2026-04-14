@@ -7,7 +7,11 @@ use std::{
 use sqlx::PgPool;
 use tokio::sync::RwLock;
 
-use crate::{cache::RuntimeCache, config::Settings, routes::ws_online::OnlinePresenceHub};
+use crate::{
+    cache::RuntimeCache,
+    config::Settings,
+    routes::{ws_content_updates::ContentUpdatesHub, ws_online::OnlinePresenceHub},
+};
 
 #[derive(Clone)]
 pub struct AppState {
@@ -18,6 +22,7 @@ pub struct AppState {
     pub admin_path_cache: Arc<RwLock<Option<AdminPathCache>>>,
     pub runtime_cache: Arc<RuntimeCache>,
     pub online_presence_hub: Arc<OnlinePresenceHub>,
+    pub content_updates_hub: Arc<ContentUpdatesHub>,
 }
 
 #[derive(Debug)]
