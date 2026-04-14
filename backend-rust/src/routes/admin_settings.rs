@@ -15,7 +15,7 @@ use crate::{
     state::AppState,
 };
 
-use super::{admin_auth, admin_mail};
+use super::{admin_auth, admin_mail, sync_api};
 
 const SENSITIVE_ADMIN_SETTING_KEYS: &[&str] = &["user_account", "user_account_password"];
 const SETTINGS_CACHE_KEY: &str = "settings:list";
@@ -217,6 +217,7 @@ pub async fn admin_update_settings(
         let mut guard = state.admin_path_cache.write().await;
         *guard = None;
     }
+    sync_api::record_content_change_best_effort(&state, "setting", "update", vec![]).await;
 
     let data = list_admin_settings(&state).await?;
     Ok(Json(AdminSettingListResponse { data }))
@@ -305,6 +306,7 @@ pub async fn admin_update_account_settings(
     })?;
     invalidate_settings_cache(&state).await;
     admin_mail::invalidate_mail_settings_cache();
+    sync_api::record_content_change_best_effort(&state, "setting", "update", vec![]).await;
 
     let data = list_admin_settings(&state).await?;
     Ok(Json(AdminSettingListResponse { data }))
