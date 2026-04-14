@@ -109,6 +109,10 @@ pub async fn create_db_pool(settings: &Settings) -> AppResult<PgPool> {
 }
 
 pub async fn apply_startup_schema_maintenance(settings: &Settings, pool: &PgPool) {
+    if let Err(error) = ensure_content_sync_tables(pool).await {
+        warn!("[startup] skip ensure_content_sync_tables: {error}");
+    }
+
     if let Err(error) = ensure_schema_compatibility_boolean_flags(pool).await {
         warn!("[startup] skip ensure_schema_compatibility_boolean_flags: {error}");
     }
@@ -137,10 +141,38 @@ pub async fn apply_startup_schema_maintenance(settings: &Settings, pool: &PgPool
 pub async fn ensure_installation_schema_bootstrap(pool: &PgPool) -> AppResult<()> {
     ensure_core_content_tables(pool).await?;
     ensure_system_tables(pool).await?;
+    ensure_content_sync_tables(pool).await?;
     ensure_schema_compatibility_columns(pool).await?;
     ensure_schema_compatibility_boolean_flags(pool).await?;
     ensure_schema_compatibility_numeric_types(pool).await?;
     ensure_performance_indexes(pool).await?;
+    Ok(())
+}
+
+async fn ensure_content_sync_tables(pool: &PgPool) -> AppResult<()> {
+    run_ddl(
+        pool,
+        r#"
+        CREATE TABLE IF NOT EXISTS content_change_log (
+            seq BIGSERIAL PRIMARY KEY,
+            event_type VARCHAR(40) NOT NULL DEFAULT 'content.updated',
+            resource VARCHAR(40) NOT NULL,
+            action VARCHAR(20) NOT NULL,
+            ids JSONB NOT NULL DEFAULT '[]'::jsonb,
+            updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+        )
+        "#,
+        "content_change_log",
+    )
+    .await?;
+
+    run_ddl(
+        pool,
+        "CREATE INDEX IF NOT EXISTS idx_content_change_log_resource_seq ON content_change_log (resource, seq)",
+        "idx_content_change_log_resource_seq",
+    )
+    .await?;
+
     Ok(())
 }
 
