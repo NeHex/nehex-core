@@ -588,7 +588,7 @@ export function useSettingsPage() {
 
   const envVersion = (
     (import.meta as ImportMeta & { env?: Record<string, string | undefined> }).env
-      ?.VITE_NEHEX_CORE_VERSION || '1.2.2'
+      ?.VITE_NEHEX_CORE_VERSION || '1.2.3'
   ).trim()
 
   const nehexSnapshot = ref<NehexSnapshot>(getNehexSnapshotData())
