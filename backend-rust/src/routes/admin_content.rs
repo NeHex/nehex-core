@@ -11,7 +11,7 @@ use crate::{
     state::AppState,
 };
 
-use super::admin_auth;
+use super::{admin_auth, sync_api};
 
 const ARTICLES_CACHE_KEY: &str = "articles:list";
 const DAILIES_CACHE_KEY: &str = "dailies:list";
@@ -356,6 +356,7 @@ pub async fn admin_create_article(
     .await
     .map_err(|error| AppError::internal(format!("Failed to create article: {error}")))?;
     invalidate_cache_key(&state, ARTICLES_CACHE_KEY).await;
+    sync_api::record_content_change_best_effort(&state, "article", "create", vec![item.id]).await;
 
     Ok(Json(AdminArticleDetailResponse { data: item }))
 }
@@ -414,6 +415,7 @@ pub async fn admin_update_article(
     .map_err(|error| AppError::internal(format!("Failed to update article: {error}")))?
     .ok_or_else(|| AppError::not_found("Article not found"))?;
     invalidate_cache_key(&state, ARTICLES_CACHE_KEY).await;
+    sync_api::record_content_change_best_effort(&state, "article", "update", vec![item.id]).await;
 
     Ok(Json(AdminArticleDetailResponse { data: item }))
 }
@@ -436,6 +438,8 @@ pub async fn admin_delete_article(
         return Err(AppError::not_found("Article not found"));
     }
     invalidate_cache_key(&state, ARTICLES_CACHE_KEY).await;
+    sync_api::record_content_change_best_effort(&state, "article", "delete", vec![article_id])
+        .await;
 
     Ok(Json(AdminActionResponse {
         success: true,
@@ -466,6 +470,7 @@ pub async fn admin_create_daily(
     .await
     .map_err(|error| AppError::internal(format!("Failed to create daily: {error}")))?;
     invalidate_cache_key(&state, DAILIES_CACHE_KEY).await;
+    sync_api::record_content_change_best_effort(&state, "daily", "create", vec![item.id]).await;
 
     Ok(Json(AdminDailyDetailResponse { data: item }))
 }
@@ -497,6 +502,7 @@ pub async fn admin_update_daily(
     .map_err(|error| AppError::internal(format!("Failed to update daily: {error}")))?
     .ok_or_else(|| AppError::not_found("Daily not found"))?;
     invalidate_cache_key(&state, DAILIES_CACHE_KEY).await;
+    sync_api::record_content_change_best_effort(&state, "daily", "update", vec![item.id]).await;
 
     Ok(Json(AdminDailyDetailResponse { data: item }))
 }
@@ -539,6 +545,7 @@ pub async fn admin_delete_daily(
         return Err(AppError::not_found("Daily not found"));
     }
     invalidate_cache_key(&state, DAILIES_CACHE_KEY).await;
+    sync_api::record_content_change_best_effort(&state, "daily", "delete", vec![daily_id]).await;
 
     Ok(Json(AdminActionResponse {
         success: true,
@@ -580,6 +587,7 @@ pub async fn admin_create_album(
     .await
     .map_err(|error| AppError::internal(format!("Failed to create album: {error}")))?;
     invalidate_cache_key(&state, ALBUMS_CACHE_KEY).await;
+    sync_api::record_content_change_best_effort(&state, "album", "create", vec![item.id]).await;
 
     Ok(Json(AdminAlbumDetailResponse { data: item }))
 }
@@ -622,6 +630,7 @@ pub async fn admin_update_album(
     .map_err(|error| AppError::internal(format!("Failed to update album: {error}")))?
     .ok_or_else(|| AppError::not_found("Album not found"))?;
     invalidate_cache_key(&state, ALBUMS_CACHE_KEY).await;
+    sync_api::record_content_change_best_effort(&state, "album", "update", vec![item.id]).await;
 
     Ok(Json(AdminAlbumDetailResponse { data: item }))
 }
@@ -644,6 +653,7 @@ pub async fn admin_delete_album(
         return Err(AppError::not_found("Album not found"));
     }
     invalidate_cache_key(&state, ALBUMS_CACHE_KEY).await;
+    sync_api::record_content_change_best_effort(&state, "album", "delete", vec![album_id]).await;
 
     Ok(Json(AdminActionResponse {
         success: true,
@@ -917,6 +927,7 @@ pub async fn admin_create_project(
     .await
     .map_err(|error| AppError::internal(format!("Failed to create project: {error}")))?;
     invalidate_cache_key(&state, PROJECTS_CACHE_KEY).await;
+    sync_api::record_content_change_best_effort(&state, "project", "create", vec![item.id]).await;
 
     Ok(Json(AdminProjectDetailResponse { data: item }))
 }
@@ -979,6 +990,7 @@ pub async fn admin_update_project(
     .map_err(|error| AppError::internal(format!("Failed to update project: {error}")))?
     .ok_or_else(|| AppError::not_found("Project not found"))?;
     invalidate_cache_key(&state, PROJECTS_CACHE_KEY).await;
+    sync_api::record_content_change_best_effort(&state, "project", "update", vec![item.id]).await;
 
     Ok(Json(AdminProjectDetailResponse { data: item }))
 }
@@ -1001,6 +1013,8 @@ pub async fn admin_delete_project(
         return Err(AppError::not_found("Project not found"));
     }
     invalidate_cache_key(&state, PROJECTS_CACHE_KEY).await;
+    sync_api::record_content_change_best_effort(&state, "project", "delete", vec![project_id])
+        .await;
 
     Ok(Json(AdminActionResponse {
         success: true,
