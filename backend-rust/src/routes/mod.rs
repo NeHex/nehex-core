@@ -13,4 +13,6 @@ pub mod admin_static;
 pub mod health;
 pub mod public_api;
 pub mod storage_files;
+pub mod sync_api;
+pub mod ws_content_updates;
 pub mod ws_online;
