@@ -76,7 +76,10 @@ async fn run() -> AppResult<()> {
         admin_path_cache: Arc::new(RwLock::new(None)),
         runtime_cache,
         online_presence_hub: Arc::new(routes::ws_online::OnlinePresenceHub::new()),
+        content_updates_hub: Arc::new(routes::ws_content_updates::ContentUpdatesHub::new()),
     };
+
+    routes::ws_content_updates::spawn_redis_subscriber(state.clone());
 
     let cors_layer = build_cors_layer(&settings);
     let admin_api_router =
@@ -86,8 +89,10 @@ async fn run() -> AppResult<()> {
         .route("/health", get(routes::health::health))
         .route("/version", get(routes::health::version))
         .merge(routes::public_api::router())
+        .merge(routes::sync_api::router())
         .merge(routes::storage_files::router())
         .merge(routes::ws_online::router())
+        .merge(routes::ws_content_updates::router())
         .nest("/admin-api", admin_api_router)
         .fallback(routes::admin_static::fallback_handler)
         .layer(TraceLayer::new_for_http())
