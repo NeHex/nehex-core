@@ -13,7 +13,7 @@ use crate::{
     state::AppState,
 };
 
-use super::admin_auth;
+use super::{admin_auth, sync_api};
 
 const FRIENDS_CACHE_KEY: &str = "friends:list";
 
@@ -200,13 +200,13 @@ pub async fn admin_create_friend(
             AppError::internal(format!("Failed to inspect existing friend: {error}"))
         })?;
 
-    let data = if let Some(existing_row) = existing {
+    let (data, event_action) = if let Some(existing_row) = existing {
         if !overwrite_existing {
             return Err(AppError::Conflict("Friend URL already exists".to_string()));
         }
 
         let friend_id = existing_row.try_get::<i64, _>("id").unwrap_or_default();
-        sqlx::query_as::<_, FriendItem>(
+        let data = sqlx::query_as::<_, FriendItem>(
             r#"
             UPDATE friends
             SET
@@ -229,9 +229,10 @@ pub async fn admin_create_friend(
         .bind(status)
         .fetch_one(&state.db_pool)
         .await
-        .map_err(|error| AppError::internal(format!("Failed to overwrite friend: {error}")))?
+        .map_err(|error| AppError::internal(format!("Failed to overwrite friend: {error}")))?;
+        (data, "update")
     } else {
-        sqlx::query_as::<_, FriendItem>(
+        let data = sqlx::query_as::<_, FriendItem>(
             r#"
             INSERT INTO friends (title, description, category, favicon, url, status)
             VALUES ($1,$2,$3,$4,$5,$6)
@@ -246,9 +247,12 @@ pub async fn admin_create_friend(
         .bind(status)
         .fetch_one(&state.db_pool)
         .await
-        .map_err(map_unique_violation("Friend URL already exists"))?
+        .map_err(map_unique_violation("Friend URL already exists"))?;
+        (data, "create")
     };
     invalidate_friends_cache(&state).await;
+    sync_api::record_content_change_best_effort(&state, "friend", event_action, vec![data.id])
+        .await;
 
     Ok(Json(AdminFriendDetailResponse { data }))
 }
@@ -344,6 +348,7 @@ pub async fn admin_update_friend(
     .await
     .map_err(map_unique_violation("Friend URL already exists"))?;
     invalidate_friends_cache(&state).await;
+    sync_api::record_content_change_best_effort(&state, "friend", "update", vec![data.id]).await;
 
     Ok(Json(AdminFriendDetailResponse { data }))
 }
@@ -366,6 +371,7 @@ pub async fn admin_delete_friend(
         return Err(AppError::not_found("Friend not found"));
     }
     invalidate_friends_cache(&state).await;
+    sync_api::record_content_change_best_effort(&state, "friend", "delete", vec![friend_id]).await;
 
     Ok(Json(AdminActionResponse {
         success: true,
@@ -649,6 +655,7 @@ pub async fn admin_update_friend_apply_status(
         AppError::internal(format!("Failed to update friend apply status: {error}"))
     })?;
     invalidate_friends_cache(&state).await;
+    sync_api::record_content_change_best_effort(&state, "friend", "update", vec![]).await;
 
     Ok(Json(AdminFriendApplyDetailResponse { data }))
 }
