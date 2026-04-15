@@ -133,6 +133,10 @@ pub fn router() -> Router<AppState> {
             post(admin_settings::admin_test_kuma_api_url),
         )
         .route(
+            "/settings/kuma-api/{provider}/{movie_id}",
+            get(admin_settings::admin_get_kuma_movie),
+        )
+        .route(
             "/backups",
             get(admin_backup::admin_list_backups).post(admin_backup::admin_create_backup),
         )
