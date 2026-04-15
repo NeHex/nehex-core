@@ -228,6 +228,26 @@
     <main class="content-wrap" :class="{ 'content-wrap--mobile': isMobile }">
       <slot />
     </main>
+
+    <v-dialog v-model="kumaConfigDialog" max-width="520">
+      <v-card class="dialog-card" rounded="xl">
+        <v-card-title>未配置 Kuma API</v-card-title>
+        <v-card-text>
+          检测到尚未配置 Kuma-API 地址，请前往
+          <a class="kuma-settings-link" href="#" @click.prevent="goToKumaConfig">
+            设定 -> NeHex配置
+          </a>
+          完成配置后再进入 Kuma 页面。
+        </v-card-text>
+        <v-card-actions>
+          <v-spacer />
+          <v-btn variant="text" @click="kumaConfigDialog = false">取消</v-btn>
+          <v-btn color="primary" prepend-icon="mdi-open-in-new" @click="goToKumaConfig">
+            前往配置
+          </v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
   </div>
 </template>
 
@@ -236,7 +256,7 @@ import { computed, ref, useSlots, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useDisplay } from 'vuetify'
 import { adminLogout, resetAdminSessionCache } from '@/services/admin-api'
-import { fetchSiteUrl } from '@/services/settings'
+import { fetchSettingsMap, fetchSiteUrl } from '@/services/settings'
 import { clearAuthSession } from '@/utils/auth'
 
 type MenuChildItem = {
@@ -255,6 +275,7 @@ type MenuItem = {
 
 const menuItems: MenuItem[] = [
   { icon: 'mdi-view-dashboard-outline', label: '仪表盘', to: '/' },
+  { icon: 'mdi-television-play', label: 'Kuma', to: '/kuma' },
   {
     icon: 'mdi-post-outline',
     label: '文章管理',
@@ -339,6 +360,7 @@ const hasSecondaryNav = computed(() => Boolean(slots['secondary-nav']))
 const isMobile = computed(() => display.mdAndDown.value)
 const mobileMainDrawer = ref(false)
 const mobileSecondaryDrawer = ref(false)
+const kumaConfigDialog = ref(false)
 
 watch(
   () => route.fullPath,
@@ -422,6 +444,11 @@ function handleMenuItemClick(item: MenuItem): void {
     return
   }
 
+  if (item.to === '/kuma') {
+    void handleKumaRouteEnter()
+    return
+  }
+
   void router.push(item.to)
 }
 
@@ -467,6 +494,35 @@ function closeMobileDrawers(): void {
   }
   mobileMainDrawer.value = false
   mobileSecondaryDrawer.value = false
+}
+
+async function handleKumaRouteEnter(): Promise<void> {
+  closeMobileDrawers()
+
+  const configured = await hasKumaApiConfigured()
+  if (!configured) {
+    kumaConfigDialog.value = true
+    return
+  }
+
+  await router.push('/kuma')
+}
+
+async function hasKumaApiConfigured(): Promise<boolean> {
+  try {
+    const settingsMap = await fetchSettingsMap()
+    const kumaApiUrl = String(settingsMap.get('kuma_api_url') ?? '').trim()
+    return kumaApiUrl.length > 0
+  } catch (error) {
+    console.warn('Failed to check kuma_api_url from /setting', error)
+    return false
+  }
+}
+
+function goToKumaConfig(): void {
+  kumaConfigDialog.value = false
+  closeMobileDrawers()
+  void router.push('/settings')
 }
 </script>
 
@@ -696,6 +752,17 @@ function closeMobileDrawers(): void {
 .content-wrap {
   padding: 22px;
   min-width: 0;
+}
+
+.dialog-card {
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: linear-gradient(180deg, rgba(24, 30, 41, 0.98), rgba(19, 24, 34, 0.98));
+  color: #edf1ff;
+}
+
+.kuma-settings-link {
+  color: #8fb0ff;
+  text-decoration: underline;
 }
 
 @media (max-width: 980px) {
