@@ -23,5 +23,6 @@ declare module 'vue' {
     ProjectEditorWorkspace: typeof import('./components/admin/ProjectEditorWorkspace.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
+    UnsavedChangesLeaveDialog: typeof import('./components/common/UnsavedChangesLeaveDialog.vue')['default']
   }
 }
