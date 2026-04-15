@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, time::Duration};
 
 use axum::{
     Json,
@@ -9,6 +9,7 @@ use chrono::NaiveDateTime;
 use serde::{Deserialize, Serialize, de::Error as DeError};
 use serde_json::Value;
 use sqlx::Row;
+use url::Url;
 
 use crate::{
     error::{AppError, AppResult},
@@ -21,6 +22,9 @@ const SENSITIVE_ADMIN_SETTING_KEYS: &[&str] = &["user_account", "user_account_pa
 const SETTINGS_CACHE_KEY: &str = "settings:list";
 const SETTINGS_WITH_THEME_DETAILS_CACHE_KEY: &str = "settings:list:with-theme-details";
 const INSTALL_STATUS_CACHE_KEY: &str = "admin:install:status";
+const KUMA_API_DEFAULT_HELLO: &str =
+    "hello,welcome to Kuma API; Visite: https://github.com/nehex/kuma-api";
+const KUMA_API_TEST_TIMEOUT_SECONDS: u64 = 8;
 
 #[derive(Serialize)]
 struct SettingItem {
@@ -56,6 +60,19 @@ pub struct AdminAccountSettingsUpdateRequest {
     account: Option<String>,
     new_password: Option<String>,
     confirm_password: Option<String>,
+}
+
+#[derive(Deserialize)]
+pub struct AdminKumaApiTestRequest {
+    url: String,
+}
+
+#[derive(Serialize)]
+pub struct AdminKumaApiTestResponse {
+    success: bool,
+    message: String,
+    normalized_url: String,
+    response_preview: String,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -312,6 +329,68 @@ pub async fn admin_update_account_settings(
     Ok(Json(AdminSettingListResponse { data }))
 }
 
+pub async fn admin_test_kuma_api_url(
+    State(state): State<AppState>,
+    method: Method,
+    headers: HeaderMap,
+    Json(payload): Json<AdminKumaApiTestRequest>,
+) -> AppResult<Json<AdminKumaApiTestResponse>> {
+    let _principal = admin_auth::require_admin_principal(&state, &method, &headers)?;
+    let normalized_url = normalize_kuma_api_url(payload.url)?;
+
+    let mut client_builder =
+        reqwest::Client::builder().timeout(Duration::from_secs(KUMA_API_TEST_TIMEOUT_SECONDS));
+    if should_bypass_env_proxy_for_kuma() {
+        // Loopback proxies (127.0.0.1/localhost) are frequently invalid inside containers and
+        // can break outbound connectivity to public Kuma endpoints.
+        client_builder = client_builder.no_proxy();
+    }
+    let client = client_builder
+        .build()
+        .map_err(|error| AppError::internal(format!("Failed to build HTTP client: {error}")))?;
+
+    let response = client
+        .get(normalized_url.as_str())
+        .send()
+        .await
+        .map_err(|error| {
+            AppError::Unprocessable(format!("Kuma API 请求失败: {error} (debug: {error:?})"))
+        })?;
+
+    if !response.status().is_success() {
+        return Err(AppError::Unprocessable(format!(
+            "Kuma API 返回状态异常: {}",
+            response.status()
+        )));
+    }
+
+    let body = response
+        .json::<Value>()
+        .await
+        .map_err(|error| AppError::Unprocessable(format!("Kuma API 返回非 JSON: {error}")))?;
+
+    let first_message = body
+        .as_array()
+        .and_then(|items| items.first())
+        .and_then(|item| item.as_str())
+        .unwrap_or_default()
+        .trim()
+        .to_string();
+
+    if first_message != KUMA_API_DEFAULT_HELLO {
+        return Err(AppError::Unprocessable(format!(
+            "Kuma API 返回内容不符合预期: {first_message}"
+        )));
+    }
+
+    Ok(Json(AdminKumaApiTestResponse {
+        success: true,
+        message: "连接成功，Kuma-API 可用".to_string(),
+        normalized_url,
+        response_preview: first_message,
+    }))
+}
+
 async fn list_admin_settings(state: &AppState) -> AppResult<Vec<SettingItem>> {
     let rows = sqlx::query(
         r#"
@@ -399,6 +478,73 @@ fn serialize_setting_content(setting_type: &str, value: Value) -> AppResult<Opti
 
 fn is_supported_setting_type(value: &str) -> bool {
     matches!(value, "string" | "int" | "float" | "boolean" | "json")
+}
+
+fn should_bypass_env_proxy_for_kuma() -> bool {
+    [
+        "HTTPS_PROXY",
+        "https_proxy",
+        "HTTP_PROXY",
+        "http_proxy",
+        "ALL_PROXY",
+        "all_proxy",
+    ]
+    .iter()
+    .filter_map(|key| std::env::var(key).ok())
+    .any(|value| is_loopback_proxy(&value))
+}
+
+fn is_loopback_proxy(raw: &str) -> bool {
+    let text = raw.trim();
+    if text.is_empty() {
+        return false;
+    }
+
+    let normalized = if text.contains("://") {
+        text.to_string()
+    } else {
+        format!("http://{text}")
+    };
+
+    Url::parse(&normalized)
+        .ok()
+        .and_then(|url| url.host_str().map(|host| host.to_ascii_lowercase()))
+        .map(|host| matches!(host.as_str(), "127.0.0.1" | "localhost" | "::1" | "0.0.0.0"))
+        .unwrap_or(false)
+}
+
+fn normalize_kuma_api_url(raw: String) -> AppResult<String> {
+    let text = raw.trim();
+    if text.is_empty() {
+        return Err(AppError::Unprocessable(
+            "Kuma API 地址不能为空".to_string(),
+        ));
+    }
+
+    let normalized = if text.starts_with("http://") || text.starts_with("https://") {
+        text.to_string()
+    } else if text.starts_with("//") {
+        format!("https:{text}")
+    } else {
+        format!("https://{}", text.trim_start_matches('/'))
+    };
+
+    let parsed = Url::parse(&normalized)
+        .map_err(|error| AppError::Unprocessable(format!("Kuma API 地址格式错误: {error}")))?;
+
+    let scheme = parsed.scheme();
+    if scheme != "http" && scheme != "https" {
+        return Err(AppError::Unprocessable(
+            "Kuma API 地址仅支持 http/https".to_string(),
+        ));
+    }
+    if parsed.host_str().is_none() {
+        return Err(AppError::Unprocessable(
+            "Kuma API 地址缺少主机名".to_string(),
+        ));
+    }
+
+    Ok(parsed.to_string())
 }
 
 fn normalize_optional_text(value: String) -> Option<String> {

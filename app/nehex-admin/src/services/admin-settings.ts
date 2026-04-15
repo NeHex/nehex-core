@@ -24,6 +24,13 @@ export type AdminAccountSettingsUpdatePayload = {
   confirm_password?: string | null
 }
 
+export type AdminKumaApiTestResult = {
+  success: boolean
+  message: string
+  normalized_url: string
+  response_preview: string
+}
+
 type AdminSettingListResponse = {
   data: AdminSettingItem[]
 }
@@ -70,4 +77,17 @@ export async function updateAdminAccountSettings(
     throw new Error('Unexpected admin account settings response format')
   }
   return result.data
+}
+
+export async function testAdminKumaApiUrl(url: string): Promise<AdminKumaApiTestResult> {
+  const response = await adminFetch('/admin-api/settings/kuma-api/test', {
+    method: 'POST',
+    body: JSON.stringify({ url }),
+  })
+
+  const payload = await parseJson<AdminKumaApiTestResult>(response)
+  if (!payload || typeof payload !== 'object') {
+    throw new Error('Unexpected kuma api test response format')
+  }
+  return payload
 }

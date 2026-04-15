@@ -1,6 +1,7 @@
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import {
   fetchAdminSettings,
+  testAdminKumaApiUrl,
   updateAdminAccountSettings,
   updateAdminSettings,
   type AdminSettingItem,
@@ -148,7 +149,6 @@ const sections: SectionMeta[] = [
 const defaultSection: SectionMeta = sections[0]!
 
 const githubLatestReleaseApi = 'https://api.github.com/repos/nehex/nehex-core/releases/latest'
-const KUMA_API_DEFAULT_HELLO = 'hello,welcome to Kuma API; Visite: https://github.com/nehex/kuma-api'
 const REI_THEME_FILE = 'rei.json'
 const CREATE_THEME_OPTION_VALUE = '__create_theme_template__'
 const DEFAULT_ADMIN_LOGIN_BACKGROUND = '/images/background-2k.png'
@@ -1360,26 +1360,9 @@ export function useSettingsPage() {
 
     kumaApiTesting.value = true
     try {
-      const response = await fetch(target, {
-        method: 'GET',
-        cache: 'no-store',
-      })
-
-      if (!response.ok) {
-        throw new Error(`请求失败 (${response.status})`)
-      }
-
-      const payload = await response.json() as unknown
-      if (!Array.isArray(payload) || typeof payload[0] !== 'string') {
-        throw new Error('返回格式错误，期望 JSON 数组字符串')
-      }
-
-      if (payload[0] !== KUMA_API_DEFAULT_HELLO) {
-        throw new Error(`返回内容不匹配，收到: ${payload[0]}`)
-      }
-
-      nehexForm.kumaApiUrl = target
-      kumaApiTestResult.value = '连接成功，Kuma-API 可用'
+      const result = await testAdminKumaApiUrl(target)
+      nehexForm.kumaApiUrl = result.normalized_url || target
+      kumaApiTestResult.value = result.message || '连接成功，Kuma-API 可用'
     } catch (error) {
       kumaApiTestError.value = error instanceof Error ? error.message : '测试失败'
     } finally {

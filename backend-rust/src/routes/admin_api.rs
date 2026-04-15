@@ -129,6 +129,10 @@ pub fn router() -> Router<AppState> {
             put(admin_settings::admin_update_account_settings),
         )
         .route(
+            "/settings/kuma-api/test",
+            post(admin_settings::admin_test_kuma_api_url),
+        )
+        .route(
             "/backups",
             get(admin_backup::admin_list_backups).post(admin_backup::admin_create_backup),
         )
