@@ -108,6 +108,7 @@
                 @click="handleSubmenuItemClick(child)"
               />
             </div>
+            <hr v-if="item.dividerAfter" class="menu-divider">
           </template>
         </v-list>
 
@@ -168,6 +169,7 @@
               @click="handleSubmenuItemClick(child)"
             />
           </div>
+          <hr v-if="item.dividerAfter" class="menu-divider">
         </template>
       </v-list>
 
@@ -271,12 +273,19 @@ type MenuItem = {
   label: string
   to: string
   dividerBefore?: boolean
+  dividerAfter?: boolean
   children?: MenuChildItem[]
 }
 
 const menuItems: MenuItem[] = [
   { icon: 'mdi-view-dashboard-outline', label: '仪表盘', to: '/' },
-  { icon: 'mdi-server-outline', label: 'Kuma', to: '/kuma', dividerBefore: true },
+  {
+    icon: 'mdi-server-outline',
+    label: 'Kuma',
+    to: '/kuma',
+    dividerBefore: true,
+    dividerAfter: true,
+  },
   {
     icon: 'mdi-post-outline',
     label: '文章管理',
