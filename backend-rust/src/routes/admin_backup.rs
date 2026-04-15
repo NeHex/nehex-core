@@ -52,6 +52,7 @@ const APP_TABLE_ORDER: &[&str] = &[
     "comment",
     "media_folder",
     "media_image",
+    "kuma_movie",
     "mail_log",
 ];
 
