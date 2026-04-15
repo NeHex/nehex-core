@@ -106,6 +106,11 @@
       v-model="mediaPickerVisible"
       @select-image="handleMediaLibrarySelect"
     />
+    <UnsavedChangesLeaveDialog
+      v-model="unsavedLeaveDialogVisible"
+      @cancel="cancelUnsavedLeave"
+      @confirm="confirmUnsavedLeave"
+    />
   </section>
 </template>
 
@@ -113,7 +118,9 @@
 import MarkdownIt from 'markdown-it'
 import { computed, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
+import UnsavedChangesLeaveDialog from '@/components/common/UnsavedChangesLeaveDialog.vue'
 import { useGlobalSnackbar } from '@/composables/useGlobalSnackbar'
+import { useUnsavedChangesGuard } from '@/composables/useUnsavedChangesGuard'
 import {
   createDaily,
   fetchDailyById,
@@ -147,6 +154,12 @@ type SelectedMediaImage = {
   fileName: string
 }
 
+type EditorSnapshot = {
+  title: string
+  weather: string
+  content: string
+}
+
 const loading = ref(false)
 const submitting = ref(false)
 const uploadingImage = ref(false)
@@ -159,6 +172,7 @@ const dragOver = ref(false)
 const dragDepth = ref(0)
 const splitPanelRef = ref<HTMLElement | null>(null)
 const markdownInputRef = ref<HTMLTextAreaElement | null>(null)
+const savedSnapshot = ref('')
 const {
   showGlobalSuccess,
   showGlobalError,
@@ -184,6 +198,29 @@ const renderedMarkdown = computed(() => {
   }
   return markdown.render(content)
 })
+
+function buildEditorSnapshot(): EditorSnapshot {
+  return {
+    title: editorForm.title.trim(),
+    weather: editorForm.weather.trim().toLowerCase(),
+    content: editorForm.content,
+  }
+}
+
+function serializeSnapshot(snapshot: EditorSnapshot): string {
+  return JSON.stringify(snapshot)
+}
+
+function syncSavedSnapshot(): void {
+  savedSnapshot.value = serializeSnapshot(buildEditorSnapshot())
+}
+
+const hasUnsavedChanges = computed(() => serializeSnapshot(buildEditorSnapshot()) !== savedSnapshot.value)
+const {
+  unsavedLeaveDialogVisible,
+  confirmUnsavedLeave,
+  cancelUnsavedLeave,
+} = useUnsavedChangesGuard(hasUnsavedChanges)
 
 function clampPercent(value: number): number {
   return Math.min(75, Math.max(25, value))
@@ -411,6 +448,7 @@ async function submitEditor(): Promise<void> {
     } else {
       await createDaily(payload)
     }
+    syncSavedSnapshot()
     showGlobalSuccess('日常发布成功')
     await router.push('/dailies')
   } catch (error) {
@@ -428,6 +466,7 @@ async function goManage(): Promise<void> {
 
 onMounted(async () => {
   await loadDailyDetail()
+  syncSavedSnapshot()
 })
 </script>
 
