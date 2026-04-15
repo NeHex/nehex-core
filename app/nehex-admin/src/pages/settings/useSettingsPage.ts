@@ -26,6 +26,7 @@ type SectionKey = 'nehex' | 'site' | 'owner' | 'storage' | 'theme'
 type NehexForm = {
   adminManagerWeb: string
   adminLoginBackground: string
+  kumaApiUrl: string
 }
 
 type SiteForm = {
@@ -147,6 +148,7 @@ const sections: SectionMeta[] = [
 const defaultSection: SectionMeta = sections[0]!
 
 const githubLatestReleaseApi = 'https://api.github.com/repos/nehex/nehex-core/releases/latest'
+const KUMA_API_DEFAULT_HELLO = 'hello,welcome to Kuma API; Visite: https://github.com/nehex/kuma-api'
 const REI_THEME_FILE = 'rei.json'
 const CREATE_THEME_OPTION_VALUE = '__create_theme_template__'
 const DEFAULT_ADMIN_LOGIN_BACKGROUND = '/images/background-2k.png'
@@ -471,6 +473,23 @@ function validateAdminManagerWebPath(raw: string): string {
   return ''
 }
 
+function normalizeKumaApiUrl(raw: string): string {
+  const text = raw.trim()
+  if (!text) {
+    return ''
+  }
+
+  if (text.startsWith('http://') || text.startsWith('https://')) {
+    return text
+  }
+
+  if (text.startsWith('//')) {
+    return `https:${text}`
+  }
+
+  return `https://${text.replace(/^\/+/, '')}`
+}
+
 function normalizeStorageProvider(raw: string): StorageProvider {
   const normalized = raw.trim().toLowerCase()
   if (normalized === 'r2' || normalized === 's3' || normalized === 'aliyun_oss' || normalized === 'hi168_s3' || normalized === 'local') {
@@ -514,6 +533,7 @@ export function useSettingsPage() {
   const nehexForm = reactive<NehexForm>({
     adminManagerWeb: '/nehex-admin',
     adminLoginBackground: DEFAULT_ADMIN_LOGIN_BACKGROUND,
+    kumaApiUrl: '',
   })
 
   const nehexClasses = ref<ArticleClassItem[]>([])
@@ -585,6 +605,9 @@ export function useSettingsPage() {
   const updateCheckError = ref('')
   const latestRelease = ref<LatestRelease | null>(null)
   const currentVersion = ref('')
+  const kumaApiTesting = ref(false)
+  const kumaApiTestResult = ref('')
+  const kumaApiTestError = ref('')
 
   const envVersion = (
     (import.meta as ImportMeta & { env?: Record<string, string | undefined> }).env
@@ -895,6 +918,7 @@ export function useSettingsPage() {
       form: {
         adminManagerWeb: nehexForm.adminManagerWeb,
         adminLoginBackground: nehexForm.adminLoginBackground,
+        kumaApiUrl: nehexForm.kumaApiUrl,
       },
       classes: nehexClasses.value.map((item) => ({ ...item })),
       extraConfig: { ...nehexExtraConfig.value },
@@ -965,6 +989,7 @@ export function useSettingsPage() {
   function applyNehexSnapshot(snapshot: NehexSnapshot): void {
     nehexForm.adminManagerWeb = normalizeAdminManagerWebPath(snapshot.form.adminManagerWeb)
     nehexForm.adminLoginBackground = snapshot.form.adminLoginBackground || DEFAULT_ADMIN_LOGIN_BACKGROUND
+    nehexForm.kumaApiUrl = snapshot.form.kumaApiUrl || ''
     nehexClasses.value = snapshot.classes.map((item) => ({ ...item }))
     nehexExtraConfig.value = { ...snapshot.extraConfig }
     accountForm.account = snapshot.account
@@ -1032,6 +1057,7 @@ export function useSettingsPage() {
 
     nehexForm.adminManagerWeb = normalizeAdminManagerWebPath(readSetting(settingsMap, 'admin_manager_web') || '/nehex-admin')
     nehexForm.adminLoginBackground = readSetting(settingsMap, 'admin_login_background') || DEFAULT_ADMIN_LOGIN_BACKGROUND
+    nehexForm.kumaApiUrl = readSetting(settingsMap, 'kuma_api_url')
 
     const parsedClass = parseArticleClassPayload(settingsMap.get('nehex_article_class'))
     nehexClasses.value = parsedClass.items
@@ -1253,6 +1279,11 @@ export function useSettingsPage() {
           setting_content: nehexForm.adminLoginBackground.trim() || DEFAULT_ADMIN_LOGIN_BACKGROUND,
           setting_type: 'string',
         },
+        {
+          setting_key: 'kuma_api_url',
+          setting_content: nehexForm.kumaApiUrl.trim(),
+          setting_type: 'string',
+        },
         { setting_key: 'nehex_article_class', setting_content: buildArticleClassSettingContent(), setting_type: 'json' },
       ]
     }
@@ -1315,6 +1346,45 @@ export function useSettingsPage() {
     }
 
     successMessage.value = `已重置${activeSection.value.label}`
+  }
+
+  async function testKumaApiUrl(): Promise<void> {
+    kumaApiTestResult.value = ''
+    kumaApiTestError.value = ''
+
+    const target = normalizeKumaApiUrl(nehexForm.kumaApiUrl)
+    if (!target) {
+      kumaApiTestError.value = '请先输入 Kuma-API 地址'
+      return
+    }
+
+    kumaApiTesting.value = true
+    try {
+      const response = await fetch(target, {
+        method: 'GET',
+        cache: 'no-store',
+      })
+
+      if (!response.ok) {
+        throw new Error(`请求失败 (${response.status})`)
+      }
+
+      const payload = await response.json() as unknown
+      if (!Array.isArray(payload) || typeof payload[0] !== 'string') {
+        throw new Error('返回格式错误，期望 JSON 数组字符串')
+      }
+
+      if (payload[0] !== KUMA_API_DEFAULT_HELLO) {
+        throw new Error(`返回内容不匹配，收到: ${payload[0]}`)
+      }
+
+      nehexForm.kumaApiUrl = target
+      kumaApiTestResult.value = '连接成功，Kuma-API 可用'
+    } catch (error) {
+      kumaApiTestError.value = error instanceof Error ? error.message : '测试失败'
+    } finally {
+      kumaApiTesting.value = false
+    }
   }
 
   async function saveCurrentSection(): Promise<void> {
@@ -1420,6 +1490,9 @@ export function useSettingsPage() {
     currentVersion,
     hasNewRelease,
     releaseStatusText,
+    kumaApiTesting,
+    kumaApiTestResult,
+    kumaApiTestError,
     adminManagerWebValidationMessage,
     adminManagerWebHint,
 
@@ -1432,6 +1505,7 @@ export function useSettingsPage() {
     addArticleClass,
     removeArticleClass,
     checkLatestRelease,
+    testKumaApiUrl,
     resetCurrentSection,
     saveCurrentSection,
   }
