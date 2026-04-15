@@ -2,7 +2,7 @@ use std::{collections::HashMap, time::Duration};
 
 use axum::{
     Json,
-    extract::State,
+    extract::{Path, State},
     http::{HeaderMap, Method},
 };
 use chrono::NaiveDateTime;
@@ -25,6 +25,7 @@ const INSTALL_STATUS_CACHE_KEY: &str = "admin:install:status";
 const KUMA_API_DEFAULT_HELLO: &str =
     "hello,welcome to Kuma API; Visite: https://github.com/nehex/kuma-api";
 const KUMA_API_TEST_TIMEOUT_SECONDS: u64 = 8;
+const KUMA_API_MOVIE_TIMEOUT_SECONDS: u64 = 10;
 
 #[derive(Serialize)]
 struct SettingItem {
@@ -73,6 +74,24 @@ pub struct AdminKumaApiTestResponse {
     message: String,
     normalized_url: String,
     response_preview: String,
+}
+
+#[derive(Serialize)]
+pub struct AdminKumaMovieResponse {
+    success: bool,
+    provider: String,
+    movie_id: String,
+    data: AdminKumaMovieItem,
+}
+
+#[derive(Serialize)]
+pub struct AdminKumaMovieItem {
+    cover: String,
+    title: String,
+    years: String,
+    desc: String,
+    url: String,
+    score: Option<String>,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -391,6 +410,62 @@ pub async fn admin_test_kuma_api_url(
     }))
 }
 
+pub async fn admin_get_kuma_movie(
+    State(state): State<AppState>,
+    method: Method,
+    headers: HeaderMap,
+    Path((provider_raw, movie_id_raw)): Path<(String, String)>,
+) -> AppResult<Json<AdminKumaMovieResponse>> {
+    let _principal = admin_auth::require_admin_principal(&state, &method, &headers)?;
+    let provider = normalize_kuma_movie_provider(provider_raw)?;
+    let movie_id = normalize_kuma_movie_id(movie_id_raw)?;
+    let kuma_api_url = load_kuma_api_url_from_settings(&state).await?;
+    let endpoint_url = format!("{}/{provider}/{movie_id}", kuma_api_url.trim_end_matches('/'));
+
+    let mut client_builder =
+        reqwest::Client::builder().timeout(Duration::from_secs(KUMA_API_MOVIE_TIMEOUT_SECONDS));
+    if should_bypass_env_proxy_for_kuma() {
+        client_builder = client_builder.no_proxy();
+    }
+    let client = client_builder
+        .build()
+        .map_err(|error| AppError::internal(format!("Failed to build HTTP client: {error}")))?;
+
+    let response = client
+        .get(endpoint_url)
+        .send()
+        .await
+        .map_err(|error| AppError::Unprocessable(format!("Kuma API 请求失败: {error}")))?;
+
+    if !response.status().is_success() {
+        return Err(AppError::Unprocessable(format!(
+            "Kuma API 返回状态异常: {}",
+            response.status()
+        )));
+    }
+
+    let body = response
+        .json::<Value>()
+        .await
+        .map_err(|error| AppError::Unprocessable(format!("Kuma API 返回非 JSON: {error}")))?;
+
+    let source = body
+        .get(provider.as_str())
+        .ok_or_else(|| {
+            AppError::Unprocessable(format!("Kuma API 响应缺少 `{provider}` 字段"))
+        })?
+        .clone();
+
+    let item = parse_kuma_movie_payload(source)?;
+
+    Ok(Json(AdminKumaMovieResponse {
+        success: true,
+        provider,
+        movie_id,
+        data: item,
+    }))
+}
+
 async fn list_admin_settings(state: &AppState) -> AppResult<Vec<SettingItem>> {
     let rows = sqlx::query(
         r#"
@@ -545,6 +620,90 @@ fn normalize_kuma_api_url(raw: String) -> AppResult<String> {
     }
 
     Ok(parsed.to_string())
+}
+
+async fn load_kuma_api_url_from_settings(state: &AppState) -> AppResult<String> {
+    let row = sqlx::query("SELECT setting_content FROM settings WHERE setting_key = $1 LIMIT 1")
+        .bind("kuma_api_url")
+        .fetch_optional(&state.db_pool)
+        .await
+        .map_err(|error| {
+            AppError::internal(format!("Failed to load kuma_api_url from settings: {error}"))
+        })?;
+
+    let raw_value = row
+        .and_then(|item| item.try_get::<Option<String>, _>("setting_content").ok().flatten())
+        .unwrap_or_default();
+
+    if raw_value.trim().is_empty() {
+        return Err(AppError::Unprocessable(
+            "请先前往设定 -> NeHex配置，配置 Kuma-API 地址".to_string(),
+        ));
+    }
+
+    normalize_kuma_api_url(raw_value)
+}
+
+fn normalize_kuma_movie_provider(raw: String) -> AppResult<String> {
+    let provider = raw.trim().to_lowercase();
+    if matches!(provider.as_str(), "douban" | "tmdb") {
+        Ok(provider)
+    } else {
+        Err(AppError::Unprocessable(
+            "provider 仅支持 douban / tmdb".to_string(),
+        ))
+    }
+}
+
+fn normalize_kuma_movie_id(raw: String) -> AppResult<String> {
+    let movie_id = raw.trim().to_string();
+    if movie_id.is_empty() {
+        return Err(AppError::Unprocessable("movie_id 不能为空".to_string()));
+    }
+
+    if !movie_id
+        .chars()
+        .all(|ch| ch.is_ascii_alphanumeric() || ch == '-' || ch == '_')
+    {
+        return Err(AppError::Unprocessable(
+            "movie_id 仅支持字母、数字、-、_".to_string(),
+        ));
+    }
+
+    Ok(movie_id)
+}
+
+fn parse_kuma_movie_payload(source: Value) -> AppResult<AdminKumaMovieItem> {
+    let object = source
+        .as_object()
+        .ok_or_else(|| AppError::Unprocessable("Kuma API 返回数据格式异常".to_string()))?;
+
+    let read_text = |key: &str| -> String {
+        object
+            .get(key)
+            .and_then(Value::as_str)
+            .unwrap_or_default()
+            .trim()
+            .to_string()
+    };
+
+    let title = read_text("title");
+    if title.is_empty() {
+        return Err(AppError::Unprocessable(
+            "Kuma API 返回缺少 title 字段".to_string(),
+        ));
+    }
+
+    let score = read_text("score");
+
+    Ok(AdminKumaMovieItem {
+        cover: read_text("cover"),
+        title,
+        years: read_text("years"),
+        desc: read_text("desc"),
+        url: read_text("url"),
+        score: if score.is_empty() { None } else { Some(score) },
+    })
 }
 
 fn normalize_optional_text(value: String) -> Option<String> {
