@@ -1,3 +1,5 @@
+# syntax=docker/dockerfile:1.7
+
 ARG DOCKERHUB_MIRROR=docker.io
 
 FROM ${DOCKERHUB_MIRROR}/library/node:22-alpine AS frontend-builder
@@ -6,7 +8,8 @@ WORKDIR /app/app/nehex-admin
 RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.aliyun.com/g' /etc/apk/repositories
 
 COPY app/nehex-admin/package.json app/nehex-admin/package-lock.json ./
-RUN npm ci --registry=https://registry.npmmirror.com
+RUN --mount=type=cache,target=/root/.npm \
+    npm ci --registry=https://registry.npmmirror.com
 
 COPY app/nehex-admin ./
 RUN npm run build
@@ -26,8 +29,21 @@ RUN mkdir -p /usr/local/cargo/conf && \
     echo 'timeout = 120' >> /usr/local/cargo/config.toml && \
     echo 'multiplexing = false' >> /usr/local/cargo/config.toml
 
+COPY backend-rust/Cargo.toml backend-rust/Cargo.lock ./backend-rust/
+RUN mkdir -p /app/backend-rust/src
+COPY backend-rust/src/main.rs ./backend-rust/src/main.rs
+
+# Pre-fetch dependencies so source-only changes don't re-download crates.
+RUN --mount=type=cache,target=/usr/local/cargo/registry \
+    --mount=type=cache,target=/usr/local/cargo/git \
+    cd backend-rust && cargo fetch --manifest-path Cargo.toml --locked
+
 COPY backend-rust ./backend-rust
-RUN cd backend-rust && cargo build --release
+RUN --mount=type=cache,target=/usr/local/cargo/registry \
+    --mount=type=cache,target=/usr/local/cargo/git \
+    --mount=type=cache,target=/app/backend-rust/target \
+    cd backend-rust && find src -type f -exec touch {} + && cargo build --release --locked && \
+    cp /app/backend-rust/target/release/backend-rust /app/backend-rust-release
 
 FROM ${DOCKERHUB_MIRROR}/library/debian:bookworm-slim AS runtime
 ENV ADMIN_MANAGER_BUILD_ON_STARTUP=false
@@ -40,7 +56,7 @@ RUN sed -i "s@deb.debian.org@mirrors.aliyun.com@g" /etc/apt/sources.list.d/debia
 
 WORKDIR /app
 
-COPY --from=backend-builder /app/backend-rust/target/release/backend-rust ./backend-rust/backend-rust
+COPY --from=backend-builder /app/backend-rust-release ./backend-rust/backend-rust
 COPY --from=frontend-builder /app/app/nehex-admin/dist ./app/nehex-admin/dist
 
 RUN mkdir -p /app/storage /app/backups
