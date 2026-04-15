@@ -142,7 +142,7 @@
                     prepend-icon="mdi-delete-outline"
                     :loading="isMovieDeleting(card.id)"
                     variant="text"
-                    @click="deleteMovieCard(card)"
+                    @click="openDeleteMovieDialog(card)"
                   >
                     删除
                   </v-btn>
@@ -162,11 +162,50 @@
         </v-window-item>
       </v-window>
     </section>
+
+    <v-dialog
+      v-model="movieDeleteDialog"
+      :persistent="isDeleteDialogSubmitting"
+      max-width="500"
+    >
+      <v-card class="movie-delete-dialog-card" rounded="xl">
+        <v-card-title class="movie-delete-dialog-title">
+          <v-icon color="error" icon="mdi-alert-circle-outline" />
+          <span>删除电影卡片</span>
+        </v-card-title>
+        <v-card-text class="movie-delete-dialog-text">
+          <p>
+            确定要删除
+            <strong>「{{ movieCardPendingDelete?.title || '-' }}」</strong>
+            吗？此操作不可撤销。
+          </p>
+        </v-card-text>
+        <v-card-actions class="movie-delete-dialog-actions">
+          <v-spacer />
+          <v-btn
+            :disabled="isDeleteDialogSubmitting"
+            variant="text"
+            @click="closeDeleteMovieDialog"
+          >
+            取消
+          </v-btn>
+          <v-btn
+            color="error"
+            prepend-icon="mdi-delete-outline"
+            :loading="isDeleteDialogSubmitting"
+            variant="flat"
+            @click="confirmDeleteMovieCard"
+          >
+            确认删除
+          </v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
   </AdminLayout>
 </template>
 
 <script lang="ts" setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import AdminLayout from '@/components/admin/AdminLayout.vue'
 import {
   createAdminKumaMovie,
@@ -216,6 +255,15 @@ const movieCreating = ref(false)
 const movieCreateError = ref('')
 const movieCards = ref<KumaMovieCard[]>([])
 const deletingMovieIds = ref<number[]>([])
+const movieDeleteDialog = ref(false)
+const movieCardPendingDelete = ref<KumaMovieCard | null>(null)
+const isDeleteDialogSubmitting = computed(() => {
+  const id = movieCardPendingDelete.value?.id
+  if (typeof id !== 'number') {
+    return false
+  }
+  return isMovieDeleting(id)
+})
 
 async function createMovieCard(): Promise<void> {
   const movieId = movieIdInput.value.trim()
@@ -249,9 +297,25 @@ function isMovieDeleting(id: number): boolean {
   return deletingMovieIds.value.includes(id)
 }
 
-async function deleteMovieCard(card: KumaMovieCard): Promise<void> {
-  const confirmed = window.confirm(`确定删除电影卡片「${card.title}」吗？`)
-  if (!confirmed || isMovieDeleting(card.id)) {
+function openDeleteMovieDialog(card: KumaMovieCard): void {
+  if (isMovieDeleting(card.id)) {
+    return
+  }
+  movieCardPendingDelete.value = card
+  movieDeleteDialog.value = true
+}
+
+function closeDeleteMovieDialog(): void {
+  if (isDeleteDialogSubmitting.value) {
+    return
+  }
+  movieDeleteDialog.value = false
+  movieCardPendingDelete.value = null
+}
+
+async function confirmDeleteMovieCard(): Promise<void> {
+  const card = movieCardPendingDelete.value
+  if (!card || isMovieDeleting(card.id)) {
     return
   }
 
@@ -260,12 +324,20 @@ async function deleteMovieCard(card: KumaMovieCard): Promise<void> {
   try {
     await deleteAdminKumaMovie(card.id)
     movieCards.value = movieCards.value.filter((item) => item.id !== card.id)
+    movieDeleteDialog.value = false
+    movieCardPendingDelete.value = null
   } catch (error) {
     movieCreateError.value = error instanceof Error ? error.message : '删除电影卡片失败'
   } finally {
     deletingMovieIds.value = deletingMovieIds.value.filter((id) => id !== card.id)
   }
 }
+
+watch(movieDeleteDialog, (visible) => {
+  if (!visible && !isDeleteDialogSubmitting.value) {
+    movieCardPendingDelete.value = null
+  }
+})
 
 onMounted(async () => {
   try {
@@ -434,6 +506,32 @@ onMounted(async () => {
 .movie-link-btn,
 .movie-delete-btn {
   margin-left: -8px;
+}
+
+.movie-delete-dialog-card {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: linear-gradient(180deg, rgba(24, 30, 41, 0.98), rgba(19, 24, 34, 0.98));
+  color: #edf1ff;
+}
+
+.movie-delete-dialog-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 18px;
+}
+
+.movie-delete-dialog-text {
+  color: #d2dcf3;
+  line-height: 1.7;
+}
+
+.movie-delete-dialog-text p {
+  margin: 0;
+}
+
+.movie-delete-dialog-actions {
+  padding: 0 20px 18px;
 }
 
 @media (max-width: 980px) {
