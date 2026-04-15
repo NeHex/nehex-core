@@ -288,13 +288,18 @@
       v-model="mediaPickerVisible"
       @select-image="handleMediaLibrarySelect"
     />
+    <UnsavedChangesLeaveDialog
+      v-model="unsavedLeaveDialogVisible"
+      @cancel="cancelUnsavedLeave"
+      @confirm="confirmUnsavedLeave"
+    />
   </section>
 </template>
 
 <script lang="ts" setup>
 import MarkdownIt from 'markdown-it'
-import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
-import { onBeforeRouteLeave, useRouter } from 'vue-router'
+import { computed, nextTick, onMounted, reactive, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import {
   createArticle,
   fetchArticleById,
@@ -306,6 +311,8 @@ import { fetchArticleClassOptions, type ArticleClassOption } from '@/services/se
 import { uploadMarkdownImage } from '@/services/storage'
 import ImageUploadHintCard from '@/components/admin/ImageUploadHintCard.vue'
 import MediaLibraryImagePicker from '@/components/admin/MediaLibraryImagePicker.vue'
+import UnsavedChangesLeaveDialog from '@/components/common/UnsavedChangesLeaveDialog.vue'
+import { useUnsavedChangesGuard } from '@/composables/useUnsavedChangesGuard'
 
 const props = defineProps<{
   articleId?: number | null
@@ -427,6 +434,11 @@ function syncSavedSnapshot(): void {
 }
 
 const hasUnsavedChanges = computed(() => _serializeSnapshot(_buildEditorSnapshot()) !== savedSnapshot.value)
+const {
+  unsavedLeaveDialogVisible,
+  confirmUnsavedLeave,
+  cancelUnsavedLeave,
+} = useUnsavedChangesGuard(hasUnsavedChanges)
 
 function ensureClassOption(value: string): void {
   const normalized = value.trim()
@@ -873,30 +885,10 @@ async function goManage(): Promise<void> {
   await router.push('/articles')
 }
 
-function handleBeforeUnload(event: BeforeUnloadEvent): void {
-  if (!hasUnsavedChanges.value) {
-    return
-  }
-  event.preventDefault()
-  event.returnValue = ''
-}
-
-onBeforeRouteLeave(() => {
-  if (!hasUnsavedChanges.value) {
-    return true
-  }
-  return window.confirm('文章内容未保存，确定离开当前页面吗？')
-})
-
 onMounted(async () => {
-  window.addEventListener('beforeunload', handleBeforeUnload)
   await loadClassOptions()
   await loadArticleDetail()
   syncSavedSnapshot()
-})
-
-onBeforeUnmount(() => {
-  window.removeEventListener('beforeunload', handleBeforeUnload)
 })
 </script>
 
