@@ -180,6 +180,11 @@
       v-model="mediaPickerVisible"
       @select-image="handleMediaLibrarySelect"
     />
+    <UnsavedChangesLeaveDialog
+      v-model="unsavedLeaveDialogVisible"
+      @cancel="cancelUnsavedLeave"
+      @confirm="confirmUnsavedLeave"
+    />
   </section>
 </template>
 
@@ -187,7 +192,9 @@
 import MarkdownIt from 'markdown-it'
 import { computed, nextTick, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
+import UnsavedChangesLeaveDialog from '@/components/common/UnsavedChangesLeaveDialog.vue'
 import { useGlobalSnackbar } from '@/composables/useGlobalSnackbar'
+import { useUnsavedChangesGuard } from '@/composables/useUnsavedChangesGuard'
 import {
   createStandalonePage,
   fetchStandalonePageById,
@@ -230,6 +237,15 @@ type SelectedMediaImage = {
   fileName: string
 }
 
+type EditorSnapshot = {
+  pageKey: string
+  title: string
+  coverImage: string
+  content: string
+  sort: number
+  status: number
+}
+
 const statusOptions = [
   { label: '启用', value: 1 },
   { label: '禁用', value: 0 },
@@ -244,6 +260,7 @@ const previewMode = ref(false)
 const dragOver = ref(false)
 const dragDepth = ref(0)
 const markdownInputRef = ref<HTMLTextAreaElement | null>(null)
+const savedSnapshot = ref('')
 const {
   showGlobalSuccess,
   showGlobalError,
@@ -270,6 +287,32 @@ const renderedMarkdown = computed(() => {
   }
   return markdown.render(content)
 })
+
+function buildEditorSnapshot(): EditorSnapshot {
+  return {
+    pageKey: normalizePageKey(editorForm.pageKey),
+    title: editorForm.title.trim(),
+    coverImage: editorForm.coverImage.trim(),
+    content: editorForm.content,
+    sort: normalizeSort(editorForm.sort),
+    status: normalizeStatus(editorForm.status),
+  }
+}
+
+function serializeSnapshot(snapshot: EditorSnapshot): string {
+  return JSON.stringify(snapshot)
+}
+
+function syncSavedSnapshot(): void {
+  savedSnapshot.value = serializeSnapshot(buildEditorSnapshot())
+}
+
+const hasUnsavedChanges = computed(() => serializeSnapshot(buildEditorSnapshot()) !== savedSnapshot.value)
+const {
+  unsavedLeaveDialogVisible,
+  confirmUnsavedLeave,
+  cancelUnsavedLeave,
+} = useUnsavedChangesGuard(hasUnsavedChanges)
 
 function normalizeSort(value: number): number {
   if (!Number.isFinite(value)) {
@@ -655,6 +698,7 @@ async function submitEditor(): Promise<void> {
     } else {
       await createStandalonePage(payload)
     }
+    syncSavedSnapshot()
     showGlobalSuccess('独立页发布成功')
     await router.push('/pages')
   } catch (error) {
@@ -672,6 +716,7 @@ async function goManage(): Promise<void> {
 
 onMounted(async () => {
   await loadPageDetail()
+  syncSavedSnapshot()
 })
 </script>
 
