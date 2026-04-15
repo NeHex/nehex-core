@@ -20,7 +20,10 @@
         @click="toggleMainDrawer"
       />
 
-      <v-app-bar-title class="mobile-topbar-title">{{ adminTitle }}</v-app-bar-title>
+      <v-app-bar-title class="mobile-topbar-title">
+        <span class="brand-name">{{ adminBrandName }}</span>
+        <span class="brand-version">v{{ adminVersion }}</span>
+      </v-app-bar-title>
 
       <v-spacer />
 
@@ -68,7 +71,10 @@
     >
       <div class="mobile-drawer-content">
         <div class="sidebar-header sidebar-header--mobile">
-          <div class="site-name">{{ adminTitle }}</div>
+          <div class="site-name">
+            <span class="brand-name">{{ adminBrandName }}</span>
+            <span class="brand-version">v{{ adminVersion }}</span>
+          </div>
           <v-btn
             aria-label="关闭导航菜单"
             icon="mdi-close"
@@ -132,7 +138,10 @@
 
     <aside v-else class="sidebar">
       <div class="sidebar-header">
-        <div class="site-name">{{ adminTitle }}</div>
+        <div class="site-name">
+          <span class="brand-name">{{ adminBrandName }}</span>
+          <span class="brand-version">v{{ adminVersion }}</span>
+        </div>
       </div>
 
       <v-list class="menu-list" density="comfortable" nav>
@@ -223,11 +232,11 @@
 </template>
 
 <script lang="ts" setup>
-import { computed, onMounted, ref, useSlots, watch } from 'vue'
+import { computed, ref, useSlots, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useDisplay } from 'vuetify'
 import { adminLogout, resetAdminSessionCache } from '@/services/admin-api'
-import { fetchAdminTitle, fetchSiteUrl, getDefaultAdminTitle } from '@/services/settings'
+import { fetchSiteUrl } from '@/services/settings'
 import { clearAuthSession } from '@/utils/auth'
 
 type MenuChildItem = {
@@ -322,21 +331,14 @@ const router = useRouter()
 const route = useRoute()
 const display = useDisplay()
 
-const adminTitle = ref(getDefaultAdminTitle())
+const adminBrandName = 'NeHex'
+const adminVersion = __NEHEX_ADMIN_VERSION__.trim() || '1.2.4'
 const expandedMenuKey = ref<string | null>(getDefaultExpandedMenuKey())
 const slots = useSlots()
 const hasSecondaryNav = computed(() => Boolean(slots['secondary-nav']))
 const isMobile = computed(() => display.mdAndDown.value)
 const mobileMainDrawer = ref(false)
 const mobileSecondaryDrawer = ref(false)
-
-onMounted(async () => {
-  try {
-    adminTitle.value = await fetchAdminTitle()
-  } catch (error) {
-    console.warn('Failed to load admin title from /setting', error)
-  }
-})
 
 watch(
   () => route.fullPath,
@@ -486,6 +488,9 @@ function closeMobileDrawers(): void {
 }
 
 .mobile-topbar-title {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
   font-size: 16px;
   font-weight: 700;
   letter-spacing: 0.3px;
@@ -541,10 +546,26 @@ function closeMobileDrawers(): void {
 }
 
 .site-name {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
   font-size: 18px;
   font-weight: 700;
   color: #f2f5ff;
   letter-spacing: 0.4px;
+}
+
+.brand-name {
+  font-size: inherit;
+  font-weight: inherit;
+  letter-spacing: inherit;
+}
+
+.brand-version {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+  color: #aeb8cc;
 }
 
 .mobile-secondary-head {
