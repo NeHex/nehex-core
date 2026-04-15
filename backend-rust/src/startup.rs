@@ -425,6 +425,27 @@ async fn ensure_system_tables(pool: &PgPool) -> AppResult<()> {
     )
     .await?;
 
+    run_ddl(
+        pool,
+        r#"
+        CREATE TABLE IF NOT EXISTS kuma_movie (
+            id BIGSERIAL PRIMARY KEY,
+            provider VARCHAR(20) NOT NULL,
+            movie_id VARCHAR(120) NOT NULL,
+            cover VARCHAR(1200),
+            title VARCHAR(500) NOT NULL,
+            years VARCHAR(120),
+            score VARCHAR(60),
+            description TEXT,
+            source_url VARCHAR(1200),
+            create_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            update_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+        )
+        "#,
+        "kuma_movie",
+    )
+    .await?;
+
     Ok(())
 }
 
@@ -507,6 +528,7 @@ async fn ensure_schema_compatibility_numeric_types(pool: &PgPool) -> AppResult<(
         ("media_image", "id"),
         ("media_image", "size_bytes"),
         ("media_folder", "id"),
+        ("kuma_movie", "id"),
     ];
 
     for (table_name, column_name) in upgrade_targets {
@@ -638,6 +660,18 @@ async fn ensure_performance_indexes(pool: &PgPool) -> AppResult<()> {
             "idx_media_image_folder_time",
             "folder_id,create_time,id",
             false,
+        ),
+        (
+            "kuma_movie",
+            "idx_kuma_movie_create_time",
+            "create_time,id",
+            false,
+        ),
+        (
+            "kuma_movie",
+            "uq_kuma_movie_provider_movie_id",
+            "provider,movie_id",
+            true,
         ),
     ];
 
