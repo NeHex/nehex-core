@@ -7,6 +7,12 @@ import VueRouter from 'unplugin-vue-router/vite'
 // Utilities
 import { defineConfig, loadEnv } from 'vite'
 import { fileURLToPath, URL } from 'node:url'
+import { readFileSync } from 'node:fs'
+
+const adminPackage = JSON.parse(
+  readFileSync(new URL('./package.json', import.meta.url), 'utf-8'),
+) as { version?: string }
+const adminVersion = String(adminPackage.version ?? '').trim() || '1.2.4'
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => {
@@ -42,7 +48,10 @@ export default defineConfig(({ mode }) => {
         'unplugin-vue-router/data-loaders/basic',
       ],
     },
-    define: { 'process.env': {} },
+    define: {
+      'process.env': {},
+      __NEHEX_ADMIN_VERSION__: JSON.stringify(adminVersion),
+    },
     resolve: {
       alias: {
         '@': fileURLToPath(new URL('src', import.meta.url)),
