@@ -94,6 +94,43 @@ pub struct AdminKumaMovieItem {
     score: Option<String>,
 }
 
+#[derive(sqlx::FromRow, Serialize)]
+pub struct AdminKumaMovieCard {
+    id: i64,
+    provider: String,
+    movie_id: String,
+    cover: String,
+    title: String,
+    years: String,
+    score: Option<String>,
+    desc: String,
+    url: String,
+    create_time: NaiveDateTime,
+    update_time: NaiveDateTime,
+}
+
+#[derive(Serialize)]
+pub struct AdminKumaMovieListResponse {
+    data: Vec<AdminKumaMovieCard>,
+}
+
+#[derive(Serialize)]
+pub struct AdminKumaMovieDetailResponse {
+    data: AdminKumaMovieCard,
+}
+
+#[derive(Serialize)]
+pub struct AdminKumaMovieActionResponse {
+    success: bool,
+    message: String,
+}
+
+#[derive(Deserialize)]
+pub struct AdminKumaMovieCreateRequest {
+    provider: String,
+    movie_id: String,
+}
+
 #[derive(Debug, Clone, Default)]
 enum OptionalField<T> {
     #[default]
@@ -420,49 +457,175 @@ pub async fn admin_get_kuma_movie(
     let provider = normalize_kuma_movie_provider(provider_raw)?;
     let movie_id = normalize_kuma_movie_id(movie_id_raw)?;
     let kuma_api_url = load_kuma_api_url_from_settings(&state).await?;
-    let endpoint_url = format!("{}/{provider}/{movie_id}", kuma_api_url.trim_end_matches('/'));
-
-    let mut client_builder =
-        reqwest::Client::builder().timeout(Duration::from_secs(KUMA_API_MOVIE_TIMEOUT_SECONDS));
-    if should_bypass_env_proxy_for_kuma() {
-        client_builder = client_builder.no_proxy();
-    }
-    let client = client_builder
-        .build()
-        .map_err(|error| AppError::internal(format!("Failed to build HTTP client: {error}")))?;
-
-    let response = client
-        .get(endpoint_url)
-        .send()
-        .await
-        .map_err(|error| AppError::Unprocessable(format!("Kuma API 请求失败: {error}")))?;
-
-    if !response.status().is_success() {
-        return Err(AppError::Unprocessable(format!(
-            "Kuma API 返回状态异常: {}",
-            response.status()
-        )));
-    }
-
-    let body = response
-        .json::<Value>()
-        .await
-        .map_err(|error| AppError::Unprocessable(format!("Kuma API 返回非 JSON: {error}")))?;
-
-    let source = body
-        .get(provider.as_str())
-        .ok_or_else(|| {
-            AppError::Unprocessable(format!("Kuma API 响应缺少 `{provider}` 字段"))
-        })?
-        .clone();
-
-    let item = parse_kuma_movie_payload(source)?;
+    let item = request_kuma_movie_item(&provider, &movie_id, &kuma_api_url).await?;
 
     Ok(Json(AdminKumaMovieResponse {
         success: true,
         provider,
         movie_id,
         data: item,
+    }))
+}
+
+pub async fn admin_list_kuma_movies(
+    State(state): State<AppState>,
+    method: Method,
+    headers: HeaderMap,
+) -> AppResult<Json<AdminKumaMovieListResponse>> {
+    let _principal = admin_auth::require_admin_principal(&state, &method, &headers)?;
+    ensure_kuma_movie_table(&state).await?;
+
+    let rows = sqlx::query_as::<_, AdminKumaMovieCard>(
+        r#"
+        SELECT
+            id::bigint AS id,
+            provider,
+            movie_id,
+            COALESCE(cover, '') AS cover,
+            title,
+            COALESCE(years, '') AS years,
+            score,
+            COALESCE(description, '') AS desc,
+            COALESCE(source_url, '') AS url,
+            create_time,
+            update_time
+        FROM kuma_movie
+        ORDER BY create_time DESC, id DESC
+        "#,
+    )
+    .fetch_all(&state.db_pool)
+    .await
+    .map_err(|error| AppError::internal(format!("Failed to list kuma movies: {error}")))?;
+
+    Ok(Json(AdminKumaMovieListResponse { data: rows }))
+}
+
+pub async fn admin_create_kuma_movie(
+    State(state): State<AppState>,
+    method: Method,
+    headers: HeaderMap,
+    Json(payload): Json<AdminKumaMovieCreateRequest>,
+) -> AppResult<Json<AdminKumaMovieDetailResponse>> {
+    let _principal = admin_auth::require_admin_principal(&state, &method, &headers)?;
+    ensure_kuma_movie_table(&state).await?;
+
+    let provider = normalize_kuma_movie_provider(payload.provider)?;
+    let movie_id = normalize_kuma_movie_id(payload.movie_id)?;
+    let kuma_api_url = load_kuma_api_url_from_settings(&state).await?;
+    let item = request_kuma_movie_item(&provider, &movie_id, &kuma_api_url).await?;
+
+    let existing_id = sqlx::query_scalar::<_, i64>(
+        "SELECT id::bigint FROM kuma_movie WHERE provider = $1 AND movie_id = $2 LIMIT 1",
+    )
+    .bind(&provider)
+    .bind(&movie_id)
+    .fetch_optional(&state.db_pool)
+    .await
+    .map_err(|error| AppError::internal(format!("Failed to query kuma movie: {error}")))?;
+
+    let row = if let Some(id) = existing_id {
+        sqlx::query_as::<_, AdminKumaMovieCard>(
+            r#"
+            UPDATE kuma_movie
+            SET
+                cover = $2,
+                title = $3,
+                years = $4,
+                score = $5,
+                description = $6,
+                source_url = $7,
+                update_time = CURRENT_TIMESTAMP
+            WHERE id = $1
+            RETURNING
+                id::bigint AS id,
+                provider,
+                movie_id,
+                COALESCE(cover, '') AS cover,
+                title,
+                COALESCE(years, '') AS years,
+                score,
+                COALESCE(description, '') AS desc,
+                COALESCE(source_url, '') AS url,
+                create_time,
+                update_time
+            "#,
+        )
+        .bind(id)
+        .bind(item.cover)
+        .bind(item.title)
+        .bind(item.years)
+        .bind(item.score)
+        .bind(item.desc)
+        .bind(item.url)
+        .fetch_one(&state.db_pool)
+        .await
+        .map_err(|error| AppError::internal(format!("Failed to update kuma movie: {error}")))?
+    } else {
+        sqlx::query_as::<_, AdminKumaMovieCard>(
+            r#"
+            INSERT INTO kuma_movie (
+                provider,
+                movie_id,
+                cover,
+                title,
+                years,
+                score,
+                description,
+                source_url
+            )
+            VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+            RETURNING
+                id::bigint AS id,
+                provider,
+                movie_id,
+                COALESCE(cover, '') AS cover,
+                title,
+                COALESCE(years, '') AS years,
+                score,
+                COALESCE(description, '') AS desc,
+                COALESCE(source_url, '') AS url,
+                create_time,
+                update_time
+            "#,
+        )
+        .bind(&provider)
+        .bind(&movie_id)
+        .bind(item.cover)
+        .bind(item.title)
+        .bind(item.years)
+        .bind(item.score)
+        .bind(item.desc)
+        .bind(item.url)
+        .fetch_one(&state.db_pool)
+        .await
+        .map_err(|error| AppError::internal(format!("Failed to create kuma movie: {error}")))?
+    };
+
+    Ok(Json(AdminKumaMovieDetailResponse { data: row }))
+}
+
+pub async fn admin_delete_kuma_movie(
+    State(state): State<AppState>,
+    method: Method,
+    headers: HeaderMap,
+    Path(id): Path<i64>,
+) -> AppResult<Json<AdminKumaMovieActionResponse>> {
+    let _principal = admin_auth::require_admin_principal(&state, &method, &headers)?;
+    ensure_kuma_movie_table(&state).await?;
+
+    let result = sqlx::query("DELETE FROM kuma_movie WHERE id = $1")
+        .bind(id)
+        .execute(&state.db_pool)
+        .await
+        .map_err(|error| AppError::internal(format!("Failed to delete kuma movie: {error}")))?;
+
+    if result.rows_affected() == 0 {
+        return Err(AppError::not_found("电影卡片不存在或已删除".to_string()));
+    }
+
+    Ok(Json(AdminKumaMovieActionResponse {
+        success: true,
+        message: "电影卡片已删除".to_string(),
     }))
 }
 
@@ -644,6 +807,38 @@ async fn load_kuma_api_url_from_settings(state: &AppState) -> AppResult<String> 
     normalize_kuma_api_url(raw_value)
 }
 
+async fn ensure_kuma_movie_table(state: &AppState) -> AppResult<()> {
+    sqlx::query(
+        r#"
+        CREATE TABLE IF NOT EXISTS kuma_movie (
+            id BIGSERIAL PRIMARY KEY,
+            provider VARCHAR(20) NOT NULL,
+            movie_id VARCHAR(120) NOT NULL,
+            cover VARCHAR(1200),
+            title VARCHAR(500) NOT NULL,
+            years VARCHAR(120),
+            score VARCHAR(60),
+            description TEXT,
+            source_url VARCHAR(1200),
+            create_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            update_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+        )
+        "#,
+    )
+    .execute(&state.db_pool)
+    .await
+    .map_err(|error| AppError::internal(format!("Failed to ensure kuma_movie table: {error}")))?;
+
+    sqlx::query(
+        "CREATE UNIQUE INDEX IF NOT EXISTS uq_kuma_movie_provider_movie_id ON kuma_movie (provider, movie_id)",
+    )
+    .execute(&state.db_pool)
+    .await
+    .map_err(|error| AppError::internal(format!("Failed to ensure kuma_movie unique index: {error}")))?;
+
+    Ok(())
+}
+
 fn normalize_kuma_movie_provider(raw: String) -> AppResult<String> {
     let provider = raw.trim().to_lowercase();
     if matches!(provider.as_str(), "douban" | "tmdb") {
@@ -704,6 +899,53 @@ fn parse_kuma_movie_payload(source: Value) -> AppResult<AdminKumaMovieItem> {
         url: read_text("url"),
         score: if score.is_empty() { None } else { Some(score) },
     })
+}
+
+async fn request_kuma_movie_item(
+    provider: &str,
+    movie_id: &str,
+    kuma_api_url: &str,
+) -> AppResult<AdminKumaMovieItem> {
+    let endpoint_url = format!(
+        "{}/{}/{}",
+        kuma_api_url.trim_end_matches('/'),
+        provider,
+        movie_id
+    );
+
+    let mut client_builder =
+        reqwest::Client::builder().timeout(Duration::from_secs(KUMA_API_MOVIE_TIMEOUT_SECONDS));
+    if should_bypass_env_proxy_for_kuma() {
+        client_builder = client_builder.no_proxy();
+    }
+    let client = client_builder
+        .build()
+        .map_err(|error| AppError::internal(format!("Failed to build HTTP client: {error}")))?;
+
+    let response = client
+        .get(endpoint_url)
+        .send()
+        .await
+        .map_err(|error| AppError::Unprocessable(format!("Kuma API 请求失败: {error}")))?;
+
+    if !response.status().is_success() {
+        return Err(AppError::Unprocessable(format!(
+            "Kuma API 返回状态异常: {}",
+            response.status()
+        )));
+    }
+
+    let body = response
+        .json::<Value>()
+        .await
+        .map_err(|error| AppError::Unprocessable(format!("Kuma API 返回非 JSON: {error}")))?;
+
+    let source = body
+        .get(provider)
+        .ok_or_else(|| AppError::Unprocessable(format!("Kuma API 响应缺少 `{provider}` 字段")))?
+        .clone();
+
+    parse_kuma_movie_payload(source)
 }
 
 fn normalize_optional_text(value: String) -> Option<String> {
