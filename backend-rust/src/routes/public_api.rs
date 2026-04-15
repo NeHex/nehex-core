@@ -91,6 +91,7 @@ pub fn router() -> Router<AppState> {
         .route("/setting", get(get_settings))
         .route("/setting/theme", get(get_theme_settings))
         .route("/setting/site-owner", get(get_site_owner_profile))
+        .route("/site-owner", get(get_site_owner_profile))
         .route("/album", get(get_albums))
         .route("/album/{album_id}", get(get_album_detail))
         .route("/article", get(get_articles))
