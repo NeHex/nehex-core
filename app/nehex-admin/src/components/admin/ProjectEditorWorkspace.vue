@@ -120,6 +120,11 @@
         <article class="markdown-preview" v-html="renderedMarkdown" />
       </section>
     </div>
+    <UnsavedChangesLeaveDialog
+      v-model="unsavedLeaveDialogVisible"
+      @cancel="cancelUnsavedLeave"
+      @confirm="confirmUnsavedLeave"
+    />
   </section>
 </template>
 
@@ -127,7 +132,9 @@
 import MarkdownIt from 'markdown-it'
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
+import UnsavedChangesLeaveDialog from '@/components/common/UnsavedChangesLeaveDialog.vue'
 import { useGlobalSnackbar } from '@/composables/useGlobalSnackbar'
+import { useUnsavedChangesGuard } from '@/composables/useUnsavedChangesGuard'
 import {
   createProject,
   fetchProjectById,
@@ -160,6 +167,19 @@ type EditorForm = {
   status: number
 }
 
+type EditorSnapshot = {
+  title: string
+  cover: string
+  category: string
+  description: string
+  content: string
+  techStack: string
+  projectUrl: string
+  githubUrl: string
+  sort: number
+  status: number
+}
+
 const statusOptions = [
   { label: '启用', value: 1 },
   { label: '禁用', value: 0 },
@@ -173,6 +193,7 @@ const successMessage = ref('')
 const leftPaneWidth = ref(50)
 const resizing = ref(false)
 const splitPanelRef = ref<HTMLElement | null>(null)
+const savedSnapshot = ref('')
 
 const editorForm = reactive<EditorForm>({
   title: '',
@@ -196,6 +217,36 @@ const renderedMarkdown = computed(() => {
   }
   return markdown.render(content)
 })
+
+function buildEditorSnapshot(): EditorSnapshot {
+  return {
+    title: editorForm.title.trim(),
+    cover: editorForm.cover.trim(),
+    category: editorForm.category.trim(),
+    description: editorForm.description.trim(),
+    content: editorForm.content,
+    techStack: editorForm.techStack.trim(),
+    projectUrl: editorForm.projectUrl.trim(),
+    githubUrl: editorForm.githubUrl.trim(),
+    sort: normalizeSort(editorForm.sort),
+    status: normalizeStatus(editorForm.status),
+  }
+}
+
+function serializeSnapshot(snapshot: EditorSnapshot): string {
+  return JSON.stringify(snapshot)
+}
+
+function syncSavedSnapshot(): void {
+  savedSnapshot.value = serializeSnapshot(buildEditorSnapshot())
+}
+
+const hasUnsavedChanges = computed(() => serializeSnapshot(buildEditorSnapshot()) !== savedSnapshot.value)
+const {
+  unsavedLeaveDialogVisible,
+  confirmUnsavedLeave,
+  cancelUnsavedLeave,
+} = useUnsavedChangesGuard(hasUnsavedChanges)
 
 function clampPercent(value: number): number {
   return Math.min(75, Math.max(25, value))
@@ -332,9 +383,11 @@ async function submitEditor(): Promise<void> {
   try {
     if (isEditing.value && props.projectId) {
       await updateProject(props.projectId, payload)
+      syncSavedSnapshot()
       successMessage.value = '项目已保存'
     } else {
       const created = await createProject(payload)
+      syncSavedSnapshot()
       successMessage.value = '项目已创建'
       await router.replace(`/projects/edit/${created.id}`)
     }
@@ -353,6 +406,7 @@ async function goManage(): Promise<void> {
 
 onMounted(async () => {
   await loadProjectDetail()
+  syncSavedSnapshot()
 })
 
 watch(successMessage, (nextMessage) => {
