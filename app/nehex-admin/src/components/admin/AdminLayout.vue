@@ -256,7 +256,8 @@ import { computed, ref, useSlots, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useDisplay } from 'vuetify'
 import { adminLogout, resetAdminSessionCache } from '@/services/admin-api'
-import { fetchSettingsMap, fetchSiteUrl } from '@/services/settings'
+import { fetchSiteUrl } from '@/services/settings'
+import { fetchAdminSettings } from '@/services/admin-settings'
 import { clearAuthSession } from '@/utils/auth'
 
 type MenuChildItem = {
@@ -275,12 +276,11 @@ type MenuItem = {
 
 const menuItems: MenuItem[] = [
   { icon: 'mdi-view-dashboard-outline', label: '仪表盘', to: '/' },
-  { icon: 'mdi-television-play', label: 'Kuma', to: '/kuma' },
+  { icon: 'mdi-server-outline', label: 'Kuma', to: '/kuma', dividerBefore: true },
   {
     icon: 'mdi-post-outline',
     label: '文章管理',
     to: '/articles',
-    dividerBefore: true,
     children: [
       { label: '管理', to: '/articles', parentTo: '/articles' },
       { label: '新增', to: '/articles/new' },
@@ -510,11 +510,12 @@ async function handleKumaRouteEnter(): Promise<void> {
 
 async function hasKumaApiConfigured(): Promise<boolean> {
   try {
-    const settingsMap = await fetchSettingsMap()
-    const kumaApiUrl = String(settingsMap.get('kuma_api_url') ?? '').trim()
+    const settings = await fetchAdminSettings()
+    const setting = settings.find((item) => item.setting_key === 'kuma_api_url')
+    const kumaApiUrl = String(setting?.setting_content ?? '').trim()
     return kumaApiUrl.length > 0
   } catch (error) {
-    console.warn('Failed to check kuma_api_url from /setting', error)
+    console.warn('Failed to check kuma_api_url from /admin-api/settings', error)
     return false
   }
 }
