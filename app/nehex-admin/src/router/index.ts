@@ -11,6 +11,7 @@ import { clearAuthSession, setAuthSession } from '@/utils/auth'
 import { getAdminBasePath, toRouterBase } from '@/utils/path'
 import { fetchInstallStatus } from '@/services/install'
 import { fetchAdminSession } from '@/services/admin-api'
+import { useRouteLoading } from '@/composables/useRouteLoading'
 
 const LOGIN_PATH = '/login'
 const INSTALL_PATH = '/install'
@@ -20,8 +21,10 @@ const router = createRouter({
   history: createWebHistory(toRouterBase(getAdminBasePath())),
   routes,
 })
+const { startRouteLoading, finishRouteLoading } = useRouteLoading()
 
 router.beforeEach(async (to) => {
+  startRouteLoading()
   const installStatus = await fetchInstallStatus().catch(() => ({
     installed: true,
     schema_ready: true,
@@ -68,8 +71,13 @@ router.beforeEach(async (to) => {
   return true
 })
 
+router.afterEach(() => {
+  finishRouteLoading()
+})
+
 // Workaround for https://github.com/vitejs/vite/issues/11804
 router.onError((err, to) => {
+  finishRouteLoading()
   if (err?.message?.includes?.('Failed to fetch dynamically imported module')) {
     if (localStorage.getItem('vuetify:dynamic-reload')) {
       console.error('Dynamic import error, reloading page did not fix it', err)
