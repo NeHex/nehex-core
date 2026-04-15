@@ -609,10 +609,7 @@ export function useSettingsPage() {
   const kumaApiTestResult = ref('')
   const kumaApiTestError = ref('')
 
-  const envVersion = (
-    (import.meta as ImportMeta & { env?: Record<string, string | undefined> }).env
-      ?.VITE_NEHEX_CORE_VERSION || '1.2.3'
-  ).trim()
+  const buildVersion = __NEHEX_ADMIN_VERSION__.trim() || '1.2.4'
 
   const nehexSnapshot = ref<NehexSnapshot>(getNehexSnapshotData())
   const siteSnapshot = ref<SiteForm>(getSiteFormData())
@@ -1156,14 +1153,14 @@ export function useSettingsPage() {
   }
 
   async function loadCurrentVersion(): Promise<void> {
-    currentVersion.value = envVersion
+    currentVersion.value = buildVersion
     try {
       const backendVersion = await fetchBackendVersion()
       if (backendVersion) {
         currentVersion.value = backendVersion
       }
     } catch {
-      // Keep env fallback when backend version endpoint is unavailable.
+      // Keep build-version fallback when backend version endpoint is unavailable.
     }
   }
 
