@@ -32,15 +32,7 @@
         <v-card class="panel-card link-editor-card" rounded="xl">
           <v-card-title class="card-title-row">
             <span>图片链接编辑</span>
-            <v-btn
-              color="primary"
-              prepend-icon="mdi-plus"
-              size="small"
-              variant="text"
-              @click="addImageUrlRow"
-            >
-              新增一行
-            </v-btn>
+            <span class="link-editor-tip">每行一个图片 URL</span>
           </v-card-title>
           <v-card-text class="link-editor-body">
             <ImageUploadHintCard
@@ -52,30 +44,17 @@
               @select-files="handleUploadCardFiles"
             />
 
-            <div class="url-rows">
-              <div
-                v-for="(_, index) in imageUrlEntries"
-                :key="`image-url-${index}`"
-                class="url-row"
-              >
-                <span class="url-index">{{ index + 1 }}</span>
-                <v-text-field
-                  v-model="imageUrlEntries[index]"
-                  density="comfortable"
-                  hide-details
-                  placeholder="https://example.com/image.jpg"
-                  variant="outlined"
-                />
-                <v-btn
-                  color="error"
-                  icon="mdi-delete-outline"
-                  size="small"
-                  variant="text"
-                  :disabled="imageUrlEntries.length <= 1"
-                  @click="removeImageUrlRow(index)"
-                />
-              </div>
-            </div>
+            <v-textarea
+              v-model="imageUrlsText"
+              auto-grow
+              class="url-editor-area"
+              hide-details
+              label="图片链接列表"
+              min-rows="8"
+              placeholder="https://example.com/a.jpg&#10;https://example.com/b.jpg"
+              spellcheck="false"
+              variant="outlined"
+            />
           </v-card-text>
         </v-card>
 
@@ -164,13 +143,20 @@
         </v-card>
       </aside>
     </div>
+    <UnsavedChangesLeaveDialog
+      v-model="unsavedLeaveDialogVisible"
+      @cancel="cancelUnsavedLeave"
+      @confirm="confirmUnsavedLeave"
+    />
   </section>
 </template>
 
 <script lang="ts" setup>
-import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
+import UnsavedChangesLeaveDialog from '@/components/common/UnsavedChangesLeaveDialog.vue'
 import { useGlobalSnackbar } from '@/composables/useGlobalSnackbar'
+import { useUnsavedChangesGuard } from '@/composables/useUnsavedChangesGuard'
 import {
   createAlbum,
   fetchAlbumById,
@@ -202,13 +188,22 @@ type EditorForm = {
   likeCount: number
 }
 
+type EditorSnapshot = {
+  title: string
+  className: string
+  cover: string
+  likeCount: number
+  imgUrls: string
+}
+
 const loading = ref(false)
 const submitting = ref(false)
 const uploadingImage = ref(false)
 const errorMessage = ref('')
-const imageUrlEntries = ref<string[]>([''])
+const imageUrlsText = ref('')
 const draggingPreviewIndex = ref<number | null>(null)
 const hoverPreviewIndex = ref<number | null>(null)
+const savedSnapshot = ref('')
 
 const editorForm = reactive<EditorForm>({
   title: '',
@@ -218,13 +213,13 @@ const editorForm = reactive<EditorForm>({
 })
 
 const isEditing = computed(() => Number.isFinite(props.albumId))
-const previewImages = computed(() => parseAlbumImageUrls(joinAlbumImageUrls(imageUrlEntries.value)))
-
-watch(imageUrlEntries, (items) => {
-  if (items.length <= 0) {
-    imageUrlEntries.value = ['']
-  }
-}, { deep: true })
+const previewImages = computed(() => parseAlbumImageUrls(imageUrlsText.value))
+const hasUnsavedChanges = computed(() => serializeSnapshot(buildEditorSnapshot()) !== savedSnapshot.value)
+const {
+  unsavedLeaveDialogVisible,
+  confirmUnsavedLeave,
+  cancelUnsavedLeave,
+} = useUnsavedChangesGuard(hasUnsavedChanges)
 
 function normalizeNumber(value: number): number {
   if (!Number.isFinite(value)) {
@@ -233,29 +228,27 @@ function normalizeNumber(value: number): number {
   return Math.max(0, Math.floor(value))
 }
 
-function ensureRows(): void {
-  if (imageUrlEntries.value.length <= 0) {
-    imageUrlEntries.value = ['']
+function buildEditorSnapshot(): EditorSnapshot {
+  return {
+    title: editorForm.title.trim(),
+    className: editorForm.className.trim(),
+    cover: editorForm.cover.trim(),
+    likeCount: normalizeNumber(editorForm.likeCount),
+    imgUrls: joinAlbumImageUrls(previewImages.value) || '',
   }
 }
 
-function addImageUrlRow(): void {
-  ensureRows()
-  imageUrlEntries.value.push('')
+function serializeSnapshot(snapshot: EditorSnapshot): string {
+  return JSON.stringify(snapshot)
 }
 
-function removeImageUrlRow(index: number): void {
-  if (imageUrlEntries.value.length <= 1) {
-    imageUrlEntries.value[0] = ''
-    return
-  }
-  imageUrlEntries.value.splice(index, 1)
-  ensureRows()
+function syncSavedSnapshot(): void {
+  savedSnapshot.value = serializeSnapshot(buildEditorSnapshot())
 }
 
 function setPreviewUrls(urls: string[]): void {
   const unique = parseAlbumImageUrls(joinAlbumImageUrls(urls))
-  imageUrlEntries.value = unique.length > 0 ? unique : ['']
+  imageUrlsText.value = joinAlbumImageUrls(unique) || ''
 
   const cover = editorForm.cover.trim()
   if (cover && !unique.includes(cover)) {
@@ -306,7 +299,7 @@ function fillEditorForm(album: {
   editorForm.likeCount = Number.isFinite(album.like_count) ? Number(album.like_count) : 0
 
   const parsed = parseAlbumImageUrls(album.img_urls)
-  imageUrlEntries.value = parsed.length > 0 ? parsed : ['']
+  imageUrlsText.value = joinAlbumImageUrls(parsed) || ''
 }
 
 function pickClipboardImages(event: ClipboardEvent): File[] {
@@ -493,6 +486,7 @@ async function submitEditor(): Promise<void> {
     } else {
       await createAlbum(payload)
     }
+    syncSavedSnapshot()
     showGlobalSuccess('相册发布成功')
     await router.push('/albums')
   } catch (error) {
@@ -510,6 +504,7 @@ async function goManage(): Promise<void> {
 
 onMounted(async () => {
   await loadAlbumDetail()
+  syncSavedSnapshot()
 })
 </script>
 
@@ -582,6 +577,11 @@ onMounted(async () => {
   gap: 8px;
 }
 
+.link-editor-tip {
+  color: #9fb0d4;
+  font-size: 13px;
+}
+
 .link-editor-body,
 .preview-body,
 .info-form {
@@ -599,26 +599,8 @@ onMounted(async () => {
   width: 100%;
 }
 
-.url-rows {
+.url-editor-area {
   min-height: 0;
-  overflow: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding-right: 2px;
-}
-
-.url-row {
-  display: grid;
-  grid-template-columns: 26px minmax(0, 1fr) 32px;
-  align-items: center;
-  gap: 6px;
-}
-
-.url-index {
-  color: #c7d6f4;
-  font-size: 13px;
-  text-align: center;
 }
 
 .preview-count {
