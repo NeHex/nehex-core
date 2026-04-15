@@ -148,9 +148,10 @@ import {
 
 const router = useRouter()
 const { showGlobalError } = useGlobalSnackbar()
+const WARNING_STORAGE_KEY = 'nehex:developer-options-warning-accepted'
 
-const warningDialog = ref(true)
-const warningAccepted = ref(false)
+const warningAccepted = ref(readWarningAccepted())
+const warningDialog = ref(!warningAccepted.value)
 
 const cliEngine = ref<DeveloperCliEngine>('postgresql')
 const cliCommand = ref('status')
@@ -219,6 +220,7 @@ onBeforeUnmount(() => {
 function confirmWarning(): void {
   warningAccepted.value = true
   warningDialog.value = false
+  persistWarningAccepted()
 }
 
 function leaveDeveloperOptions(): void {
@@ -287,6 +289,22 @@ function restartAutoRefresh(): void {
   autoRefreshTimer = window.setInterval(() => {
     void loadLogs()
   }, 5000)
+}
+
+function readWarningAccepted(): boolean {
+  try {
+    return window.localStorage.getItem(WARNING_STORAGE_KEY) === '1'
+  } catch {
+    return false
+  }
+}
+
+function persistWarningAccepted(): void {
+  try {
+    window.localStorage.setItem(WARNING_STORAGE_KEY, '1')
+  } catch {
+    // Ignore storage errors and keep in-memory state.
+  }
 }
 </script>
 
