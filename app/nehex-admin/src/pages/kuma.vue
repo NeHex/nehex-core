@@ -103,7 +103,7 @@
                   <v-chip size="small" variant="tonal">
                     {{ card.provider.toUpperCase() }}
                   </v-chip>
-                  <v-chip size="small" variant="tonal">#{{ card.movieId }}</v-chip>
+                  <v-chip size="small" variant="tonal">#{{ card.movie_id }}</v-chip>
                   <v-chip
                     v-if="card.score"
                     color="warning"
@@ -121,18 +121,32 @@
 
                 <p class="movie-desc">{{ card.desc || '暂无简介' }}</p>
 
-                <v-btn
-                  v-if="card.url"
-                  class="movie-link-btn"
-                  color="primary"
-                  :href="card.url"
-                  prepend-icon="mdi-open-in-new"
-                  rel="noopener noreferrer"
-                  target="_blank"
-                  variant="text"
-                >
-                  打开详情
-                </v-btn>
+                <div class="movie-action-row">
+                  <v-btn
+                    v-if="card.url"
+                    class="movie-link-btn"
+                    color="primary"
+                    :href="card.url"
+                    prepend-icon="mdi-open-in-new"
+                    rel="noopener noreferrer"
+                    target="_blank"
+                    variant="text"
+                  >
+                    打开详情
+                  </v-btn>
+                  <span v-else class="movie-action-placeholder" />
+
+                  <v-btn
+                    class="movie-delete-btn"
+                    color="error"
+                    prepend-icon="mdi-delete-outline"
+                    :loading="isMovieDeleting(card.id)"
+                    variant="text"
+                    @click="deleteMovieCard(card)"
+                  >
+                    删除
+                  </v-btn>
+                </div>
               </v-card-text>
             </v-card>
           </div>
@@ -152,9 +166,15 @@
 </template>
 
 <script lang="ts" setup>
-import { computed, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import AdminLayout from '@/components/admin/AdminLayout.vue'
-import { fetchAdminKumaMovie, type KumaMovieProvider } from '@/services/kuma'
+import {
+  createAdminKumaMovie,
+  deleteAdminKumaMovie,
+  fetchAdminKumaMovies,
+  type KumaMovieCard,
+  type KumaMovieProvider,
+} from '@/services/kuma'
 
 type KumaSectionKey = 'movie' | 'music'
 
@@ -185,18 +205,6 @@ const activeSectionMeta = computed(() => {
   return sections.find((item) => item.key === activeSection.value) || sections[0]!
 })
 
-type MovieCard = {
-  id: number
-  provider: KumaMovieProvider
-  movieId: string
-  cover: string
-  title: string
-  years: string
-  desc: string
-  url: string
-  score?: string | null
-}
-
 const movieProviderOptions: Array<{ label: string, value: KumaMovieProvider }> = [
   { label: '豆瓣', value: 'douban' },
   { label: 'TMDB', value: 'tmdb' },
@@ -206,8 +214,8 @@ const movieIdInput = ref('')
 const movieProvider = ref<KumaMovieProvider>('douban')
 const movieCreating = ref(false)
 const movieCreateError = ref('')
-const movieCards = ref<MovieCard[]>([])
-let movieCardSerial = 1
+const movieCards = ref<KumaMovieCard[]>([])
+const deletingMovieIds = ref<number[]>([])
 
 async function createMovieCard(): Promise<void> {
   const movieId = movieIdInput.value.trim()
@@ -219,21 +227,16 @@ async function createMovieCard(): Promise<void> {
   movieCreating.value = true
   movieCreateError.value = ''
   try {
-    const item = await fetchAdminKumaMovie(movieProvider.value, movieId)
+    const item = await createAdminKumaMovie({
+      provider: movieProvider.value,
+      movie_id: movieId,
+    })
+
     movieCards.value = [
-      {
-        id: movieCardSerial++,
-        provider: movieProvider.value,
-        movieId,
-        cover: item.cover || '',
-        title: item.title || movieId,
-        years: item.years || '',
-        desc: item.desc || '',
-        url: item.url || '',
-        score: item.score || null,
-      },
-      ...movieCards.value,
+      item,
+      ...movieCards.value.filter((card) => card.id !== item.id),
     ]
+    movieCards.value.sort((a, b) => b.id - a.id)
     movieIdInput.value = ''
   } catch (error) {
     movieCreateError.value = error instanceof Error ? error.message : '创建电影卡片失败'
@@ -241,6 +244,36 @@ async function createMovieCard(): Promise<void> {
     movieCreating.value = false
   }
 }
+
+function isMovieDeleting(id: number): boolean {
+  return deletingMovieIds.value.includes(id)
+}
+
+async function deleteMovieCard(card: KumaMovieCard): Promise<void> {
+  const confirmed = window.confirm(`确定删除电影卡片「${card.title}」吗？`)
+  if (!confirmed || isMovieDeleting(card.id)) {
+    return
+  }
+
+  deletingMovieIds.value = [...deletingMovieIds.value, card.id]
+  movieCreateError.value = ''
+  try {
+    await deleteAdminKumaMovie(card.id)
+    movieCards.value = movieCards.value.filter((item) => item.id !== card.id)
+  } catch (error) {
+    movieCreateError.value = error instanceof Error ? error.message : '删除电影卡片失败'
+  } finally {
+    deletingMovieIds.value = deletingMovieIds.value.filter((id) => id !== card.id)
+  }
+}
+
+onMounted(async () => {
+  try {
+    movieCards.value = await fetchAdminKumaMovies()
+  } catch (error) {
+    movieCreateError.value = error instanceof Error ? error.message : '加载电影卡片失败'
+  }
+})
 </script>
 
 <style scoped>
@@ -380,10 +413,26 @@ async function createMovieCard(): Promise<void> {
   color: #d2dcf3;
   line-height: 1.6;
   font-size: 14px;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  min-height: calc(1.6em * 2);
 }
 
-.movie-link-btn {
-  align-self: flex-start;
+.movie-action-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.movie-action-placeholder {
+  flex: 1 1 auto;
+}
+
+.movie-link-btn,
+.movie-delete-btn {
   margin-left: -8px;
 }
 
