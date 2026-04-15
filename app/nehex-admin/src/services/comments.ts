@@ -65,6 +65,7 @@ export async function fetchAdminComments(
 
   const response = await adminFetch(`/admin-api/comments${query}`, {
     method: 'GET',
+    cache: 'no-store',
   })
 
   const payload = await parseJson<AdminCommentListResponse>(response)
