@@ -557,6 +557,15 @@ async function confirmDelete(): Promise<void> {
   errorMessage.value = ''
   try {
     await deleteAdminComment(deletingId)
+
+    const remaining = comments.value.filter((item) => item.id !== deletingId)
+    const removedCount = comments.value.length - remaining.length
+    if (removedCount > 0) {
+      comments.value = remaining
+      totalComments.value = Math.max(0, totalComments.value - removedCount)
+      syncEditForms(remaining)
+    }
+
     closeDeleteDialog(true)
     if (editingCommentId.value === deletingId) {
       closeEditDialog(true)
