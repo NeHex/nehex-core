@@ -137,6 +137,14 @@ pub fn router() -> Router<AppState> {
             get(admin_settings::admin_get_kuma_movie),
         )
         .route(
+            "/kuma/movies",
+            get(admin_settings::admin_list_kuma_movies).post(admin_settings::admin_create_kuma_movie),
+        )
+        .route(
+            "/kuma/movies/{id}",
+            delete(admin_settings::admin_delete_kuma_movie),
+        )
+        .route(
             "/backups",
             get(admin_backup::admin_list_backups).post(admin_backup::admin_create_backup),
         )
