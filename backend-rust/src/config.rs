@@ -54,7 +54,7 @@ impl Settings {
 
         Self {
             app_name: env_string("APP_NAME", "NeHex Core API"),
-            app_version: env_string("APP_VERSION", "1.2.3"),
+            app_version: env!("CARGO_PKG_VERSION").to_string(),
             app_env: env_string("APP_ENV", "dev"),
             app_port: env_u16("APP_PORT", 7878),
             cors_allow_origins,
