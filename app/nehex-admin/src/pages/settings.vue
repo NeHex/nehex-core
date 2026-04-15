@@ -74,6 +74,47 @@
               <v-divider class="my-4" />
 
               <div class="stack-block">
+                <div class="block-title">Kuma-API 地址</div>
+                <div class="field-action-row">
+                  <v-text-field
+                    v-model="nehexForm.kumaApiUrl"
+                    hide-details
+                    label="Kuma-API 地址（kuma_api_url）"
+                    placeholder="https://kuma-api.example.com"
+                    variant="outlined"
+                  />
+                  <v-btn
+                    class="field-action-btn"
+                    color="primary"
+                    :loading="kumaApiTesting"
+                    variant="text"
+                    @click="testKumaApiUrl"
+                  >
+                    测试链接
+                  </v-btn>
+                </div>
+
+                <v-alert
+                  v-if="kumaApiTestResult"
+                  density="comfortable"
+                  type="success"
+                  variant="tonal"
+                >
+                  {{ kumaApiTestResult }}
+                </v-alert>
+                <v-alert
+                  v-if="kumaApiTestError"
+                  density="comfortable"
+                  type="error"
+                  variant="tonal"
+                >
+                  {{ kumaApiTestError }}
+                </v-alert>
+              </div>
+
+              <v-divider class="my-4" />
+
+              <div class="stack-block">
                 <div class="block-title">分类设置</div>
                 <div class="class-editor-row">
                   <v-text-field
@@ -652,6 +693,9 @@ const {
   currentVersion,
   hasNewRelease,
   releaseStatusText,
+  kumaApiTesting,
+  kumaApiTestResult,
+  kumaApiTestError,
   adminManagerWebValidationMessage,
   adminManagerWebHint,
 
@@ -664,6 +708,7 @@ const {
   addArticleClass,
   removeArticleClass,
   checkLatestRelease,
+  testKumaApiUrl,
   resetCurrentSection,
   saveCurrentSection,
 } = useSettingsPage()
