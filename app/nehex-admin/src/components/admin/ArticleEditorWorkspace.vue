@@ -293,8 +293,8 @@
 
 <script lang="ts" setup>
 import MarkdownIt from 'markdown-it'
-import { computed, nextTick, onMounted, reactive, ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
+import { onBeforeRouteLeave, useRouter } from 'vue-router'
 import {
   createArticle,
   fetchArticleById,
@@ -341,6 +341,17 @@ type SelectedMediaImage = {
   fileName: string
 }
 
+type EditorSnapshot = {
+  title: string
+  className: string
+  tag: string
+  articleTopImage: string
+  top: number
+  read: number
+  status: 0 | 1
+  content: string
+}
+
 const DEFAULT_CLASS_OPTIONS: ArticleClassOption[] = [
   {
     value: 'default',
@@ -362,6 +373,7 @@ const previewMode = ref(false)
 const dragOver = ref(false)
 const dragDepth = ref(0)
 const markdownInputRef = ref<HTMLTextAreaElement | null>(null)
+const savedSnapshot = ref('')
 
 const classOptions = ref<ArticleClassOption[]>(DEFAULT_CLASS_OPTIONS)
 const {
@@ -392,6 +404,29 @@ const renderedMarkdown = computed(() => {
   }
   return markdown.render(content)
 })
+
+function _buildEditorSnapshot(): EditorSnapshot {
+  return {
+    title: editorForm.title.trim(),
+    className: editorForm.className.trim(),
+    tag: editorForm.tag.trim(),
+    articleTopImage: editorForm.articleTopImage.trim(),
+    top: normalizeNumber(editorForm.top),
+    read: normalizeNumber(editorForm.read),
+    status: normalizeStatus(editorForm.status),
+    content: editorForm.content,
+  }
+}
+
+function _serializeSnapshot(snapshot: EditorSnapshot): string {
+  return JSON.stringify(snapshot)
+}
+
+function syncSavedSnapshot(): void {
+  savedSnapshot.value = _serializeSnapshot(_buildEditorSnapshot())
+}
+
+const hasUnsavedChanges = computed(() => _serializeSnapshot(_buildEditorSnapshot()) !== savedSnapshot.value)
 
 function ensureClassOption(value: string): void {
   const normalized = value.trim()
@@ -804,6 +839,7 @@ async function submitEditor(nextStatus?: 0 | 1, stayOnPage = false): Promise<voi
       : await createArticle(payload)
 
     fillEditorForm(saved)
+    syncSavedSnapshot()
 
     const savedAsDraft = normalizeStatus(payload.status) === 0
     if (isEditing.value && props.articleId) {
@@ -837,9 +873,30 @@ async function goManage(): Promise<void> {
   await router.push('/articles')
 }
 
+function handleBeforeUnload(event: BeforeUnloadEvent): void {
+  if (!hasUnsavedChanges.value) {
+    return
+  }
+  event.preventDefault()
+  event.returnValue = ''
+}
+
+onBeforeRouteLeave(() => {
+  if (!hasUnsavedChanges.value) {
+    return true
+  }
+  return window.confirm('文章内容未保存，确定离开当前页面吗？')
+})
+
 onMounted(async () => {
+  window.addEventListener('beforeunload', handleBeforeUnload)
   await loadClassOptions()
   await loadArticleDetail()
+  syncSavedSnapshot()
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('beforeunload', handleBeforeUnload)
 })
 </script>
 
