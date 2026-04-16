@@ -3,7 +3,6 @@ import { computed, ref } from 'vue'
 const MIN_LOADING_VISIBLE_MS = 220
 
 const routeLoading = ref(false)
-let pendingCount = 0
 let loadingStartedAt = 0
 let finishTimer: number | null = null
 
@@ -17,7 +16,6 @@ function clearFinishTimer(): void {
 
 function startRouteLoading(): void {
   clearFinishTimer()
-  pendingCount += 1
   if (!routeLoading.value) {
     routeLoading.value = true
     loadingStartedAt = Date.now()
@@ -25,8 +23,7 @@ function startRouteLoading(): void {
 }
 
 function finishRouteLoading(): void {
-  pendingCount = Math.max(0, pendingCount - 1)
-  if (pendingCount > 0) {
+  if (!routeLoading.value) {
     return
   }
 
