@@ -16,7 +16,7 @@ use url::Url;
 
 use crate::{
     error::{AppError, AppResult},
-    routes::{admin_auth, admin_mail, admin_settings},
+    routes::{admin_auth, admin_mail},
     state::AppState,
 };
 
@@ -540,7 +540,9 @@ struct KumaMovieListResponse {
 }
 
 async fn get_kuma_movies(State(state): State<AppState>) -> AppResult<Json<KumaMovieListResponse>> {
-    admin_settings::ensure_kuma_movie_table(&state).await?;
+    if !table_exists(&state, "kuma_movie").await? {
+        return Ok(Json(KumaMovieListResponse { data: Vec::new() }));
+    }
 
     if let Some(cached) = state
         .runtime_cache
@@ -550,8 +552,9 @@ async fn get_kuma_movies(State(state): State<AppState>) -> AppResult<Json<KumaMo
         return Ok(Json(KumaMovieListResponse { data: cached }));
     }
 
-    let rows = sqlx::query_as::<_, KumaMovieRow>(
-        r#"
+    let rows = if column_exists(&state, "kuma_movie", "watch_status").await? {
+        sqlx::query_as::<_, KumaMovieRow>(
+            r#"
         SELECT
             id::bigint AS id,
             provider,
@@ -566,12 +569,36 @@ async fn get_kuma_movies(State(state): State<AppState>) -> AppResult<Json<KumaMo
             create_time,
             update_time
         FROM kuma_movie
-        ORDER BY d.create_time DESC, d.id DESC
+        ORDER BY create_time DESC, id DESC
         "#,
-    )
-    .fetch_all(&state.db_pool)
-    .await
-    .map_err(|error| AppError::internal(format!("Failed to list kuma movies: {error}")))?;
+        )
+        .fetch_all(&state.db_pool)
+        .await
+        .map_err(|error| AppError::internal(format!("Failed to list kuma movies: {error}")))?
+    } else {
+        sqlx::query_as::<_, KumaMovieRow>(
+            r#"
+        SELECT
+            id::bigint AS id,
+            provider,
+            movie_id,
+            'want'::text AS watch_status,
+            cover,
+            title,
+            years,
+            score,
+            description AS desc,
+            source_url AS url,
+            create_time,
+            update_time
+        FROM kuma_movie
+        ORDER BY create_time DESC, id DESC
+        "#,
+        )
+        .fetch_all(&state.db_pool)
+        .await
+        .map_err(|error| AppError::internal(format!("Failed to list kuma movies: {error}")))?
+    };
 
     let data = rows
         .into_iter()
@@ -717,6 +744,43 @@ async fn get_dailies(State(state): State<AppState>) -> AppResult<Json<DailyListR
         .set(DAILIES_CACHE_KEY, data.clone(), DAILIES_CACHE_TTL_SECONDS)
         .await;
     Ok(Json(DailyListResponse { data }))
+}
+
+async fn table_exists(state: &AppState, table_name: &str) -> AppResult<bool> {
+    sqlx::query_scalar::<_, bool>(
+        r#"
+        SELECT EXISTS (
+            SELECT 1
+            FROM information_schema.tables
+            WHERE table_schema = 'public' AND table_name = $1
+        )
+        "#,
+    )
+    .bind(table_name)
+    .fetch_one(&state.db_pool)
+    .await
+    .map_err(|error| AppError::internal(format!("Failed to inspect table `{table_name}`: {error}")))
+}
+
+async fn column_exists(state: &AppState, table_name: &str, column_name: &str) -> AppResult<bool> {
+    sqlx::query_scalar::<_, bool>(
+        r#"
+        SELECT EXISTS (
+            SELECT 1
+            FROM information_schema.columns
+            WHERE table_schema = 'public' AND table_name = $1 AND column_name = $2
+        )
+        "#,
+    )
+    .bind(table_name)
+    .bind(column_name)
+    .fetch_one(&state.db_pool)
+    .await
+    .map_err(|error| {
+        AppError::internal(format!(
+            "Failed to inspect column `{table_name}.{column_name}`: {error}"
+        ))
+    })
 }
 
 #[derive(sqlx::FromRow)]
