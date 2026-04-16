@@ -32,8 +32,30 @@
           rounded="xl"
         >
           <div class="daily-content">
+            <v-img
+              v-if="daily.movie?.cover"
+              :src="daily.movie.cover"
+              class="daily-movie-cover"
+              cover
+              height="140"
+            />
+
             <div class="card-header">
-              <div class="daily-title">{{ daily.title }}</div>
+              <div>
+                <div class="daily-title">{{ daily.title }}</div>
+                <div class="daily-tags">
+                  <v-chip size="x-small" variant="tonal">
+                    {{ daily.daily_type === 'review' ? '影评' : '日常' }}
+                  </v-chip>
+                  <v-chip
+                    v-if="daily.movie?.title"
+                    size="x-small"
+                    variant="tonal"
+                  >
+                    {{ daily.movie.title }}
+                  </v-chip>
+                </div>
+              </div>
 
               <div class="card-actions">
                 <v-btn
@@ -269,6 +291,13 @@ watch(isManageRoute, async (active, previous) => {
   padding: 12px;
 }
 
+.daily-movie-cover {
+  border-radius: 10px;
+  overflow: hidden;
+  margin-bottom: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+}
+
 .card-header {
   display: flex;
   justify-content: space-between;
@@ -293,6 +322,13 @@ watch(isManageRoute, async (active, previous) => {
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
+}
+
+.daily-tags {
+  margin-top: 6px;
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
 }
 
 .daily-body {
