@@ -99,6 +99,7 @@ pub struct AdminKumaMovieCard {
     id: i64,
     provider: String,
     movie_id: String,
+    watch_status: String,
     cover: String,
     title: String,
     years: String,
@@ -129,6 +130,20 @@ pub struct AdminKumaMovieActionResponse {
 pub struct AdminKumaMovieCreateRequest {
     provider: String,
     movie_id: String,
+    watch_status: Option<String>,
+}
+
+#[derive(Deserialize)]
+pub struct AdminKumaMovieUpdateRequest {
+    provider: String,
+    movie_id: String,
+    watch_status: Option<String>,
+    cover: Option<String>,
+    title: String,
+    years: Option<String>,
+    score: Option<String>,
+    desc: Option<String>,
+    url: Option<String>,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -481,6 +496,7 @@ pub async fn admin_list_kuma_movies(
             id::bigint AS id,
             provider,
             movie_id,
+            COALESCE(watch_status, 'want') AS watch_status,
             COALESCE(cover, '') AS cover,
             title,
             COALESCE(years, '') AS years,
@@ -511,6 +527,7 @@ pub async fn admin_create_kuma_movie(
 
     let provider = normalize_kuma_movie_provider(payload.provider)?;
     let movie_id = normalize_kuma_movie_id(payload.movie_id)?;
+    let watch_status = normalize_kuma_watch_status(payload.watch_status)?;
     let kuma_api_url = load_kuma_api_url_from_settings(&state).await?;
     let item = request_kuma_movie_item(&provider, &movie_id, &kuma_api_url).await?;
 
@@ -528,18 +545,20 @@ pub async fn admin_create_kuma_movie(
             r#"
             UPDATE kuma_movie
             SET
-                cover = $2,
-                title = $3,
-                years = $4,
-                score = $5,
-                description = $6,
-                source_url = $7,
+                watch_status = $2,
+                cover = $3,
+                title = $4,
+                years = $5,
+                score = $6,
+                description = $7,
+                source_url = $8,
                 update_time = CURRENT_TIMESTAMP
             WHERE id = $1
             RETURNING
                 id::bigint AS id,
                 provider,
                 movie_id,
+                COALESCE(watch_status, 'want') AS watch_status,
                 COALESCE(cover, '') AS cover,
                 title,
                 COALESCE(years, '') AS years,
@@ -551,6 +570,7 @@ pub async fn admin_create_kuma_movie(
             "#,
         )
         .bind(id)
+        .bind(&watch_status)
         .bind(item.cover)
         .bind(item.title)
         .bind(item.years)
@@ -566,6 +586,7 @@ pub async fn admin_create_kuma_movie(
             INSERT INTO kuma_movie (
                 provider,
                 movie_id,
+                watch_status,
                 cover,
                 title,
                 years,
@@ -573,11 +594,12 @@ pub async fn admin_create_kuma_movie(
                 description,
                 source_url
             )
-            VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+            VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
             RETURNING
                 id::bigint AS id,
                 provider,
                 movie_id,
+                COALESCE(watch_status, 'want') AS watch_status,
                 COALESCE(cover, '') AS cover,
                 title,
                 COALESCE(years, '') AS years,
@@ -590,6 +612,7 @@ pub async fn admin_create_kuma_movie(
         )
         .bind(&provider)
         .bind(&movie_id)
+        .bind(&watch_status)
         .bind(item.cover)
         .bind(item.title)
         .bind(item.years)
@@ -600,6 +623,90 @@ pub async fn admin_create_kuma_movie(
         .await
         .map_err(|error| AppError::internal(format!("Failed to create kuma movie: {error}")))?
     };
+
+    Ok(Json(AdminKumaMovieDetailResponse { data: row }))
+}
+
+pub async fn admin_update_kuma_movie(
+    State(state): State<AppState>,
+    method: Method,
+    headers: HeaderMap,
+    Path(id): Path<i64>,
+    Json(payload): Json<AdminKumaMovieUpdateRequest>,
+) -> AppResult<Json<AdminKumaMovieDetailResponse>> {
+    let _principal = admin_auth::require_admin_principal(&state, &method, &headers)?;
+    ensure_kuma_movie_table(&state).await?;
+
+    let provider = normalize_kuma_movie_provider(payload.provider)?;
+    let movie_id = normalize_kuma_movie_id(payload.movie_id)?;
+    let watch_status = normalize_kuma_watch_status(payload.watch_status)?;
+    let title = normalize_optional_text(payload.title)
+        .ok_or_else(|| AppError::Unprocessable("title 不能为空".to_string()))?;
+    let cover = payload.cover.and_then(normalize_optional_text);
+    let years = payload.years.and_then(normalize_optional_text);
+    let score = payload.score.and_then(normalize_optional_text);
+    let desc = payload.desc.and_then(normalize_optional_text);
+    let url = payload.url.and_then(normalize_optional_text);
+
+    let duplicate_id = sqlx::query_scalar::<_, i64>(
+        "SELECT id::bigint FROM kuma_movie WHERE provider = $1 AND movie_id = $2 AND id <> $3 LIMIT 1",
+    )
+    .bind(&provider)
+    .bind(&movie_id)
+    .bind(id)
+    .fetch_optional(&state.db_pool)
+    .await
+    .map_err(|error| AppError::internal(format!("Failed to query duplicated kuma movie: {error}")))?;
+    if duplicate_id.is_some() {
+        return Err(AppError::Unprocessable(
+            "已存在相同来源和电影 ID 的卡片".to_string(),
+        ));
+    }
+
+    let row = sqlx::query_as::<_, AdminKumaMovieCard>(
+        r#"
+        UPDATE kuma_movie
+        SET
+            provider = $2,
+            movie_id = $3,
+            watch_status = $4,
+            cover = $5,
+            title = $6,
+            years = $7,
+            score = $8,
+            description = $9,
+            source_url = $10,
+            update_time = CURRENT_TIMESTAMP
+        WHERE id = $1
+        RETURNING
+            id::bigint AS id,
+            provider,
+            movie_id,
+            COALESCE(watch_status, 'want') AS watch_status,
+            COALESCE(cover, '') AS cover,
+            title,
+            COALESCE(years, '') AS years,
+            score,
+            COALESCE(description, '') AS desc,
+            COALESCE(source_url, '') AS url,
+            create_time,
+            update_time
+        "#,
+    )
+    .bind(id)
+    .bind(&provider)
+    .bind(&movie_id)
+    .bind(&watch_status)
+    .bind(cover)
+    .bind(title)
+    .bind(years)
+    .bind(score)
+    .bind(desc)
+    .bind(url)
+    .fetch_optional(&state.db_pool)
+    .await
+    .map_err(|error| AppError::internal(format!("Failed to update kuma movie: {error}")))?
+    .ok_or_else(|| AppError::not_found("电影卡片不存在或已删除".to_string()))?;
 
     Ok(Json(AdminKumaMovieDetailResponse { data: row }))
 }
@@ -814,6 +921,7 @@ async fn ensure_kuma_movie_table(state: &AppState) -> AppResult<()> {
             id BIGSERIAL PRIMARY KEY,
             provider VARCHAR(20) NOT NULL,
             movie_id VARCHAR(120) NOT NULL,
+            watch_status VARCHAR(20) NOT NULL DEFAULT 'want',
             cover VARCHAR(1200),
             title VARCHAR(500) NOT NULL,
             years VARCHAR(120),
@@ -835,6 +943,13 @@ async fn ensure_kuma_movie_table(state: &AppState) -> AppResult<()> {
     .execute(&state.db_pool)
     .await
     .map_err(|error| AppError::internal(format!("Failed to ensure kuma_movie unique index: {error}")))?;
+
+    sqlx::query(
+        "ALTER TABLE kuma_movie ADD COLUMN IF NOT EXISTS watch_status VARCHAR(20) NOT NULL DEFAULT 'want'",
+    )
+    .execute(&state.db_pool)
+    .await
+    .map_err(|error| AppError::internal(format!("Failed to ensure kuma_movie watch_status column: {error}")))?;
 
     Ok(())
 }
@@ -866,6 +981,24 @@ fn normalize_kuma_movie_id(raw: String) -> AppResult<String> {
     }
 
     Ok(movie_id)
+}
+
+fn normalize_kuma_watch_status(raw: Option<String>) -> AppResult<String> {
+    let normalized = raw
+        .unwrap_or_else(|| "want".to_string())
+        .trim()
+        .to_lowercase();
+    if normalized.is_empty() {
+        return Ok("want".to_string());
+    }
+
+    if matches!(normalized.as_str(), "want" | "watched" | "liked") {
+        Ok(normalized)
+    } else {
+        Err(AppError::Unprocessable(
+            "watch_status 仅支持 want / watched / liked".to_string(),
+        ))
+    }
 }
 
 fn parse_kuma_movie_payload(source: Value) -> AppResult<AdminKumaMovieItem> {
