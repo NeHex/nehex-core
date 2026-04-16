@@ -16,7 +16,7 @@ use url::Url;
 
 use crate::{
     error::{AppError, AppResult},
-    routes::{admin_auth, admin_mail},
+    routes::{admin_auth, admin_mail, admin_settings},
     state::AppState,
 };
 
@@ -540,6 +540,8 @@ struct KumaMovieListResponse {
 }
 
 async fn get_kuma_movies(State(state): State<AppState>) -> AppResult<Json<KumaMovieListResponse>> {
+    admin_settings::ensure_kuma_movie_table(&state).await?;
+
     if let Some(cached) = state
         .runtime_cache
         .get::<Vec<KumaMovieItem>>(KUMA_MOVIE_CACHE_KEY)
