@@ -813,10 +813,10 @@ onMounted(async () => {
   line-height: 1.6;
   font-size: 14px;
   display: -webkit-box;
-  -webkit-line-clamp: 2;
+  -webkit-line-clamp: 4;
   -webkit-box-orient: vertical;
   overflow: hidden;
-  min-height: calc(1.6em * 2);
+  min-height: calc(1.6em * 4);
 }
 
 .movie-action-row {
