@@ -432,6 +432,7 @@ async fn ensure_system_tables(pool: &PgPool) -> AppResult<()> {
             id BIGSERIAL PRIMARY KEY,
             provider VARCHAR(20) NOT NULL,
             movie_id VARCHAR(120) NOT NULL,
+            watch_status VARCHAR(20) NOT NULL DEFAULT 'want',
             cover VARCHAR(1200),
             title VARCHAR(500) NOT NULL,
             years VARCHAR(120),
@@ -472,6 +473,15 @@ async fn ensure_schema_compatibility_columns(pool: &PgPool) -> AppResult<()> {
             pool,
             "ALTER TABLE comment ADD COLUMN IF NOT EXISTS is_admin BIGINT NOT NULL DEFAULT 0",
             "comment.is_admin",
+        )
+        .await?;
+    }
+
+    if tables.contains("kuma_movie") {
+        run_ddl(
+            pool,
+            "ALTER TABLE kuma_movie ADD COLUMN IF NOT EXISTS watch_status VARCHAR(20) NOT NULL DEFAULT 'want'",
+            "kuma_movie.watch_status",
         )
         .await?;
     }
