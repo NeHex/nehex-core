@@ -248,7 +248,9 @@ async fn ensure_core_content_tables(pool: &PgPool) -> AppResult<()> {
             title VARCHAR(255) NOT NULL,
             content TEXT,
             create_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            weather VARCHAR(50)
+            weather VARCHAR(50),
+            daily_type VARCHAR(20) NOT NULL DEFAULT 'note',
+            kuma_movie_id BIGINT
         )
         "#,
         "daily",
@@ -473,6 +475,21 @@ async fn ensure_schema_compatibility_columns(pool: &PgPool) -> AppResult<()> {
             pool,
             "ALTER TABLE comment ADD COLUMN IF NOT EXISTS is_admin BIGINT NOT NULL DEFAULT 0",
             "comment.is_admin",
+        )
+        .await?;
+    }
+
+    if tables.contains("daily") {
+        run_ddl(
+            pool,
+            "ALTER TABLE daily ADD COLUMN IF NOT EXISTS daily_type VARCHAR(20) NOT NULL DEFAULT 'note'",
+            "daily.daily_type",
+        )
+        .await?;
+        run_ddl(
+            pool,
+            "ALTER TABLE daily ADD COLUMN IF NOT EXISTS kuma_movie_id BIGINT",
+            "daily.kuma_movie_id",
         )
         .await?;
     }
