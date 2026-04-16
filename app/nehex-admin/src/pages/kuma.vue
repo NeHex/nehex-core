@@ -36,7 +36,7 @@
               </div>
 
               <v-card-text class="movie-card-body">
-                <div class="movie-input-row">
+                <div class="movie-input-column">
                   <v-text-field
                     v-model="movieIdInput"
                     density="comfortable"
@@ -56,6 +56,30 @@
                     label="来源"
                     variant="outlined"
                   />
+                  <v-select
+                    v-model="movieWatchStatus"
+                    :items="movieWatchStatusOptions"
+                    density="comfortable"
+                    hide-details
+                    item-title="label"
+                    item-value="value"
+                    label="状态"
+                    variant="outlined"
+                  >
+                    <template #item="{ props, item }">
+                      <v-list-item v-bind="props">
+                        <template #prepend>
+                          <v-icon :icon="item.raw.icon" size="18" />
+                        </template>
+                      </v-list-item>
+                    </template>
+                    <template #selection="{ item }">
+                      <div class="movie-status-selection">
+                        <v-icon :icon="item.raw.icon" size="16" />
+                        <span>{{ item.raw.label }}</span>
+                      </div>
+                    </template>
+                  </v-select>
                 </div>
 
                 <v-btn
@@ -104,6 +128,14 @@
                     {{ card.provider.toUpperCase() }}
                   </v-chip>
                   <v-chip size="small" variant="tonal">#{{ card.movie_id }}</v-chip>
+                  <v-chip size="small" variant="tonal">
+                    <v-icon
+                      start
+                      :icon="getMovieWatchStatusMeta(card.watch_status).icon"
+                      size="14"
+                    />
+                    {{ getMovieWatchStatusMeta(card.watch_status).label }}
+                  </v-chip>
                   <v-chip
                     v-if="card.score"
                     color="warning"
@@ -137,9 +169,20 @@
                   <span v-else class="movie-action-placeholder" />
 
                   <v-btn
+                    class="movie-edit-btn"
+                    color="info"
+                    prepend-icon="mdi-pencil-outline"
+                    :loading="isMovieEditing(card.id)"
+                    variant="text"
+                    @click="openEditMovieDialog(card)"
+                  >
+                    编辑
+                  </v-btn>
+                  <v-btn
                     class="movie-delete-btn"
                     color="error"
                     prepend-icon="mdi-delete-outline"
+                    :disabled="isMovieEditing(card.id)"
                     :loading="isMovieDeleting(card.id)"
                     variant="text"
                     @click="openDeleteMovieDialog(card)"
@@ -162,6 +205,145 @@
         </v-window-item>
       </v-window>
     </section>
+
+    <v-dialog
+      v-model="movieEditDialog"
+      :persistent="isEditDialogSubmitting"
+      max-width="500"
+    >
+      <v-card class="movie-edit-dialog-card" rounded="xl">
+        <v-card-title class="movie-edit-dialog-title">
+          <v-icon color="info" icon="mdi-pencil-outline" />
+          <span>编辑电影卡片</span>
+        </v-card-title>
+        <v-card-text class="movie-edit-dialog-text">
+          <div class="movie-input-column">
+            <v-text-field
+              v-model="movieEditIdInput"
+              density="comfortable"
+              hide-details
+              label="电影 ID"
+              placeholder="例如：1292052 / 278"
+              variant="outlined"
+              @keydown.enter.prevent="confirmEditMovieCard"
+            />
+            <v-select
+              v-model="movieEditProvider"
+              :items="movieProviderOptions"
+              density="comfortable"
+              hide-details
+              item-title="label"
+              item-value="value"
+              label="来源"
+              variant="outlined"
+            />
+            <v-select
+              v-model="movieEditWatchStatus"
+              :items="movieWatchStatusOptions"
+              density="comfortable"
+              hide-details
+              item-title="label"
+              item-value="value"
+              label="状态"
+              variant="outlined"
+            >
+              <template #item="{ props, item }">
+                <v-list-item v-bind="props">
+                  <template #prepend>
+                    <v-icon :icon="item.raw.icon" size="18" />
+                  </template>
+                </v-list-item>
+              </template>
+              <template #selection="{ item }">
+                <div class="movie-status-selection">
+                  <v-icon :icon="item.raw.icon" size="16" />
+                  <span>{{ item.raw.label }}</span>
+                </div>
+              </template>
+            </v-select>
+            <v-text-field
+              v-model="movieEditTitle"
+              density="comfortable"
+              hide-details
+              label="标题"
+              placeholder="电影标题"
+              variant="outlined"
+              @keydown.enter.prevent="confirmEditMovieCard"
+            />
+            <v-text-field
+              v-model="movieEditYears"
+              density="comfortable"
+              hide-details
+              label="年份"
+              placeholder="例如：2024"
+              variant="outlined"
+            />
+            <v-text-field
+              v-model="movieEditScore"
+              density="comfortable"
+              hide-details
+              label="评分"
+              placeholder="例如：8.6"
+              variant="outlined"
+            />
+            <v-text-field
+              v-model="movieEditCover"
+              density="comfortable"
+              hide-details
+              label="封面地址"
+              placeholder="https://..."
+              variant="outlined"
+            />
+            <v-text-field
+              v-model="movieEditUrl"
+              density="comfortable"
+              hide-details
+              label="详情链接"
+              placeholder="https://..."
+              variant="outlined"
+            />
+            <v-textarea
+              v-model="movieEditDesc"
+              auto-grow
+              density="comfortable"
+              hide-details
+              label="简介"
+              placeholder="电影简介"
+              rows="3"
+              variant="outlined"
+            />
+          </div>
+          <v-alert
+            v-if="movieEditError"
+            class="mt-3"
+            density="comfortable"
+            type="error"
+            variant="tonal"
+          >
+            {{ movieEditError }}
+          </v-alert>
+        </v-card-text>
+        <v-card-actions class="movie-edit-dialog-actions">
+          <v-spacer />
+          <v-btn
+            :disabled="isEditDialogSubmitting"
+            variant="text"
+            @click="closeEditMovieDialog"
+          >
+            取消
+          </v-btn>
+          <v-btn
+            color="info"
+            prepend-icon="mdi-content-save-outline"
+            :loading="isEditDialogSubmitting"
+            variant="flat"
+            @click="confirmEditMovieCard"
+          >
+            保存
+          </v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
 
     <v-dialog
       v-model="movieDeleteDialog"
@@ -211,8 +393,10 @@ import {
   createAdminKumaMovie,
   deleteAdminKumaMovie,
   fetchAdminKumaMovies,
+  updateAdminKumaMovie,
   type KumaMovieCard,
   type KumaMovieProvider,
+  type KumaMovieWatchStatus,
 } from '@/services/kuma'
 
 type KumaSectionKey = 'movie' | 'music'
@@ -248,15 +432,45 @@ const movieProviderOptions: Array<{ label: string, value: KumaMovieProvider }> =
   { label: '豆瓣', value: 'douban' },
   { label: 'TMDB', value: 'tmdb' },
 ]
+const movieWatchStatusOptions: Array<{
+  label: string
+  value: KumaMovieWatchStatus
+  icon: string
+}> = [
+  { label: '想看', value: 'want', icon: 'mdi-star-outline' },
+  { label: '看过', value: 'watched', icon: 'mdi-star' },
+  { label: '喜欢', value: 'liked', icon: 'mdi-heart' },
+]
 
 const movieIdInput = ref('')
 const movieProvider = ref<KumaMovieProvider>('douban')
+const movieWatchStatus = ref<KumaMovieWatchStatus>('want')
 const movieCreating = ref(false)
 const movieCreateError = ref('')
 const movieCards = ref<KumaMovieCard[]>([])
 const deletingMovieIds = ref<number[]>([])
+const editingMovieIds = ref<number[]>([])
+const movieEditDialog = ref(false)
+const movieCardPendingEdit = ref<KumaMovieCard | null>(null)
+const movieEditIdInput = ref('')
+const movieEditProvider = ref<KumaMovieProvider>('douban')
+const movieEditWatchStatus = ref<KumaMovieWatchStatus>('want')
+const movieEditCover = ref('')
+const movieEditTitle = ref('')
+const movieEditYears = ref('')
+const movieEditScore = ref('')
+const movieEditDesc = ref('')
+const movieEditUrl = ref('')
+const movieEditError = ref('')
 const movieDeleteDialog = ref(false)
 const movieCardPendingDelete = ref<KumaMovieCard | null>(null)
+const isEditDialogSubmitting = computed(() => {
+  const id = movieCardPendingEdit.value?.id
+  if (typeof id !== 'number') {
+    return false
+  }
+  return isMovieEditing(id)
+})
 const isDeleteDialogSubmitting = computed(() => {
   const id = movieCardPendingDelete.value?.id
   if (typeof id !== 'number') {
@@ -264,6 +478,26 @@ const isDeleteDialogSubmitting = computed(() => {
   }
   return isMovieDeleting(id)
 })
+
+function normalizeMovieProvider(raw: string): KumaMovieProvider {
+  return raw === 'tmdb' ? 'tmdb' : 'douban'
+}
+
+function normalizeMovieWatchStatus(raw: string | undefined): KumaMovieWatchStatus {
+  if (raw === 'watched' || raw === 'liked') {
+    return raw
+  }
+  return 'want'
+}
+
+function getMovieWatchStatusMeta(raw: string): {
+  label: string
+  value: KumaMovieWatchStatus
+  icon: string
+} {
+  const normalized = normalizeMovieWatchStatus(raw)
+  return movieWatchStatusOptions.find((item) => item.value === normalized) || movieWatchStatusOptions[0]!
+}
 
 async function createMovieCard(): Promise<void> {
   const movieId = movieIdInput.value.trim()
@@ -278,6 +512,7 @@ async function createMovieCard(): Promise<void> {
     const item = await createAdminKumaMovie({
       provider: movieProvider.value,
       movie_id: movieId,
+      watch_status: movieWatchStatus.value,
     })
 
     movieCards.value = [
@@ -297,8 +532,87 @@ function isMovieDeleting(id: number): boolean {
   return deletingMovieIds.value.includes(id)
 }
 
+function isMovieEditing(id: number): boolean {
+  return editingMovieIds.value.includes(id)
+}
+
+function openEditMovieDialog(card: KumaMovieCard): void {
+  if (isMovieDeleting(card.id) || isMovieEditing(card.id)) {
+    return
+  }
+
+  movieCardPendingEdit.value = card
+  movieEditProvider.value = normalizeMovieProvider(card.provider)
+  movieEditWatchStatus.value = normalizeMovieWatchStatus(card.watch_status)
+  movieEditIdInput.value = card.movie_id
+  movieEditCover.value = card.cover || ''
+  movieEditTitle.value = card.title || ''
+  movieEditYears.value = card.years || ''
+  movieEditScore.value = card.score || ''
+  movieEditDesc.value = card.desc || ''
+  movieEditUrl.value = card.url || ''
+  movieEditError.value = ''
+  movieEditDialog.value = true
+}
+
+function closeEditMovieDialog(): void {
+  if (isEditDialogSubmitting.value) {
+    return
+  }
+  movieEditDialog.value = false
+  movieCardPendingEdit.value = null
+  movieEditError.value = ''
+}
+
+async function confirmEditMovieCard(): Promise<void> {
+  const card = movieCardPendingEdit.value
+  if (!card || isMovieEditing(card.id)) {
+    return
+  }
+
+  const movieId = movieEditIdInput.value.trim()
+  const title = movieEditTitle.value.trim()
+  if (!movieId) {
+    movieEditError.value = '请先输入电影 ID'
+    return
+  }
+  if (!title) {
+    movieEditError.value = '请先输入标题'
+    return
+  }
+
+  editingMovieIds.value = [...editingMovieIds.value, card.id]
+  movieEditError.value = ''
+  movieCreateError.value = ''
+  try {
+    const updated = await updateAdminKumaMovie(card.id, {
+      provider: movieEditProvider.value,
+      movie_id: movieId,
+      watch_status: movieEditWatchStatus.value,
+      cover: movieEditCover.value.trim(),
+      title,
+      years: movieEditYears.value.trim(),
+      score: movieEditScore.value.trim(),
+      desc: movieEditDesc.value.trim(),
+      url: movieEditUrl.value.trim(),
+    })
+    movieCards.value = movieCards.value.map((item) => {
+      if (item.id === updated.id) {
+        return updated
+      }
+      return item
+    })
+    movieEditDialog.value = false
+    movieCardPendingEdit.value = null
+  } catch (error) {
+    movieEditError.value = error instanceof Error ? error.message : '更新电影卡片失败'
+  } finally {
+    editingMovieIds.value = editingMovieIds.value.filter((id) => id !== card.id)
+  }
+}
+
 function openDeleteMovieDialog(card: KumaMovieCard): void {
-  if (isMovieDeleting(card.id)) {
+  if (isMovieDeleting(card.id) || isMovieEditing(card.id)) {
     return
   }
   movieCardPendingDelete.value = card
@@ -336,6 +650,13 @@ async function confirmDeleteMovieCard(): Promise<void> {
 watch(movieDeleteDialog, (visible) => {
   if (!visible && !isDeleteDialogSubmitting.value) {
     movieCardPendingDelete.value = null
+  }
+})
+
+watch(movieEditDialog, (visible) => {
+  if (!visible && !isEditDialogSubmitting.value) {
+    movieCardPendingEdit.value = null
+    movieEditError.value = ''
   }
 })
 
@@ -454,10 +775,16 @@ onMounted(async () => {
   gap: 10px;
 }
 
-.movie-input-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 132px;
+.movie-input-column {
+  display: flex;
+  flex-direction: column;
   gap: 8px;
+}
+
+.movie-status-selection {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .movie-meta-row {
@@ -504,8 +831,33 @@ onMounted(async () => {
 }
 
 .movie-link-btn,
+.movie-edit-btn,
 .movie-delete-btn {
   margin-left: -8px;
+}
+
+.movie-edit-dialog-card {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: linear-gradient(180deg, rgba(24, 30, 41, 0.98), rgba(19, 24, 34, 0.98));
+  color: #edf1ff;
+}
+
+.movie-edit-dialog-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 18px;
+}
+
+.movie-edit-dialog-text {
+  color: #d2dcf3;
+  line-height: 1.7;
+  max-height: 62vh;
+  overflow: auto;
+}
+
+.movie-edit-dialog-actions {
+  padding: 0 20px 18px;
 }
 
 .movie-delete-dialog-card {
@@ -538,10 +890,6 @@ onMounted(async () => {
   .page-header {
     flex-direction: column;
     align-items: flex-start;
-  }
-
-  .movie-input-row {
-    grid-template-columns: 1fr;
   }
 }
 </style>
