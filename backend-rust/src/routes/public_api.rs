@@ -71,6 +71,8 @@ const PAGES_CACHE_KEY: &str = "pages:list";
 const PAGES_CACHE_TTL_SECONDS: u64 = 20;
 const FRIENDS_CACHE_KEY: &str = "friends:list";
 const FRIENDS_CACHE_TTL_SECONDS: u64 = 30;
+const KUMA_MOVIE_CACHE_KEY: &str = "kuma:movie:list";
+const KUMA_MOVIE_CACHE_TTL_SECONDS: u64 = 20;
 const COMMENT_CACHE_TTL_SECONDS: u64 = 8;
 const SETTINGS_CACHE_KEY: &str = "settings:list";
 const SETTINGS_WITH_THEME_DETAILS_CACHE_KEY: &str = "settings:list:with-theme-details";
@@ -103,6 +105,7 @@ pub fn router() -> Router<AppState> {
         .route("/friend", get(get_friends))
         .route("/friend/apply", post(post_friend_apply))
         .route("/friend-apply", post(post_friend_apply))
+        .route("/kuma/movie", get(get_kuma_movies))
 }
 
 #[derive(sqlx::FromRow)]
@@ -497,6 +500,105 @@ fn map_project_item(row: ProjectRow) -> ProjectItem {
         create_time: row.create_time,
         update_time: row.update_time,
     }
+}
+
+#[derive(sqlx::FromRow)]
+struct KumaMovieRow {
+    id: i64,
+    provider: String,
+    movie_id: String,
+    watch_status: String,
+    cover: Option<String>,
+    title: String,
+    years: Option<String>,
+    score: Option<String>,
+    desc: Option<String>,
+    url: Option<String>,
+    create_time: NaiveDateTime,
+    update_time: NaiveDateTime,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+struct KumaMovieItem {
+    id: i64,
+    provider: String,
+    movie_id: String,
+    watch_status: String,
+    cover: String,
+    title: String,
+    years: String,
+    score: Option<String>,
+    desc: String,
+    url: String,
+    create_time: NaiveDateTime,
+    update_time: NaiveDateTime,
+}
+
+#[derive(Serialize)]
+struct KumaMovieListResponse {
+    data: Vec<KumaMovieItem>,
+}
+
+async fn get_kuma_movies(State(state): State<AppState>) -> AppResult<Json<KumaMovieListResponse>> {
+    if let Some(cached) = state
+        .runtime_cache
+        .get::<Vec<KumaMovieItem>>(KUMA_MOVIE_CACHE_KEY)
+        .await
+    {
+        return Ok(Json(KumaMovieListResponse { data: cached }));
+    }
+
+    let rows = sqlx::query_as::<_, KumaMovieRow>(
+        r#"
+        SELECT
+            id::bigint AS id,
+            provider,
+            movie_id,
+            COALESCE(watch_status, 'want') AS watch_status,
+            cover,
+            title,
+            years,
+            score,
+            description AS desc,
+            source_url AS url,
+            create_time,
+            update_time
+        FROM kuma_movie
+        ORDER BY create_time DESC, id DESC
+        "#,
+    )
+    .fetch_all(&state.db_pool)
+    .await
+    .map_err(|error| AppError::internal(format!("Failed to list kuma movies: {error}")))?;
+
+    let data = rows
+        .into_iter()
+        .map(|row| KumaMovieItem {
+            id: row.id,
+            provider: row.provider,
+            movie_id: row.movie_id,
+            watch_status: row.watch_status,
+            cover: row.cover.unwrap_or_default(),
+            title: row.title,
+            years: row.years.unwrap_or_default(),
+            score: row.score,
+            desc: row.desc.unwrap_or_default(),
+            url: row.url.unwrap_or_default(),
+            create_time: row.create_time,
+            update_time: row.update_time,
+        })
+        .collect::<Vec<_>>();
+
+    state
+        .runtime_cache
+        .set(
+            KUMA_MOVIE_CACHE_KEY,
+            data.clone(),
+            KUMA_MOVIE_CACHE_TTL_SECONDS,
+        )
+        .await;
+
+    Ok(Json(KumaMovieListResponse { data }))
 }
 
 #[derive(sqlx::FromRow)]
