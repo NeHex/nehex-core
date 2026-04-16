@@ -142,7 +142,7 @@ pub fn router() -> Router<AppState> {
         )
         .route(
             "/kuma/movies/{id}",
-            delete(admin_settings::admin_delete_kuma_movie),
+            put(admin_settings::admin_update_kuma_movie).delete(admin_settings::admin_delete_kuma_movie),
         )
         .route(
             "/backups",
