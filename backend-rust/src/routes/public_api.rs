@@ -564,7 +564,7 @@ async fn get_kuma_movies(State(state): State<AppState>) -> AppResult<Json<KumaMo
             create_time,
             update_time
         FROM kuma_movie
-        ORDER BY create_time DESC, id DESC
+        ORDER BY d.create_time DESC, d.id DESC
         "#,
     )
     .fetch_all(&state.db_pool)
@@ -608,6 +608,29 @@ struct DailyRow {
     content: Option<String>,
     create_time: NaiveDateTime,
     weather: Option<String>,
+    daily_type: String,
+    kuma_movie_id: Option<i64>,
+    movie_provider: Option<String>,
+    movie_movie_id: Option<String>,
+    movie_watch_status: Option<String>,
+    movie_cover: Option<String>,
+    movie_title: Option<String>,
+    movie_years: Option<String>,
+    movie_score: Option<String>,
+    movie_url: Option<String>,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+struct DailyMovieItem {
+    id: i64,
+    provider: String,
+    movie_id: String,
+    watch_status: String,
+    cover: String,
+    title: String,
+    years: String,
+    score: Option<String>,
+    url: String,
 }
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -617,6 +640,9 @@ struct DailyItem {
     content: Option<String>,
     create_time: NaiveDateTime,
     weather: Option<String>,
+    daily_type: String,
+    kuma_movie_id: Option<i64>,
+    movie: Option<DailyMovieItem>,
 }
 
 #[derive(Serialize)]
@@ -635,8 +661,24 @@ async fn get_dailies(State(state): State<AppState>) -> AppResult<Json<DailyListR
 
     let rows = sqlx::query_as::<_, DailyRow>(
         r#"
-        SELECT id::bigint AS id, title, content, create_time, weather
-        FROM daily
+        SELECT
+            d.id::bigint AS id,
+            d.title,
+            d.content,
+            d.create_time,
+            d.weather,
+            COALESCE(d.daily_type, 'note') AS daily_type,
+            d.kuma_movie_id::bigint AS kuma_movie_id,
+            km.provider AS movie_provider,
+            km.movie_id AS movie_movie_id,
+            COALESCE(km.watch_status, 'want') AS movie_watch_status,
+            km.cover AS movie_cover,
+            km.title AS movie_title,
+            km.years AS movie_years,
+            km.score AS movie_score,
+            km.source_url AS movie_url
+        FROM daily d
+        LEFT JOIN kuma_movie km ON km.id = d.kuma_movie_id
         ORDER BY create_time DESC, id DESC
         "#,
     )
@@ -652,6 +694,19 @@ async fn get_dailies(State(state): State<AppState>) -> AppResult<Json<DailyListR
             content: row.content,
             create_time: row.create_time,
             weather: row.weather,
+            daily_type: row.daily_type,
+            kuma_movie_id: row.kuma_movie_id,
+            movie: row.kuma_movie_id.map(|movie_id| DailyMovieItem {
+                id: movie_id,
+                provider: row.movie_provider.unwrap_or_default(),
+                movie_id: row.movie_movie_id.unwrap_or_default(),
+                watch_status: row.movie_watch_status.unwrap_or_else(|| "want".to_string()),
+                cover: row.movie_cover.unwrap_or_default(),
+                title: row.movie_title.unwrap_or_default(),
+                years: row.movie_years.unwrap_or_default(),
+                score: row.movie_score,
+                url: row.movie_url.unwrap_or_default(),
+            }),
         })
         .collect::<Vec<_>>();
 
