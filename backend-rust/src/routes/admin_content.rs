@@ -69,6 +69,10 @@ struct DailyItem {
     content: Option<String>,
     create_time: NaiveDateTime,
     weather: Option<String>,
+    daily_type: String,
+    kuma_movie_id: Option<i64>,
+    movie_title: Option<String>,
+    movie_cover: Option<String>,
 }
 
 #[derive(Serialize)]
@@ -170,6 +174,16 @@ pub struct DailyPayload {
     title: String,
     content: Option<String>,
     weather: Option<String>,
+    daily_type: Option<String>,
+    kuma_movie_id: Option<i64>,
+}
+
+struct NormalizedDailyPayload {
+    title: String,
+    content: Option<String>,
+    weather: Option<String>,
+    daily_type: String,
+    kuma_movie_id: Option<i64>,
 }
 
 #[derive(Deserialize)]
@@ -454,21 +468,24 @@ pub async fn admin_create_daily(
     Json(payload): Json<DailyPayload>,
 ) -> AppResult<Json<AdminDailyDetailResponse>> {
     let _principal = admin_auth::require_admin_principal(&state, &method, &headers)?;
-    let title = normalize_required_text(payload.title, "title")?;
+    let normalized = normalize_daily_payload(&state, payload).await?;
 
-    let item = sqlx::query_as::<_, DailyItem>(
+    let inserted_id = sqlx::query_scalar::<_, i64>(
         r#"
-        INSERT INTO daily (title, content, weather)
-        VALUES ($1, $2, $3)
-        RETURNING id::bigint AS id, title, content, create_time, weather
+        INSERT INTO daily (title, content, weather, daily_type, kuma_movie_id)
+        VALUES ($1, $2, $3, $4, $5)
+        RETURNING id::bigint AS id
         "#,
     )
-    .bind(title)
-    .bind(normalize_optional_text(payload.content))
-    .bind(normalize_optional_text(payload.weather))
+    .bind(normalized.title)
+    .bind(normalized.content)
+    .bind(normalized.weather)
+    .bind(normalized.daily_type)
+    .bind(normalized.kuma_movie_id)
     .fetch_one(&state.db_pool)
     .await
     .map_err(|error| AppError::internal(format!("Failed to create daily: {error}")))?;
+    let item = fetch_daily_item_by_id(&state, inserted_id).await?;
     invalidate_cache_key(&state, DAILIES_CACHE_KEY).await;
     sync_api::record_content_change_best_effort(&state, "daily", "create", vec![item.id]).await;
 
@@ -483,24 +500,27 @@ pub async fn admin_update_daily(
     Json(payload): Json<DailyPayload>,
 ) -> AppResult<Json<AdminDailyDetailResponse>> {
     let _principal = admin_auth::require_admin_principal(&state, &method, &headers)?;
-    let title = normalize_required_text(payload.title, "title")?;
+    let normalized = normalize_daily_payload(&state, payload).await?;
 
-    let item = sqlx::query_as::<_, DailyItem>(
+    let updated_id = sqlx::query_scalar::<_, i64>(
         r#"
         UPDATE daily
-        SET title = $2, content = $3, weather = $4
+        SET title = $2, content = $3, weather = $4, daily_type = $5, kuma_movie_id = $6
         WHERE id = $1
-        RETURNING id::bigint AS id, title, content, create_time, weather
+        RETURNING id::bigint AS id
         "#,
     )
     .bind(daily_id)
-    .bind(title)
-    .bind(normalize_optional_text(payload.content))
-    .bind(normalize_optional_text(payload.weather))
+    .bind(normalized.title)
+    .bind(normalized.content)
+    .bind(normalized.weather)
+    .bind(normalized.daily_type)
+    .bind(normalized.kuma_movie_id)
     .fetch_optional(&state.db_pool)
     .await
     .map_err(|error| AppError::internal(format!("Failed to update daily: {error}")))?
     .ok_or_else(|| AppError::not_found("Daily not found"))?;
+    let item = fetch_daily_item_by_id(&state, updated_id).await?;
     invalidate_cache_key(&state, DAILIES_CACHE_KEY).await;
     sync_api::record_content_change_best_effort(&state, "daily", "update", vec![item.id]).await;
 
@@ -514,16 +534,7 @@ pub async fn admin_get_daily(
     Path(daily_id): Path<i64>,
 ) -> AppResult<Json<AdminDailyDetailResponse>> {
     let _principal = admin_auth::require_admin_principal(&state, &method, &headers)?;
-
-    let item = sqlx::query_as::<_, DailyItem>(
-        "SELECT id::bigint AS id, title, content, create_time, weather FROM daily WHERE id = $1 LIMIT 1",
-    )
-    .bind(daily_id)
-    .fetch_optional(&state.db_pool)
-    .await
-    .map_err(|error| AppError::internal(format!("Failed to get daily: {error}")))?
-    .ok_or_else(|| AppError::not_found("Daily not found"))?;
-
+    let item = fetch_daily_item_by_id(&state, daily_id).await?;
     Ok(Json(AdminDailyDetailResponse { data: item }))
 }
 
@@ -1045,6 +1056,55 @@ fn normalize_status(status: i64) -> i64 {
     if status > 0 { 1 } else { 0 }
 }
 
+fn normalize_daily_type(raw: Option<String>) -> AppResult<String> {
+    let normalized = raw.unwrap_or_else(|| "note".to_string()).trim().to_lowercase();
+    if normalized.is_empty() || normalized == "note" || normalized == "daily" || normalized == "日常" {
+        return Ok("note".to_string());
+    }
+    if normalized == "review" || normalized == "movie_review" || normalized == "影评" {
+        return Ok("review".to_string());
+    }
+
+    Err(AppError::Unprocessable(
+        "daily_type 仅支持 note(日常) 或 review(影评)".to_string(),
+    ))
+}
+
+async fn normalize_daily_payload(
+    state: &AppState,
+    payload: DailyPayload,
+) -> AppResult<NormalizedDailyPayload> {
+    let title = normalize_required_text(payload.title, "title")?;
+    let daily_type = normalize_daily_type(payload.daily_type)?;
+    let requested_movie_id = payload.kuma_movie_id.and_then(|id| if id > 0 { Some(id) } else { None });
+    let kuma_movie_id = if daily_type == "review" {
+        let movie_id = requested_movie_id.ok_or_else(|| {
+            AppError::Unprocessable("影评类型必须选择一条 Kuma 电影".to_string())
+        })?;
+        let exists = sqlx::query_scalar::<_, i64>(
+            "SELECT id::bigint AS id FROM kuma_movie WHERE id = $1 LIMIT 1",
+        )
+        .bind(movie_id)
+        .fetch_optional(&state.db_pool)
+        .await
+        .map_err(|error| AppError::internal(format!("Failed to verify kuma movie id: {error}")))?;
+        if exists.is_none() {
+            return Err(AppError::Unprocessable("所选 Kuma 电影不存在".to_string()));
+        }
+        Some(movie_id)
+    } else {
+        None
+    };
+
+    Ok(NormalizedDailyPayload {
+        title,
+        content: normalize_optional_text(payload.content),
+        weather: normalize_optional_text(payload.weather),
+        daily_type,
+        kuma_movie_id,
+    })
+}
+
 fn normalize_article_payload(payload: ArticlePayload) -> AppResult<ArticlePayload> {
     Ok(ArticlePayload {
         title: normalize_required_text(payload.title, "title")?,
@@ -1109,4 +1169,30 @@ fn is_unique_violation(error: &sqlx::Error) -> bool {
 
 async fn invalidate_cache_key(state: &AppState, key: &str) {
     state.runtime_cache.delete(key).await;
+}
+
+async fn fetch_daily_item_by_id(state: &AppState, daily_id: i64) -> AppResult<DailyItem> {
+    sqlx::query_as::<_, DailyItem>(
+        r#"
+        SELECT
+            d.id::bigint AS id,
+            d.title,
+            d.content,
+            d.create_time,
+            d.weather,
+            COALESCE(d.daily_type, 'note') AS daily_type,
+            d.kuma_movie_id::bigint AS kuma_movie_id,
+            km.title AS movie_title,
+            km.cover AS movie_cover
+        FROM daily d
+        LEFT JOIN kuma_movie km ON km.id = d.kuma_movie_id
+        WHERE d.id = $1
+        LIMIT 1
+        "#,
+    )
+    .bind(daily_id)
+    .fetch_optional(&state.db_pool)
+    .await
+    .map_err(|error| AppError::internal(format!("Failed to get daily: {error}")))?
+    .ok_or_else(|| AppError::not_found("Daily not found"))
 }
