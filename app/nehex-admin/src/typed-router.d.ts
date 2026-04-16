@@ -32,6 +32,7 @@ declare module 'vue-router/auto-routes' {
     '/developer-options': RouteRecordInfo<'/developer-options', '/developer-options', Record<never, never>, Record<never, never>>,
     '/friends': RouteRecordInfo<'/friends', '/friends', Record<never, never>, Record<never, never>>,
     '/install': RouteRecordInfo<'/install', '/install', Record<never, never>, Record<never, never>>,
+    '/kuma': RouteRecordInfo<'/kuma', '/kuma', Record<never, never>, Record<never, never>>,
     '/login': RouteRecordInfo<'/login', '/login', Record<never, never>, Record<never, never>>,
     '/media': RouteRecordInfo<'/media', '/media', Record<never, never>, Record<never, never>>,
     '/pages': RouteRecordInfo<'/pages', '/pages', Record<never, never>, Record<never, never>, '/pages/edit/[id]' | '/pages/new'>,
@@ -111,6 +112,10 @@ declare module 'vue-router/auto-routes' {
     }
     'src/pages/install.vue': {
       routes: '/install'
+      views: never
+    }
+    'src/pages/kuma.vue': {
+      routes: '/kuma'
       views: never
     }
     'src/pages/login.vue': {
