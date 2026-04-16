@@ -39,13 +39,63 @@
       />
 
       <v-select
+        v-model="editorForm.dailyType"
+        :items="dailyTypeOptions"
+        item-title="label"
+        item-value="value"
+        label="类型"
+        variant="outlined"
+      />
+
+      <v-select
         v-model="editorForm.weather"
         :items="weatherOptions"
         label="天气（可选）"
         variant="outlined"
         clearable
       />
+
+      <v-select
+        v-if="isReviewType"
+        v-model="editorForm.kumaMovieId"
+        :items="kumaMovieOptions"
+        item-title="label"
+        item-value="value"
+        label="影评电影（从 Kuma 选择）"
+        :loading="kumaMoviesLoading"
+        variant="outlined"
+      />
     </div>
+
+    <v-card
+      v-if="isReviewType && selectedKumaMovie"
+      class="selected-movie-card"
+      rounded="lg"
+      variant="tonal"
+    >
+      <div class="selected-movie-inner">
+        <v-img
+          v-if="selectedKumaMovie.cover"
+          :src="selectedKumaMovie.cover"
+          class="selected-movie-cover"
+          cover
+          height="96"
+          width="72"
+        />
+        <div v-else class="selected-movie-cover selected-movie-cover--empty">
+          <v-icon icon="mdi-image-off-outline" size="24" />
+        </div>
+        <div class="selected-movie-meta">
+          <div class="selected-movie-title">
+            {{ selectedKumaMovie.title }}
+            <span v-if="selectedKumaMovie.years">({{ selectedKumaMovie.years }})</span>
+          </div>
+          <div class="selected-movie-sub">
+            {{ selectedKumaMovie.provider.toUpperCase() }} #{{ selectedKumaMovie.movie_id }}
+          </div>
+        </div>
+      </div>
+    </v-card>
 
     <div class="split-panel" ref="splitPanelRef">
       <section
@@ -127,6 +177,10 @@ import {
   updateDaily,
   type DailyUpsertPayload,
 } from '@/services/dailies'
+import {
+  fetchAdminKumaMovies,
+  type KumaMovieCard,
+} from '@/services/kuma'
 import { uploadMarkdownImage } from '@/services/storage'
 import ImageUploadHintCard from '@/components/admin/ImageUploadHintCard.vue'
 import MediaLibraryImagePicker from '@/components/admin/MediaLibraryImagePicker.vue'
@@ -145,6 +199,8 @@ const markdown = new MarkdownIt({
 
 type EditorForm = {
   title: string
+  dailyType: 'note' | 'review'
+  kumaMovieId: number | null
   weather: string
   content: string
 }
@@ -156,6 +212,8 @@ type SelectedMediaImage = {
 
 type EditorSnapshot = {
   title: string
+  dailyType: string
+  kumaMovieId: number | null
   weather: string
   content: string
 }
@@ -163,6 +221,7 @@ type EditorSnapshot = {
 const loading = ref(false)
 const submitting = ref(false)
 const uploadingImage = ref(false)
+const kumaMoviesLoading = ref(false)
 const mediaPickerVisible = ref(false)
 const errorMessage = ref('')
 const successMessage = ref('')
@@ -183,13 +242,34 @@ const {
 
 const editorForm = reactive<EditorForm>({
   title: '',
+  dailyType: 'note',
+  kumaMovieId: null,
   weather: '',
   content: '',
 })
 
 const isEditing = computed(() => Number.isFinite(props.dailyId))
+const isReviewType = computed(() => editorForm.dailyType === 'review')
 const weatherOptions = ['cloud', 'rain', 'snow', 'sun', 'wind']
 const weatherOptionSet = new Set<string>(weatherOptions)
+const dailyTypeOptions: Array<{ label: string, value: 'note' | 'review' }> = [
+  { label: '日常', value: 'note' },
+  { label: '影评', value: 'review' },
+]
+const kumaMovieItems = ref<KumaMovieCard[]>([])
+const kumaMovieOptions = computed(() => {
+  return kumaMovieItems.value.map((item) => ({
+    label: `${item.title}${item.years ? ` (${item.years})` : ''} · ${item.provider.toUpperCase()} #${item.movie_id}`,
+    value: item.id,
+  }))
+})
+const selectedKumaMovie = computed(() => {
+  const targetId = editorForm.kumaMovieId
+  if (typeof targetId !== 'number') {
+    return null
+  }
+  return kumaMovieItems.value.find((item) => item.id === targetId) || null
+})
 
 const renderedMarkdown = computed(() => {
   const content = editorForm.content.trim()
@@ -202,6 +282,8 @@ const renderedMarkdown = computed(() => {
 function buildEditorSnapshot(): EditorSnapshot {
   return {
     title: editorForm.title.trim(),
+    dailyType: editorForm.dailyType,
+    kumaMovieId: editorForm.kumaMovieId,
     weather: editorForm.weather.trim().toLowerCase(),
     content: editorForm.content,
   }
@@ -275,10 +357,17 @@ function buildPayload(): DailyUpsertPayload | null {
     showGlobalError('日常标题不能为空')
     return null
   }
+  if (editorForm.dailyType === 'review' && typeof editorForm.kumaMovieId !== 'number') {
+    errorMessage.value = '影评类型必须选择电影'
+    showGlobalError('影评类型必须选择电影')
+    return null
+  }
 
   const weather = editorForm.weather.trim().toLowerCase()
   return {
     title,
+    daily_type: editorForm.dailyType,
+    kuma_movie_id: editorForm.dailyType === 'review' ? editorForm.kumaMovieId : null,
     weather: weatherOptionSet.has(weather) ? weather : null,
     content: editorForm.content.trim() || null,
   }
@@ -403,11 +492,18 @@ async function onDropImage(event: DragEvent): Promise<void> {
 
 function fillEditorForm(daily: {
   title?: string | null
+  daily_type?: string | null
+  kuma_movie_id?: number | null
   weather?: string | null
   content?: string | null
 }): void {
   const weather = daily.weather?.trim().toLowerCase() || ''
+  const dailyType = daily.daily_type === 'review' ? 'review' : 'note'
   editorForm.title = daily.title?.trim() || ''
+  editorForm.dailyType = dailyType
+  editorForm.kumaMovieId = dailyType === 'review' && typeof daily.kuma_movie_id === 'number'
+    ? daily.kuma_movie_id
+    : null
   editorForm.weather = weatherOptionSet.has(weather) ? weather : ''
   editorForm.content = daily.content || ''
 }
@@ -428,6 +524,18 @@ async function loadDailyDetail(): Promise<void> {
     showGlobalError(message)
   } finally {
     loading.value = false
+  }
+}
+
+async function loadKumaMovies(): Promise<void> {
+  kumaMoviesLoading.value = true
+  try {
+    kumaMovieItems.value = await fetchAdminKumaMovies()
+  } catch (error) {
+    const message = error instanceof Error ? error.message : '加载 Kuma 电影列表失败'
+    showGlobalError(message)
+  } finally {
+    kumaMoviesLoading.value = false
   }
 }
 
@@ -465,6 +573,7 @@ async function goManage(): Promise<void> {
 }
 
 onMounted(async () => {
+  await loadKumaMovies()
   await loadDailyDetail()
   syncSavedSnapshot()
 })
@@ -506,6 +615,51 @@ onMounted(async () => {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
+}
+
+.selected-movie-card {
+  border: 1px solid rgba(146, 170, 226, 0.34);
+  background: linear-gradient(180deg, rgba(27, 35, 52, 0.88), rgba(22, 29, 43, 0.9));
+}
+
+.selected-movie-inner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px;
+}
+
+.selected-movie-cover {
+  width: 72px;
+  border-radius: 8px;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.selected-movie-cover--empty {
+  height: 96px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(100, 121, 165, 0.28);
+  color: #dbe6ff;
+}
+
+.selected-movie-meta {
+  min-width: 0;
+}
+
+.selected-movie-title {
+  color: #f2f6ff;
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.selected-movie-sub {
+  margin-top: 6px;
+  color: #b8c7e9;
+  font-size: 13px;
 }
 
 .split-panel {
