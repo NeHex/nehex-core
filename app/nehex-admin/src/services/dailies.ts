@@ -6,6 +6,21 @@ export type DailyItem = {
   content?: string | null
   create_time: string
   weather?: string | null
+  daily_type?: string
+  kuma_movie_id?: number | null
+  movie?: {
+    id: number
+    provider: string
+    movie_id: string
+    watch_status: string
+    cover: string
+    title: string
+    years: string
+    score?: string | null
+    url: string
+  } | null
+  movie_title?: string | null
+  movie_cover?: string | null
 }
 
 type DailyListResponse = {
@@ -20,6 +35,8 @@ export type DailyUpsertPayload = {
   title: string
   content?: string | null
   weather?: string | null
+  daily_type?: string | null
+  kuma_movie_id?: number | null
 }
 
 async function parseJson<T>(response: Response): Promise<T> {
