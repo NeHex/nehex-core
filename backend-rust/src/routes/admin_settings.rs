@@ -914,7 +914,7 @@ async fn load_kuma_api_url_from_settings(state: &AppState) -> AppResult<String> 
     normalize_kuma_api_url(raw_value)
 }
 
-async fn ensure_kuma_movie_table(state: &AppState) -> AppResult<()> {
+pub(crate) async fn ensure_kuma_movie_table(state: &AppState) -> AppResult<()> {
     sqlx::query(
         r#"
         CREATE TABLE IF NOT EXISTS kuma_movie (
