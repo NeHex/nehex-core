@@ -679,7 +679,7 @@ async fn get_dailies(State(state): State<AppState>) -> AppResult<Json<DailyListR
             km.source_url AS movie_url
         FROM daily d
         LEFT JOIN kuma_movie km ON km.id = d.kuma_movie_id
-        ORDER BY create_time DESC, id DESC
+        ORDER BY d.create_time DESC, d.id DESC
         "#,
     )
     .fetch_all(&state.db_pool)
