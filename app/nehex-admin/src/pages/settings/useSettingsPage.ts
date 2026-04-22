@@ -212,6 +212,7 @@ const REI_THEME_DEFAULT_CONTENT: Record<string, unknown> = {
     关于: '/about',
     友链: '/friends',
     游戏室: '/games',
+    travelling: true,
   },
   about_page: {
     welcome: {
@@ -409,6 +410,8 @@ function mergeReiThemeContent(content: Record<string, unknown>): Record<string, 
   const source = { ...content }
   const defaultSocial = defaults.social_link
   const sourceSocial = source.social_link
+  const defaultNavBorder = defaults.nav_border
+  const sourceNavBorder = source.nav_border
 
   if (
     defaultSocial
@@ -421,6 +424,20 @@ function mergeReiThemeContent(content: Record<string, unknown>): Record<string, 
     source.social_link = {
       ...(defaultSocial as Record<string, unknown>),
       ...(sourceSocial as Record<string, unknown>),
+    }
+  }
+
+  if (
+    defaultNavBorder
+    && typeof defaultNavBorder === 'object'
+    && !Array.isArray(defaultNavBorder)
+    && sourceNavBorder
+    && typeof sourceNavBorder === 'object'
+    && !Array.isArray(sourceNavBorder)
+  ) {
+    source.nav_border = {
+      ...(defaultNavBorder as Record<string, unknown>),
+      ...(sourceNavBorder as Record<string, unknown>),
     }
   }
 
@@ -609,7 +626,7 @@ export function useSettingsPage() {
   const kumaApiTestResult = ref('')
   const kumaApiTestError = ref('')
 
-  const buildVersion = __NEHEX_ADMIN_VERSION__.trim() || '1.2.4'
+  const buildVersion = __NEHEX_ADMIN_VERSION__.trim() || '1.2.6'
 
   const nehexSnapshot = ref<NehexSnapshot>(getNehexSnapshotData())
   const siteSnapshot = ref<SiteForm>(getSiteFormData())
