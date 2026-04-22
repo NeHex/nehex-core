@@ -12,10 +12,12 @@
       color="#161b24"
       density="comfortable"
       flat
+      theme="dark"
     >
       <v-btn
         aria-label="打开导航菜单"
         icon="mdi-menu"
+        color="#edf3ff"
         variant="text"
         @click="toggleMainDrawer"
       />
@@ -31,6 +33,7 @@
         v-if="hasSecondaryNav"
         aria-label="打开二级导航"
         icon="mdi-tune-variant"
+        color="#edf3ff"
         variant="text"
         @click="toggleSecondaryDrawer"
       />
@@ -41,11 +44,12 @@
             v-bind="props"
             aria-label="更多操作"
             icon="mdi-dots-vertical"
+            color="#edf3ff"
             variant="text"
           />
         </template>
 
-        <v-list density="comfortable" min-width="170">
+        <v-list density="comfortable" min-width="170" theme="dark">
           <v-list-item
             prepend-icon="mdi-open-in-new"
             title="前往站点"
@@ -67,6 +71,7 @@
       location="left"
       :scrim="true"
       temporary
+      theme="dark"
       width="288"
     >
       <div class="mobile-drawer-content">
@@ -79,6 +84,7 @@
             aria-label="关闭导航菜单"
             icon="mdi-close"
             size="small"
+            color="#edf3ff"
             variant="text"
             @click="mobileMainDrawer = false"
           />
@@ -204,6 +210,7 @@
       location="right"
       :scrim="true"
       temporary
+      theme="dark"
       width="288"
     >
       <div class="mobile-secondary-nav">
@@ -213,6 +220,7 @@
             aria-label="关闭二级导航"
             icon="mdi-close"
             size="small"
+            color="#edf3ff"
             variant="text"
             @click="mobileSecondaryDrawer = false"
           />
@@ -362,7 +370,7 @@ const route = useRoute()
 const display = useDisplay()
 
 const adminBrandName = 'NeHex'
-const adminVersion = __NEHEX_ADMIN_VERSION__.trim() || '1.2.4'
+const adminVersion = __NEHEX_ADMIN_VERSION__.trim() || '1.2.6'
 const expandedMenuKey = ref<string | null>(getDefaultExpandedMenuKey())
 const slots = useSlots()
 const hasSecondaryNav = computed(() => Boolean(slots['secondary-nav']))
@@ -551,6 +559,11 @@ function goToKumaConfig(): void {
 .mobile-topbar {
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
   backdrop-filter: blur(10px);
+}
+
+.mobile-topbar :deep(.v-btn),
+.mobile-topbar :deep(.v-btn .v-icon) {
+  color: #edf3ff;
 }
 
 .mobile-topbar-title {
