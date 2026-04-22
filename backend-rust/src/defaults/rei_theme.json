@@ -13,7 +13,8 @@
   "nav_border": {
     "关于": "/about",
     "友链": "/friends",
-    "游戏室": "/games"
+    "游戏室": "/games",
+    "travelling": true
   },
   "about_page": {
     "welcome": {
