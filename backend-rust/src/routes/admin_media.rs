@@ -522,16 +522,24 @@ fn map_media_image_item(row: sqlx::postgres::PgRow) -> MediaImageItem {
         .try_get::<Option<String>, _>("content_type")
         .ok()
         .flatten();
+    let provider = row
+        .try_get::<String, _>("provider")
+        .unwrap_or_else(|_| "local".to_string());
+    let key = row.try_get::<String, _>("storage_key").unwrap_or_default();
+    let raw_url = row.try_get::<String, _>("url").unwrap_or_default();
+    let resolved_url = if provider == "hi168_s3" && !key.trim().is_empty() {
+        storage_local::build_object_proxy_path(&key)
+    } else {
+        raw_url
+    };
 
     MediaImageItem {
         id: row.try_get::<i64, _>("id").unwrap_or_default(),
         folder_id: row.try_get::<Option<i64>, _>("folder_id").ok().flatten(),
         media_type: detect_media_type(content_type.as_deref(), file_name.as_deref()),
-        provider: row
-            .try_get::<String, _>("provider")
-            .unwrap_or_else(|_| "local".to_string()),
-        key: row.try_get::<String, _>("storage_key").unwrap_or_default(),
-        url: row.try_get::<String, _>("url").unwrap_or_default(),
+        provider,
+        key,
+        url: resolved_url,
         file_name,
         content_type,
         size_bytes: row

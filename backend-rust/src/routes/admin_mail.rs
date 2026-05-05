@@ -274,9 +274,8 @@ pub async fn admin_list_mail_logs(
         ));
     }
 
-    let page = query.page.unwrap_or(1).max(1);
+    let requested_page = query.page.unwrap_or(1).max(1);
     let size = query.size.unwrap_or(20).clamp(1, 100);
-    let offset = (page - 1) * size;
 
     let total = if status == "all" {
         sqlx::query_scalar::<_, i64>("SELECT COUNT(id)::bigint FROM mail_log")
@@ -297,13 +296,17 @@ pub async fn admin_list_mail_logs(
         return Ok(Json(AdminMailLogListResponse {
             data: Vec::new(),
             pagination: AdminPagination {
-                page,
+                page: requested_page,
                 size,
                 total: 0,
                 total_pages: 0,
             },
         }));
     }
+
+    let total_pages = (total + size - 1) / size;
+    let page = requested_page.min(total_pages.max(1));
+    let offset = (page - 1) * size;
 
     let rows = if status == "all" {
         sqlx::query(
@@ -391,7 +394,6 @@ pub async fn admin_list_mail_logs(
         })
         .collect::<Vec<_>>();
 
-    let total_pages = (total + size - 1) / size;
     Ok(Json(AdminMailLogListResponse {
         data,
         pagination: AdminPagination {

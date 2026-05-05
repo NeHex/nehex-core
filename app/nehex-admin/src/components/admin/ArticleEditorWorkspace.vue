@@ -198,6 +198,7 @@
             v-if="!previewMode"
             ref="markdownInputRef"
             v-model="editorForm.content"
+            @paste="onPasteImage"
             class="markdown-input"
             placeholder="在这里输入 Markdown 内容..."
             spellcheck="false"
@@ -487,6 +488,20 @@ function _pickFirstImage(files: FileList | null): File | null {
   return null
 }
 
+function _pickClipboardImage(event: ClipboardEvent): File | null {
+  const items = event.clipboardData?.items
+  if (!items) {
+    return null
+  }
+  for (const item of Array.from(items)) {
+    if (item.kind !== 'file' || !item.type.startsWith('image/')) {
+      continue
+    }
+    return item.getAsFile()
+  }
+  return null
+}
+
 function ensureEditMode(callback: () => void): void {
   if (!previewMode.value) {
     callback()
@@ -743,6 +758,15 @@ async function onDropImage(event: DragEvent): Promise<void> {
   if (!imageFile) {
     return
   }
+  await _uploadImageAndInsert(imageFile)
+}
+
+async function onPasteImage(event: ClipboardEvent): Promise<void> {
+  const imageFile = _pickClipboardImage(event)
+  if (!imageFile) {
+    return
+  }
+  event.preventDefault()
   await _uploadImageAndInsert(imageFile)
 }
 

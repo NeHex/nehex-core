@@ -18,10 +18,21 @@ export type DashboardSiteTotals = {
   friend_count: number
 }
 
+export type DashboardRecentComment = {
+  id: number
+  nickname: string
+  content: string
+  target_type: string
+  target_id: number
+  status: number
+  create_time: string
+}
+
 export type DashboardData = {
   visit_ip: DashboardPeriodMetrics
   api_calls: DashboardPeriodMetrics
   site_totals: DashboardSiteTotals
+  recent_comments: DashboardRecentComment[]
 }
 
 type DashboardResponse = {
@@ -75,6 +86,28 @@ function normalizeSiteTotals(value: unknown): DashboardSiteTotals {
   }
 }
 
+function normalizeRecentComments(value: unknown): DashboardRecentComment[] {
+  if (!Array.isArray(value)) {
+    return []
+  }
+
+  return value.map((item) => {
+    const source = item && typeof item === 'object' && !Array.isArray(item)
+      ? item as Record<string, unknown>
+      : {}
+
+    return {
+      id: Math.max(0, Math.round(toNumber(source.id))),
+      nickname: String(source.nickname ?? '').trim(),
+      content: String(source.content ?? ''),
+      target_type: String(source.target_type ?? '').trim(),
+      target_id: Math.max(0, Math.round(toNumber(source.target_id))),
+      status: Math.max(0, Math.round(toNumber(source.status))),
+      create_time: String(source.create_time ?? '').trim(),
+    }
+  })
+}
+
 function normalizeDashboardData(value: unknown): DashboardData {
   const source = value && typeof value === 'object' && !Array.isArray(value)
     ? value as Record<string, unknown>
@@ -84,6 +117,7 @@ function normalizeDashboardData(value: unknown): DashboardData {
     visit_ip: normalizePeriodMetrics(source.visit_ip),
     api_calls: normalizePeriodMetrics(source.api_calls),
     site_totals: normalizeSiteTotals(source.site_totals),
+    recent_comments: normalizeRecentComments(source.recent_comments),
   }
 }
 

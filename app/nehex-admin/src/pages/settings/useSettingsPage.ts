@@ -11,6 +11,7 @@ import {
   getSettingsMap,
   normalizeThemeFileName,
   parseArticleClassPayload,
+  parseDailyClassPayload,
   parseThemeProfileMap,
   readSetting,
   valueToText,
@@ -93,8 +94,10 @@ type SectionMeta = {
 
 type NehexSnapshot = {
   form: NehexForm
-  classes: ArticleClassItem[]
-  extraConfig: Record<string, unknown>
+  articleClasses: ArticleClassItem[]
+  articleExtraConfig: Record<string, unknown>
+  dailyClasses: ArticleClassItem[]
+  dailyExtraConfig: Record<string, unknown>
   account: string
 }
 
@@ -557,6 +560,10 @@ export function useSettingsPage() {
   const nehexExtraConfig = ref<Record<string, unknown>>({})
   const newClassValue = ref('')
   const newClassLabel = ref('')
+  const nehexDailyClasses = ref<ArticleClassItem[]>([])
+  const nehexDailyExtraConfig = ref<Record<string, unknown>>({})
+  const newDailyClassValue = ref('')
+  const newDailyClassLabel = ref('')
 
   const siteForm = reactive<SiteForm>({
     siteTitle: '',
@@ -626,7 +633,7 @@ export function useSettingsPage() {
   const kumaApiTestResult = ref('')
   const kumaApiTestError = ref('')
 
-  const buildVersion = __NEHEX_ADMIN_VERSION__.trim() || '1.2.6'
+  const buildVersion = __NEHEX_ADMIN_VERSION__.trim() || '1.2.9'
 
   const nehexSnapshot = ref<NehexSnapshot>(getNehexSnapshotData())
   const siteSnapshot = ref<SiteForm>(getSiteFormData())
@@ -723,10 +730,13 @@ export function useSettingsPage() {
     }
   })
 
-  function buildArticleClassSettingContent(): Record<string, unknown> {
+  function buildClassSettingContent(
+    classes: ArticleClassItem[],
+    extraConfig: Record<string, unknown>,
+  ): Record<string, unknown> {
     const classMap: Record<string, string> = {}
 
-    nehexClasses.value.forEach((item) => {
+    classes.forEach((item) => {
       const value = item.value.trim()
       if (!value) {
         return
@@ -736,9 +746,17 @@ export function useSettingsPage() {
     })
 
     return {
-      ...nehexExtraConfig.value,
+      ...extraConfig,
       class: classMap,
     }
+  }
+
+  function buildArticleClassSettingContent(): Record<string, unknown> {
+    return buildClassSettingContent(nehexClasses.value, nehexExtraConfig.value)
+  }
+
+  function buildDailyClassSettingContent(): Record<string, unknown> {
+    return buildClassSettingContent(nehexDailyClasses.value, nehexDailyExtraConfig.value)
   }
 
   function findThemeProfile(file: string): ThemeProfileEntry | undefined {
@@ -860,34 +878,50 @@ export function useSettingsPage() {
     successMessage.value = `已删除主题模板 ${current}`
   }
 
-  function addArticleClass(): void {
+  function addClassOption(
+    classItems: ArticleClassItem[],
+    valueRef: { value: string },
+    labelRef: { value: string },
+  ): void {
     errorMessage.value = ''
     successMessage.value = ''
 
-    const value = newClassValue.value.trim()
-    const label = newClassLabel.value.trim()
+    const value = valueRef.value.trim()
+    const label = labelRef.value.trim()
 
     if (!value) {
       errorMessage.value = '英文值不能为空'
       return
     }
 
-    if (nehexClasses.value.some((item) => item.value.trim() === value)) {
+    if (classItems.some((item) => item.value.trim() === value)) {
       errorMessage.value = '英文值已存在'
       return
     }
 
-    nehexClasses.value.push({
+    classItems.push({
       value,
       label: label || value,
     })
 
-    newClassValue.value = ''
-    newClassLabel.value = ''
+    valueRef.value = ''
+    labelRef.value = ''
+  }
+
+  function addArticleClass(): void {
+    addClassOption(nehexClasses.value, newClassValue, newClassLabel)
+  }
+
+  function addDailyClass(): void {
+    addClassOption(nehexDailyClasses.value, newDailyClassValue, newDailyClassLabel)
   }
 
   function removeArticleClass(index: number): void {
     nehexClasses.value.splice(index, 1)
+  }
+
+  function removeDailyClass(index: number): void {
+    nehexDailyClasses.value.splice(index, 1)
   }
 
   async function checkLatestRelease(): Promise<void> {
@@ -934,8 +968,10 @@ export function useSettingsPage() {
         adminLoginBackground: nehexForm.adminLoginBackground,
         kumaApiUrl: nehexForm.kumaApiUrl,
       },
-      classes: nehexClasses.value.map((item) => ({ ...item })),
-      extraConfig: { ...nehexExtraConfig.value },
+      articleClasses: nehexClasses.value.map((item) => ({ ...item })),
+      articleExtraConfig: { ...nehexExtraConfig.value },
+      dailyClasses: nehexDailyClasses.value.map((item) => ({ ...item })),
+      dailyExtraConfig: { ...nehexDailyExtraConfig.value },
       account: accountForm.account,
     }
   }
@@ -1004,8 +1040,10 @@ export function useSettingsPage() {
     nehexForm.adminManagerWeb = normalizeAdminManagerWebPath(snapshot.form.adminManagerWeb)
     nehexForm.adminLoginBackground = snapshot.form.adminLoginBackground || DEFAULT_ADMIN_LOGIN_BACKGROUND
     nehexForm.kumaApiUrl = snapshot.form.kumaApiUrl || ''
-    nehexClasses.value = snapshot.classes.map((item) => ({ ...item }))
-    nehexExtraConfig.value = { ...snapshot.extraConfig }
+    nehexClasses.value = snapshot.articleClasses.map((item) => ({ ...item }))
+    nehexExtraConfig.value = { ...snapshot.articleExtraConfig }
+    nehexDailyClasses.value = snapshot.dailyClasses.map((item) => ({ ...item }))
+    nehexDailyExtraConfig.value = { ...snapshot.dailyExtraConfig }
     accountForm.account = snapshot.account
     accountForm.newPassword = ''
     accountForm.confirmPassword = ''
@@ -1076,6 +1114,9 @@ export function useSettingsPage() {
     const parsedClass = parseArticleClassPayload(settingsMap.get('nehex_article_class'))
     nehexClasses.value = parsedClass.items
     nehexExtraConfig.value = parsedClass.extraConfig
+    const parsedDailyClass = parseDailyClassPayload(settingsMap.get('nehex_daily_class'))
+    nehexDailyClasses.value = parsedDailyClass.items
+    nehexDailyExtraConfig.value = parsedDailyClass.extraConfig
 
     siteForm.siteTitle = readSetting(settingsMap, 'site_title')
     siteForm.siteSubtitle = readSetting(settingsMap, 'site_sub_title')
@@ -1299,6 +1340,7 @@ export function useSettingsPage() {
           setting_type: 'string',
         },
         { setting_key: 'nehex_article_class', setting_content: buildArticleClassSettingContent(), setting_type: 'json' },
+        { setting_key: 'nehex_daily_class', setting_content: buildDailyClassSettingContent(), setting_type: 'json' },
       ]
     }
 
@@ -1460,6 +1502,9 @@ export function useSettingsPage() {
     nehexClasses,
     newClassValue,
     newClassLabel,
+    nehexDailyClasses,
+    newDailyClassValue,
+    newDailyClassLabel,
     accountForm,
 
     siteForm,
@@ -1500,7 +1545,9 @@ export function useSettingsPage() {
     removeCurrentThemeProfile,
     formatThemeEditorJson,
     addArticleClass,
+    addDailyClass,
     removeArticleClass,
+    removeDailyClass,
     checkLatestRelease,
     testKumaApiUrl,
     resetCurrentSection,

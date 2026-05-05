@@ -82,6 +82,11 @@ pub fn router() -> Router<AppState> {
             "/friend-applies/{apply_id}/status",
             put(admin_friends::admin_update_friend_apply_status),
         )
+        .route(
+            "/friend-exchange-info",
+            get(admin_friends::admin_get_friend_exchange_info)
+                .put(admin_friends::admin_update_friend_exchange_info),
+        )
         .route("/media/library", get(admin_media::admin_get_media_library))
         .route(
             "/media/folders",

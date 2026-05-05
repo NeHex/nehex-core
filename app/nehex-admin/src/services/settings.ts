@@ -32,11 +32,22 @@ const THEME_BACKGROUND_KEY = 'theme_background'
 const ADMIN_LOGIN_BACKGROUND_KEY = 'admin_login_background'
 const DEFAULT_ADMIN_LOGIN_BACKGROUND = '/images/background-2k.png'
 const ARTICLE_CLASS_SETTING_KEY = 'nehex_article_class'
+const DAILY_CLASS_SETTING_KEY = 'nehex_daily_class'
 const SITE_URL_KEY = 'site_url'
 const DEFAULT_ARTICLE_CLASS_OPTIONS: ArticleClassOption[] = [
   {
     value: 'default',
     label: '默认分类',
+  },
+]
+const DEFAULT_DAILY_CLASS_OPTIONS: ArticleClassOption[] = [
+  {
+    value: 'note',
+    label: '日常',
+  },
+  {
+    value: 'review',
+    label: '影评',
   },
 ]
 
@@ -272,12 +283,23 @@ function parseClassOptions(raw: unknown): ArticleClassOption[] {
 }
 
 export async function fetchArticleClassOptions(): Promise<ArticleClassOption[]> {
+  return fetchClassOptionsByKey(ARTICLE_CLASS_SETTING_KEY, DEFAULT_ARTICLE_CLASS_OPTIONS)
+}
+
+export async function fetchDailyClassOptions(): Promise<ArticleClassOption[]> {
+  return fetchClassOptionsByKey(DAILY_CLASS_SETTING_KEY, DEFAULT_DAILY_CLASS_OPTIONS)
+}
+
+async function fetchClassOptionsByKey(
+  settingKey: string,
+  fallbackOptions: ArticleClassOption[],
+): Promise<ArticleClassOption[]> {
   const settingsMap = await fetchSettingsMap()
-  const raw = settingsMap.get(ARTICLE_CLASS_SETTING_KEY)
+  const raw = settingsMap.get(settingKey)
   const options = uniqueClassOptions(parseClassOptions(raw))
 
   if (options.length === 0) {
-    return DEFAULT_ARTICLE_CLASS_OPTIONS
+    return fallbackOptions
   }
 
   return options

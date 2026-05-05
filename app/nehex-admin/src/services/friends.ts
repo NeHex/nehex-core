@@ -43,6 +43,13 @@ export type AdminFriendApplyStatusUpdatePayload = {
   friend_category?: string | null
 }
 
+export type FriendExchangeInfo = {
+  site_title: string
+  site_url: string
+  site_icon: string
+  site_description: string
+}
+
 type AdminFriendListResponse = {
   data: AdminFriendItem[]
 }
@@ -57,6 +64,10 @@ type AdminFriendApplyListResponse = {
 
 type AdminFriendApplyDetailResponse = {
   data: AdminFriendApplyItem
+}
+
+type FriendExchangeInfoResponse = {
+  data?: Partial<FriendExchangeInfo>
 }
 
 async function parseJson<T>(response: Response): Promise<T> {
@@ -227,4 +238,34 @@ export async function updateAdminFriendApplyStatus(
     throw new Error('Unexpected friend apply update response format')
   }
   return result.data
+}
+
+function normalizeFriendExchangeInfo(raw: Partial<FriendExchangeInfo> | undefined): FriendExchangeInfo {
+  return {
+    site_title: String(raw?.site_title || '').trim(),
+    site_url: String(raw?.site_url || '').trim(),
+    site_icon: String(raw?.site_icon || '').trim(),
+    site_description: String(raw?.site_description || ''),
+  }
+}
+
+export async function fetchAdminFriendExchangeInfo(): Promise<FriendExchangeInfo> {
+  const response = await adminFetch('/admin-api/friend-exchange-info', {
+    method: 'GET',
+  })
+
+  const result = await parseJson<FriendExchangeInfoResponse>(response)
+  return normalizeFriendExchangeInfo(result?.data)
+}
+
+export async function updateAdminFriendExchangeInfo(
+  payload: FriendExchangeInfo,
+): Promise<FriendExchangeInfo> {
+  const response = await adminFetch('/admin-api/friend-exchange-info', {
+    method: 'PUT',
+    body: JSON.stringify(payload),
+  })
+
+  const result = await parseJson<FriendExchangeInfoResponse>(response)
+  return normalizeFriendExchangeInfo(result?.data)
 }

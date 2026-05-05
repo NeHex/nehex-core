@@ -116,6 +116,7 @@
 
               <div class="stack-block">
                 <div class="block-title">分类设置</div>
+                <div class="block-subtitle mb-2">文章分类</div>
                 <div class="class-editor-row">
                   <v-text-field
                     v-model="newClassLabel"
@@ -139,7 +140,7 @@
                 <div v-if="nehexClasses.length > 0" class="class-card-grid">
                   <v-card
                     v-for="(item, index) in nehexClasses"
-                    :key="`class-${index}`"
+                    :key="`article-class-${index}`"
                     class="class-item-card"
                     rounded="lg"
                     variant="outlined"
@@ -179,7 +180,76 @@
                   type="info"
                   variant="tonal"
                 >
-                  暂无分类，请添加至少一个分类项。
+                  暂无文章分类，请添加至少一个分类项。
+                </v-alert>
+
+                <v-divider class="my-4" />
+
+                <div class="block-subtitle mb-2">日常分类</div>
+                <div class="class-editor-row">
+                  <v-text-field
+                    v-model="newDailyClassLabel"
+                    density="comfortable"
+                    hide-details
+                    label="分类名称"
+                    variant="outlined"
+                  />
+                  <v-text-field
+                    v-model="newDailyClassValue"
+                    density="comfortable"
+                    hide-details
+                    label="英文值（唯一）"
+                    variant="outlined"
+                  />
+                  <v-btn color="primary" prepend-icon="mdi-plus" @click="addDailyClass">
+                    添加
+                  </v-btn>
+                </div>
+
+                <div v-if="nehexDailyClasses.length > 0" class="class-card-grid">
+                  <v-card
+                    v-for="(item, index) in nehexDailyClasses"
+                    :key="`daily-class-${index}`"
+                    class="class-item-card"
+                    rounded="lg"
+                    variant="outlined"
+                  >
+                    <v-card-text class="class-item-card-content">
+                      <v-text-field
+                        v-model="item.label"
+                        density="comfortable"
+                        hide-details
+                        label="分类名称"
+                        variant="outlined"
+                      />
+                      <v-text-field
+                        v-model="item.value"
+                        density="comfortable"
+                        hide-details
+                        label="英文值"
+                        variant="outlined"
+                      />
+                      <div class="class-item-remove">
+                        <v-btn
+                          color="error"
+                          icon="mdi-delete-outline"
+                          size="small"
+                          variant="text"
+                          @click="removeDailyClass(index)"
+                        />
+                      </div>
+                    </v-card-text>
+                  </v-card>
+                </div>
+
+                <v-alert
+                  v-else
+                  class="mt-2"
+                  density="comfortable"
+                  type="info"
+                  variant="tonal"
+                >
+                  暂无日常分类，请添加至少一个分类项。
                 </v-alert>
               </div>
 
@@ -666,6 +736,9 @@ const {
   nehexClasses,
   newClassValue,
   newClassLabel,
+  nehexDailyClasses,
+  newDailyClassValue,
+  newDailyClassLabel,
   accountForm,
 
   siteForm,
@@ -706,7 +779,9 @@ const {
   removeCurrentThemeProfile,
   formatThemeEditorJson,
   addArticleClass,
+  addDailyClass,
   removeArticleClass,
+  removeDailyClass,
   checkLatestRelease,
   testKumaApiUrl,
   resetCurrentSection,

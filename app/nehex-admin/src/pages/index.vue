@@ -15,7 +15,7 @@
 
       <v-row class="dashboard-grid" dense>
         <v-col cols="12" md="6">
-          <v-card class="metric-card" rounded="xl" variant="outlined">
+          <v-card class="metric-card metric-card--sparkline overflow-visible" rounded="xl" variant="outlined">
             <div class="metric-head">
               <div>
                 <div class="metric-title">独立IP访问数</div>
@@ -39,20 +39,28 @@
               </v-btn-toggle>
             </div>
 
-            <v-sparkline
-              :auto-draw="true"
-              color="#64b5f6"
-              :gradient="['#4fc3f7', '#0288d1']"
-              :line-width="2"
-              :model-value="visitSeries.values"
-              :padding="14"
-              smooth="6"
-            />
+            <v-sheet
+              class="metric-sheet--offset mx-auto"
+              color="#0288d1"
+              elevation="4"
+              max-width="calc(100% - 32px)"
+              rounded="lg"
+            >
+              <v-sparkline
+                auto-draw
+                :model-value="visitSeries.values"
+                color="white"
+                :line-width="2"
+                :padding="16"
+                smooth="6"
+              />
+            </v-sheet>
+
           </v-card>
         </v-col>
 
         <v-col cols="12" md="6">
-          <v-card class="metric-card" rounded="xl" variant="outlined">
+          <v-card class="metric-card metric-card--sparkline overflow-visible" rounded="xl" variant="outlined">
             <div class="metric-head">
               <div>
                 <div class="metric-title">API调用数据</div>
@@ -76,15 +84,23 @@
               </v-btn-toggle>
             </div>
 
-            <v-sparkline
-              :auto-draw="true"
-              color="#81c784"
-              :gradient="['#9ccc65', '#43a047']"
-              :line-width="2"
-              :model-value="apiSeries.values"
-              :padding="14"
-              smooth="6"
-            />
+            <v-sheet
+              class="metric-sheet--offset mx-auto"
+              color="#43a047"
+              elevation="4"
+              max-width="calc(100% - 32px)"
+              rounded="lg"
+            >
+              <v-sparkline
+                auto-draw
+                :model-value="apiSeries.values"
+                color="white"
+                :line-width="2"
+                :padding="16"
+                smooth="6"
+              />
+            </v-sheet>
+
           </v-card>
         </v-col>
 
@@ -115,6 +131,35 @@
             </div>
           </v-card>
         </v-col>
+
+        <v-col cols="12">
+          <v-card class="summary-card" rounded="xl" variant="outlined">
+            <div class="summary-head">最新评论</div>
+            <div v-if="recentComments.length > 0" class="recent-comment-list">
+              <div
+                v-for="item in recentComments"
+                :key="item.id"
+                class="recent-comment-item"
+              >
+                <div class="recent-comment-meta">
+                  <span class="recent-comment-author">{{ item.nickname || '匿名用户' }}</span>
+                  <span class="recent-comment-target">
+                    {{ formatCommentTarget(item.target_type, item.target_id) }}
+                  </span>
+                  <span
+                    class="recent-comment-status"
+                    :class="item.status > 0 ? 'is-ok' : 'is-pending'"
+                  >
+                    {{ item.status > 0 ? '已审核' : '待审核' }}
+                  </span>
+                  <span class="recent-comment-time">{{ formatDateTime(item.create_time) }}</span>
+                </div>
+                <div class="recent-comment-content">{{ item.content || '（无内容）' }}</div>
+              </div>
+            </div>
+            <div v-else class="recent-comment-empty">暂无评论记录</div>
+          </v-card>
+        </v-col>
       </v-row>
     </AdminSection>
   </AdminLayout>
@@ -128,6 +173,7 @@ import {
   fetchDashboardData,
   type DashboardData,
   type DashboardPeriodKey,
+  type DashboardRecentComment,
   type DashboardSeries,
 } from '@/services/dashboard'
 import { computed, onMounted, ref } from 'vue'
@@ -168,8 +214,25 @@ const siteTotals = computed(() => dashboardData.value?.site_totals || {
   friend_count: 0,
 })
 
+const recentComments = computed<DashboardRecentComment[]>(() => (
+  dashboardData.value?.recent_comments || []
+))
+
 function formatNumber(value: number): string {
   return Math.max(0, value).toLocaleString('zh-CN')
+}
+
+function formatDateTime(value: string): string {
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) {
+    return value || '-'
+  }
+  return date.toLocaleString('zh-CN')
+}
+
+function formatCommentTarget(type: string, id: number): string {
+  const targetType = type.trim() || 'unknown'
+  return `${targetType} #${Math.max(0, id)}`
 }
 
 async function loadDashboard(): Promise<void> {
@@ -203,12 +266,16 @@ onMounted(async () => {
   background: rgba(15, 23, 42, 0.35);
 }
 
+.metric-card--sparkline {
+  padding-bottom: 8px;
+}
+
 .metric-head {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
-  padding: 16px 16px 4px;
+  padding: 16px 16px 6px;
 }
 
 .metric-title {
@@ -225,6 +292,11 @@ onMounted(async () => {
 
 .period-toggle {
   flex-shrink: 0;
+}
+
+.metric-sheet--offset {
+  top: -2px;
+  position: relative;
 }
 
 .summary-card {
@@ -260,6 +332,66 @@ onMounted(async () => {
   font-size: 24px;
   line-height: 1.2;
   font-weight: 700;
+}
+
+.recent-comment-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.recent-comment-item {
+  border: 1px solid rgba(148, 163, 184, 0.24);
+  border-radius: 12px;
+  padding: 10px 12px;
+  background: rgba(15, 23, 42, 0.45);
+}
+
+.recent-comment-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  color: rgba(203, 213, 225, 0.8);
+  font-size: 12px;
+}
+
+.recent-comment-author {
+  font-weight: 600;
+  color: rgba(241, 245, 249, 0.95);
+}
+
+.recent-comment-status {
+  border-radius: 999px;
+  padding: 1px 8px;
+}
+
+.recent-comment-status.is-ok {
+  color: #22c55e;
+  background: rgba(34, 197, 94, 0.14);
+}
+
+.recent-comment-status.is-pending {
+  color: #f59e0b;
+  background: rgba(245, 158, 11, 0.14);
+}
+
+.recent-comment-time {
+  margin-left: auto;
+}
+
+.recent-comment-content {
+  margin-top: 6px;
+  font-size: 13px;
+  line-height: 1.6;
+  color: #e2e8f0;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.recent-comment-empty {
+  color: rgba(203, 213, 225, 0.8);
+  font-size: 14px;
 }
 
 @media (max-width: 960px) {

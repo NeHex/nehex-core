@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use axum::{
     Json,
     extract::{Path, Query, State},
@@ -16,6 +18,14 @@ use crate::{
 use super::{admin_auth, sync_api};
 
 const FRIENDS_CACHE_KEY: &str = "friends:list";
+const FRIEND_EXCHANGE_SITE_TITLE_KEY: &str = "friend_exchange_site_title";
+const FRIEND_EXCHANGE_SITE_URL_KEY: &str = "friend_exchange_site_url";
+const FRIEND_EXCHANGE_SITE_ICON_KEY: &str = "friend_exchange_site_icon";
+const FRIEND_EXCHANGE_SITE_DESCRIPTION_KEY: &str = "friend_exchange_site_description";
+const SITE_TITLE_KEY: &str = "site_title";
+const SITE_URL_KEY: &str = "site_url";
+const SITE_FAVICON_KEY: &str = "site_favicon";
+const SITE_DESCRIPTION_KEY: &str = "site_description";
 
 #[derive(Serialize)]
 pub struct AdminActionResponse {
@@ -70,6 +80,19 @@ pub struct AdminFriendApplyDetailResponse {
     data: FriendApplyItem,
 }
 
+#[derive(Serialize, Clone)]
+pub struct FriendExchangeInfoItem {
+    site_title: String,
+    site_url: String,
+    site_icon: String,
+    site_description: String,
+}
+
+#[derive(Serialize)]
+pub struct FriendExchangeInfoResponse {
+    data: FriendExchangeInfoItem,
+}
+
 #[derive(Deserialize)]
 pub struct AdminFriendListQuery {
     keyword: Option<String>,
@@ -108,6 +131,14 @@ pub struct AdminFriendApplyStatusPayload {
     status: String,
     create_friend: Option<bool>,
     friend_category: Option<String>,
+}
+
+#[derive(Deserialize)]
+pub struct FriendExchangeInfoUpdatePayload {
+    site_title: String,
+    site_url: String,
+    site_icon: String,
+    site_description: String,
 }
 
 pub async fn admin_list_friends(
@@ -170,6 +201,86 @@ pub async fn admin_list_friends(
     };
 
     Ok(Json(AdminFriendListResponse { data }))
+}
+
+pub async fn admin_get_friend_exchange_info(
+    State(state): State<AppState>,
+    method: Method,
+    headers: HeaderMap,
+) -> AppResult<Json<FriendExchangeInfoResponse>> {
+    let _principal = admin_auth::require_admin_principal(&state, &method, &headers)?;
+    let data = load_friend_exchange_info(&state).await?;
+    Ok(Json(FriendExchangeInfoResponse { data }))
+}
+
+pub async fn admin_update_friend_exchange_info(
+    State(state): State<AppState>,
+    method: Method,
+    headers: HeaderMap,
+    Json(payload): Json<FriendExchangeInfoUpdatePayload>,
+) -> AppResult<Json<FriendExchangeInfoResponse>> {
+    let _principal = admin_auth::require_admin_principal(&state, &method, &headers)?;
+
+    let site_title = normalize_optional_text(Some(payload.site_title));
+    let site_url = match normalize_optional_text(Some(payload.site_url)) {
+        Some(url) => Some(
+            normalize_http_url(&url, "site_url", false)?
+                .ok_or_else(|| AppError::Unprocessable("site_url is required".to_string()))?,
+        ),
+        None => None,
+    };
+    let site_icon = match normalize_optional_text(Some(payload.site_icon)) {
+        Some(icon) => normalize_http_url(&icon, "site_icon", true)?,
+        None => None,
+    };
+    let site_description = normalize_optional_text(Some(payload.site_description));
+
+    let mut tx = state
+        .db_pool
+        .begin()
+        .await
+        .map_err(|error| AppError::internal(format!("Failed to begin friend exchange tx: {error}")))?;
+
+    upsert_setting(
+        &mut tx,
+        FRIEND_EXCHANGE_SITE_TITLE_KEY,
+        "string",
+        site_title,
+        "友链交换信息：站点标题",
+    )
+    .await?;
+    upsert_setting(
+        &mut tx,
+        FRIEND_EXCHANGE_SITE_URL_KEY,
+        "string",
+        site_url,
+        "友链交换信息：站点链接",
+    )
+    .await?;
+    upsert_setting(
+        &mut tx,
+        FRIEND_EXCHANGE_SITE_ICON_KEY,
+        "string",
+        site_icon,
+        "友链交换信息：站点图标",
+    )
+    .await?;
+    upsert_setting(
+        &mut tx,
+        FRIEND_EXCHANGE_SITE_DESCRIPTION_KEY,
+        "string",
+        site_description,
+        "友链交换信息：站点描述",
+    )
+    .await?;
+
+    tx.commit()
+        .await
+        .map_err(|error| AppError::internal(format!("Failed to commit friend exchange settings: {error}")))?;
+
+    let data = load_friend_exchange_info(&state).await?;
+    sync_api::record_content_change_best_effort(&state, "setting", "update", vec![]).await;
+    Ok(Json(FriendExchangeInfoResponse { data }))
 }
 
 pub async fn admin_create_friend(
@@ -757,4 +868,106 @@ fn truncate_text(value: String, max_len: usize) -> String {
 
 async fn invalidate_friends_cache(state: &AppState) {
     state.runtime_cache.delete(FRIENDS_CACHE_KEY).await;
+}
+
+async fn load_friend_exchange_info(state: &AppState) -> AppResult<FriendExchangeInfoItem> {
+    let keys = vec![
+        FRIEND_EXCHANGE_SITE_TITLE_KEY,
+        FRIEND_EXCHANGE_SITE_URL_KEY,
+        FRIEND_EXCHANGE_SITE_ICON_KEY,
+        FRIEND_EXCHANGE_SITE_DESCRIPTION_KEY,
+        SITE_TITLE_KEY,
+        SITE_URL_KEY,
+        SITE_FAVICON_KEY,
+        SITE_DESCRIPTION_KEY,
+    ];
+
+    let rows = sqlx::query(
+        "SELECT setting_key, setting_content FROM settings WHERE setting_key = ANY($1)",
+    )
+    .bind(keys)
+    .fetch_all(&state.db_pool)
+    .await
+    .map_err(|error| AppError::internal(format!("Failed to load friend exchange settings: {error}")))?;
+
+    let mut settings = HashMap::<String, String>::new();
+    for row in rows {
+        let key = row.try_get::<String, _>("setting_key").unwrap_or_default();
+        let value = row
+            .try_get::<Option<String>, _>("setting_content")
+            .ok()
+            .flatten()
+            .unwrap_or_default()
+            .trim()
+            .to_string();
+        settings.insert(key, value);
+    }
+
+    let site_title = pick_setting_value(&settings, FRIEND_EXCHANGE_SITE_TITLE_KEY, SITE_TITLE_KEY)
+        .unwrap_or_else(|| "NeHex".to_string());
+    let site_url = pick_setting_value(&settings, FRIEND_EXCHANGE_SITE_URL_KEY, SITE_URL_KEY)
+        .unwrap_or_default();
+    let site_icon = pick_setting_value(&settings, FRIEND_EXCHANGE_SITE_ICON_KEY, SITE_FAVICON_KEY)
+        .unwrap_or_default();
+    let site_description = pick_setting_value(
+        &settings,
+        FRIEND_EXCHANGE_SITE_DESCRIPTION_KEY,
+        SITE_DESCRIPTION_KEY,
+    )
+    .unwrap_or_default();
+
+    Ok(FriendExchangeInfoItem {
+        site_title,
+        site_url,
+        site_icon,
+        site_description,
+    })
+}
+
+fn pick_setting_value(
+    settings: &HashMap<String, String>,
+    custom_key: &str,
+    fallback_key: &str,
+) -> Option<String> {
+    let custom_value = settings
+        .get(custom_key)
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty());
+    if custom_value.is_some() {
+        return custom_value;
+    }
+
+    settings
+        .get(fallback_key)
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty())
+}
+
+async fn upsert_setting<'a>(
+    tx: &mut sqlx::Transaction<'a, sqlx::Postgres>,
+    key: &str,
+    setting_type: &str,
+    setting_content: Option<String>,
+    description: &str,
+) -> AppResult<()> {
+    sqlx::query(
+        r#"
+        INSERT INTO settings (setting_key, setting_type, setting_content, description)
+        VALUES ($1, $2, $3, $4)
+        ON CONFLICT (setting_key)
+        DO UPDATE SET
+            setting_type = EXCLUDED.setting_type,
+            setting_content = EXCLUDED.setting_content,
+            description = EXCLUDED.description,
+            updated_at = CURRENT_TIMESTAMP
+        "#,
+    )
+    .bind(key)
+    .bind(setting_type)
+    .bind(setting_content)
+    .bind(Some(description.to_string()))
+    .execute(&mut **tx)
+    .await
+    .map_err(|error| AppError::internal(format!("Failed to upsert setting `{key}`: {error}")))?;
+    Ok(())
 }

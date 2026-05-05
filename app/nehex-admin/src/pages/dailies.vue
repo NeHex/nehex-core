@@ -45,7 +45,7 @@
                 <div class="daily-title">{{ daily.title }}</div>
                 <div class="daily-tags">
                   <v-chip size="x-small" variant="tonal">
-                    {{ daily.daily_type === 'review' ? '影评' : '日常' }}
+                    {{ getDailyTypeLabel(daily.daily_type) }}
                   </v-chip>
                   <v-chip
                     v-if="daily.movie?.title"
@@ -131,6 +131,7 @@ import {
   fetchDailies,
   type DailyItem,
 } from '@/services/dailies'
+import { fetchDailyClassOptions, type ArticleClassOption } from '@/services/settings'
 
 const router = useRouter()
 const route = useRoute()
@@ -144,6 +145,10 @@ const errorMessage = ref('')
 const dailies = ref<DailyItem[]>([])
 const deleteDialog = ref(false)
 const pendingDelete = ref<DailyItem | null>(null)
+const dailyTypeMap = ref<Map<string, string>>(new Map<string, string>([
+  ['note', '日常'],
+  ['review', '影评'],
+]))
 
 function openCreatePage(): void {
   void router.push('/dailies/new')
@@ -182,6 +187,33 @@ function formatContentPreview(value: string | null | undefined): string {
   return content
 }
 
+function getDailyTypeLabel(value: string | null | undefined): string {
+  const dailyType = (value || '').trim()
+  if (!dailyType) {
+    return '日常'
+  }
+  return dailyTypeMap.value.get(dailyType) || dailyType
+}
+
+async function loadDailyClassOptions(): Promise<void> {
+  try {
+    const options = await fetchDailyClassOptions()
+    const nextMap = new Map<string, string>()
+    options.forEach((item: ArticleClassOption) => {
+      const optionValue = item.value.trim()
+      if (!optionValue || nextMap.has(optionValue)) {
+        return
+      }
+      nextMap.set(optionValue, item.label.trim() || optionValue)
+    })
+    if (nextMap.size > 0) {
+      dailyTypeMap.value = nextMap
+    }
+  } catch {
+    // Keep fallback labels when daily type options are unavailable.
+  }
+}
+
 async function loadDailies(): Promise<void> {
   loading.value = true
   errorMessage.value = ''
@@ -218,6 +250,7 @@ async function confirmDelete(): Promise<void> {
 }
 
 onMounted(async () => {
+  await loadDailyClassOptions()
   if (isManageRoute.value) {
     await loadDailies()
   }

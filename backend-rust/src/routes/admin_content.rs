@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 use axum::{
     Json,
     extract::{Path, Query, State},
@@ -18,6 +20,7 @@ const DAILIES_CACHE_KEY: &str = "dailies:list";
 const ALBUMS_CACHE_KEY: &str = "albums:list";
 const PAGES_CACHE_KEY: &str = "pages:list";
 const PROJECTS_CACHE_KEY: &str = "projects:list";
+const DAILY_CLASS_SETTING_KEY: &str = "nehex_daily_class";
 
 #[derive(Serialize)]
 pub struct AdminActionResponse {
@@ -43,6 +46,7 @@ struct ArticleItem {
     class_name: String,
     read: i64,
     like_count: i64,
+    create_time: NaiveDateTime,
     #[serde(rename = "lastEditTime")]
     last_edit_time: NaiveDateTime,
     tag: Option<String>,
@@ -256,6 +260,7 @@ pub async fn admin_list_articles(
                 class AS class_name,
                 read::bigint AS read,
                 like_count::bigint AS like_count,
+                create_time,
                 "lastEditTime" AS last_edit_time,
                 tag,
                 top::bigint AS top,
@@ -301,6 +306,7 @@ pub async fn admin_get_article(
             class AS class_name,
             read::bigint AS read,
             like_count::bigint AS like_count,
+            create_time,
             "lastEditTime" AS last_edit_time,
             tag,
             top::bigint AS top,
@@ -350,6 +356,7 @@ pub async fn admin_create_article(
             class AS class_name,
             read::bigint AS read,
             like_count::bigint AS like_count,
+            create_time,
             "lastEditTime" AS last_edit_time,
             tag,
             top::bigint AS top,
@@ -407,6 +414,7 @@ pub async fn admin_update_article(
             class AS class_name,
             read::bigint AS read,
             like_count::bigint AS like_count,
+            create_time,
             "lastEditTime" AS last_edit_time,
             tag,
             top::bigint AS top,
@@ -1056,18 +1064,77 @@ fn normalize_status(status: i64) -> i64 {
     if status > 0 { 1 } else { 0 }
 }
 
-fn normalize_daily_type(raw: Option<String>) -> AppResult<String> {
-    let normalized = raw.unwrap_or_else(|| "note".to_string()).trim().to_lowercase();
-    if normalized.is_empty() || normalized == "note" || normalized == "daily" || normalized == "日常" {
-        return Ok("note".to_string());
-    }
-    if normalized == "review" || normalized == "movie_review" || normalized == "影评" {
-        return Ok("review".to_string());
+fn parse_class_values_from_setting(raw: &str) -> Vec<String> {
+    let text = raw.trim();
+    if text.is_empty() {
+        return Vec::new();
     }
 
-    Err(AppError::Unprocessable(
-        "daily_type 仅支持 note(日常) 或 review(影评)".to_string(),
-    ))
+    if let Ok(parsed) = serde_json::from_str::<serde_json::Value>(text) {
+        if let Some(class_map) = parsed
+            .as_object()
+            .and_then(|root| root.get("class"))
+            .and_then(|class_value| class_value.as_object())
+        {
+            return class_map
+                .keys()
+                .map(|key| key.trim().to_string())
+                .filter(|key| !key.is_empty())
+                .collect();
+        }
+    }
+
+    text.split(',')
+        .map(|item| item.trim().to_string())
+        .filter(|item| !item.is_empty())
+        .collect()
+}
+
+async fn load_daily_type_allow_list(state: &AppState) -> AppResult<HashSet<String>> {
+    let raw_setting = sqlx::query_scalar::<_, String>(
+        "SELECT COALESCE(setting_content, '') AS setting_content FROM settings WHERE setting_key = $1 LIMIT 1",
+    )
+    .bind(DAILY_CLASS_SETTING_KEY)
+    .fetch_optional(&state.db_pool)
+    .await
+    .map_err(|error| AppError::internal(format!("Failed to read daily class setting: {error}")))?
+    .unwrap_or_default();
+
+    let mut allow_set = parse_class_values_from_setting(&raw_setting)
+        .into_iter()
+        .collect::<HashSet<_>>();
+
+    if allow_set.is_empty() {
+        allow_set.insert("note".to_string());
+        allow_set.insert("review".to_string());
+    }
+
+    Ok(allow_set)
+}
+
+fn normalize_daily_type(raw: Option<String>, allow_set: &HashSet<String>) -> AppResult<String> {
+    let original = raw.unwrap_or_default().trim().to_string();
+    let lowered = original.to_lowercase();
+    let normalized = if original.is_empty() {
+        "note".to_string()
+    } else if lowered == "note" || lowered == "daily" || original == "日常" {
+        "note".to_string()
+    } else if lowered == "review" || lowered == "movie_review" || original == "影评" {
+        "review".to_string()
+    } else {
+        original
+    };
+
+    if allow_set.contains(&normalized) {
+        return Ok(normalized);
+    }
+
+    let mut allowed_values = allow_set.iter().cloned().collect::<Vec<_>>();
+    allowed_values.sort_unstable();
+    Err(AppError::Unprocessable(format!(
+        "daily_type 不在允许范围内，当前可用分类：{}",
+        allowed_values.join(", ")
+    )))
 }
 
 async fn normalize_daily_payload(
@@ -1075,7 +1142,8 @@ async fn normalize_daily_payload(
     payload: DailyPayload,
 ) -> AppResult<NormalizedDailyPayload> {
     let title = normalize_required_text(payload.title, "title")?;
-    let daily_type = normalize_daily_type(payload.daily_type)?;
+    let allow_set = load_daily_type_allow_list(state).await?;
+    let daily_type = normalize_daily_type(payload.daily_type, &allow_set)?;
     let requested_movie_id = payload.kuma_movie_id.and_then(|id| if id > 0 { Some(id) } else { None });
     let kuma_movie_id = if daily_type == "review" {
         let movie_id = requested_movie_id.ok_or_else(|| {

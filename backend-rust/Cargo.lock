@@ -450,7 +450,7 @@ dependencies = [
 
 [[package]]
 name = "backend-rust"
-version = "1.2.6"
+version = "1.2.9"
 dependencies = [
  "anyhow",
  "aws-credential-types",

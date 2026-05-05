@@ -17,6 +17,11 @@ export type ThemeProfileEntry = {
   content: Record<string, unknown>
 }
 
+type ClassPayloadParseResult = {
+  items: ArticleClassItem[]
+  extraConfig: Record<string, unknown>
+}
+
 export function valueToText(value: unknown): string {
   if (value === null || value === undefined) {
     return ''
@@ -81,10 +86,7 @@ export function normalizeThemeFileName(raw: string): string {
   return `${text}.json`
 }
 
-export function parseArticleClassPayload(raw: unknown): {
-  items: ArticleClassItem[]
-  extraConfig: Record<string, unknown>
-} {
+function parseClassPayload(raw: unknown, fallbackItems: ArticleClassItem[]): ClassPayloadParseResult {
   const parsed = parseUnknownJson(raw)
   const items: ArticleClassItem[] = []
   const extraConfig: Record<string, unknown> = {}
@@ -124,13 +126,35 @@ export function parseArticleClassPayload(raw: unknown): {
   }
 
   if (items.length === 0) {
-    items.push({ value: 'default', label: '默认分类' })
+    fallbackItems.forEach((item) => {
+      const value = item.value.trim()
+      if (!value) {
+        return
+      }
+      items.push({
+        value,
+        label: item.label.trim() || value,
+      })
+    })
   }
 
   return {
     items,
     extraConfig,
   }
+}
+
+export function parseArticleClassPayload(raw: unknown): ClassPayloadParseResult {
+  return parseClassPayload(raw, [
+    { value: 'default', label: '默认分类' },
+  ])
+}
+
+export function parseDailyClassPayload(raw: unknown): ClassPayloadParseResult {
+  return parseClassPayload(raw, [
+    { value: 'note', label: '日常' },
+    { value: 'review', label: '影评' },
+  ])
 }
 
 export function parseThemeProfileMap(raw: unknown, legacy: ThemeLegacyDefaults): ThemeProfileEntry[] {

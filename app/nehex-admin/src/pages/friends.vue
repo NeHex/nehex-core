@@ -8,6 +8,55 @@
         </div>
       </header>
 
+      <v-card class="exchange-card" rounded="lg" variant="outlined">
+        <div class="exchange-head">
+          <div>
+            <div class="exchange-title">友链交换信息</div>
+            <div class="exchange-subtitle">对方添加你站点友链时可直接使用。留空时默认继承网站设置。</div>
+          </div>
+          <v-btn
+            color="primary"
+            prepend-icon="mdi-content-save-outline"
+            :loading="exchangeInfoSaving"
+            @click="saveFriendExchangeInfo"
+          >
+            保存
+          </v-btn>
+        </div>
+
+        <v-progress-linear
+          v-if="exchangeInfoLoading"
+          class="mt-2"
+          color="primary"
+          indeterminate
+        />
+
+        <div class="exchange-grid">
+          <v-text-field
+            v-model="friendExchangeForm.site_title"
+            label="站点标题"
+            variant="outlined"
+          />
+          <v-text-field
+            v-model="friendExchangeForm.site_url"
+            label="站点链接"
+            variant="outlined"
+          />
+          <v-text-field
+            v-model="friendExchangeForm.site_icon"
+            label="图标地址"
+            variant="outlined"
+          />
+          <v-textarea
+            v-model="friendExchangeForm.site_description"
+            auto-grow
+            label="站点描述"
+            min-rows="2"
+            variant="outlined"
+          />
+        </div>
+      </v-card>
+
       <v-tabs v-model="activeTab" color="primary" grow>
         <v-tab value="friends">友链列表</v-tab>
         <v-tab value="applications">申请处理</v-tab>
@@ -331,13 +380,16 @@ import { useGlobalSnackbar } from '@/composables/useGlobalSnackbar'
 import {
   createAdminFriend,
   deleteAdminFriend,
+  fetchAdminFriendExchangeInfo,
   fetchAdminFriendApplies,
   fetchAdminFriends,
+  updateAdminFriendExchangeInfo,
   updateAdminFriend,
   updateAdminFriendApplyStatus,
   type AdminFriendApplyItem,
   type AdminFriendItem,
   type AdminFriendUpsertPayload,
+  type FriendExchangeInfo,
   type FriendApplyStatus,
   type FriendStatus,
 } from '@/services/friends'
@@ -351,6 +403,8 @@ const friendsLoading = ref(false)
 const applicationsLoading = ref(false)
 const deleting = ref(false)
 const friendSubmitting = ref(false)
+const exchangeInfoLoading = ref(false)
+const exchangeInfoSaving = ref(false)
 
 const friendKeyword = ref('')
 const applyKeyword = ref('')
@@ -367,6 +421,12 @@ const overwriteDialog = ref(false)
 const editingFriendId = ref<number | null>(null)
 const pendingDelete = ref<AdminFriendItem | null>(null)
 const pendingOverwritePayload = ref<AdminFriendUpsertPayload | null>(null)
+const friendExchangeForm = reactive<FriendExchangeInfo>({
+  site_title: '',
+  site_url: '',
+  site_icon: '',
+  site_description: '',
+})
 
 const friendForm = reactive<{
   title: string
@@ -486,6 +546,50 @@ function normalizeHttpUrl(raw: string): string {
     return parsed.toString()
   } catch {
     return ''
+  }
+}
+
+function applyFriendExchangeForm(data: FriendExchangeInfo): void {
+  friendExchangeForm.site_title = data.site_title || ''
+  friendExchangeForm.site_url = data.site_url || ''
+  friendExchangeForm.site_icon = data.site_icon || ''
+  friendExchangeForm.site_description = data.site_description || ''
+}
+
+async function loadFriendExchangeInfo(): Promise<void> {
+  exchangeInfoLoading.value = true
+  errorMessage.value = ''
+  try {
+    const data = await fetchAdminFriendExchangeInfo()
+    applyFriendExchangeForm(data)
+  } catch (error) {
+    const message = error instanceof Error ? error.message : '加载友链交换信息失败'
+    errorMessage.value = message
+    showGlobalError(message)
+  } finally {
+    exchangeInfoLoading.value = false
+  }
+}
+
+async function saveFriendExchangeInfo(): Promise<void> {
+  exchangeInfoSaving.value = true
+  errorMessage.value = ''
+  successMessage.value = ''
+  try {
+    const data = await updateAdminFriendExchangeInfo({
+      site_title: friendExchangeForm.site_title,
+      site_url: friendExchangeForm.site_url,
+      site_icon: friendExchangeForm.site_icon,
+      site_description: friendExchangeForm.site_description,
+    })
+    applyFriendExchangeForm(data)
+    successMessage.value = '友链交换信息已保存'
+  } catch (error) {
+    const message = error instanceof Error ? error.message : '保存友链交换信息失败'
+    errorMessage.value = message
+    showGlobalError(message)
+  } finally {
+    exchangeInfoSaving.value = false
   }
 }
 
@@ -695,6 +799,7 @@ async function changeApplyStatus(
 
 onMounted(async () => {
   await Promise.all([
+    loadFriendExchangeInfo(),
     loadFriends(),
     loadApplications(),
   ])
@@ -714,6 +819,38 @@ watch(successMessage, (nextMessage) => {
   display: flex;
   flex-direction: column;
   gap: 12px;
+}
+
+.exchange-card {
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: linear-gradient(180deg, #151c2a, #121826);
+  padding: 12px 14px;
+}
+
+.exchange-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.exchange-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: #f2f6ff;
+}
+
+.exchange-subtitle {
+  margin-top: 4px;
+  color: #aeb8cc;
+  font-size: 13px;
+}
+
+.exchange-grid {
+  margin-top: 10px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
 }
 
 .page-header {
@@ -913,6 +1050,10 @@ watch(successMessage, (nextMessage) => {
   }
 
   .form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .exchange-grid {
     grid-template-columns: 1fr;
   }
 

@@ -210,6 +210,7 @@ async fn ensure_core_content_tables(pool: &PgPool) -> AppResult<()> {
             class VARCHAR(100) NOT NULL,
             read BIGINT NOT NULL DEFAULT 0,
             like_count BIGINT NOT NULL DEFAULT 0,
+            create_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
             "lastEditTime" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
             tag VARCHAR(255),
             top BIGINT NOT NULL DEFAULT 0,
@@ -466,6 +467,30 @@ async fn ensure_schema_compatibility_columns(pool: &PgPool) -> AppResult<()> {
             pool,
             "ALTER TABLE article ADD COLUMN IF NOT EXISTS status BIGINT NOT NULL DEFAULT 1",
             "article.status",
+        )
+        .await?;
+        run_ddl(
+            pool,
+            "ALTER TABLE article ADD COLUMN IF NOT EXISTS create_time TIMESTAMP",
+            "article.create_time",
+        )
+        .await?;
+        run_ddl(
+            pool,
+            r#"UPDATE article SET create_time = "lastEditTime" WHERE create_time IS NULL"#,
+            "article.create_time.backfill",
+        )
+        .await?;
+        run_ddl(
+            pool,
+            "ALTER TABLE article ALTER COLUMN create_time SET DEFAULT CURRENT_TIMESTAMP",
+            "article.create_time.default",
+        )
+        .await?;
+        run_ddl(
+            pool,
+            "ALTER TABLE article ALTER COLUMN create_time SET NOT NULL",
+            "article.create_time.not_null",
         )
         .await?;
     }

@@ -15,7 +15,7 @@ use crate::{
 
 use super::admin_auth;
 
-const DASHBOARD_CACHE_KEY: &str = "admin:dashboard:overview:v1";
+const DASHBOARD_CACHE_KEY: &str = "admin:dashboard:overview:v2";
 const DASHBOARD_CACHE_TTL_SECONDS: u64 = 60;
 
 #[derive(Clone, Copy)]
@@ -56,11 +56,23 @@ struct DashboardSiteTotals {
     friend_count: i64,
 }
 
+#[derive(Serialize, Deserialize, Clone, sqlx::FromRow)]
+struct DashboardRecentComment {
+    id: i64,
+    nickname: String,
+    content: String,
+    target_type: String,
+    target_id: i64,
+    status: i64,
+    create_time: NaiveDateTime,
+}
+
 #[derive(Serialize, Deserialize, Clone)]
 struct DashboardData {
     visit_ip: DashboardPeriodMetrics,
     api_calls: DashboardPeriodMetrics,
     site_totals: DashboardSiteTotals,
+    recent_comments: Vec<DashboardRecentComment>,
 }
 
 #[derive(Serialize)]
@@ -121,11 +133,13 @@ async fn build_dashboard_data(state: &AppState, specs: &Periods) -> AppResult<Da
     };
 
     let site_totals = build_site_totals(state).await?;
+    let recent_comments = build_recent_comments(state).await?;
 
     Ok(DashboardData {
         visit_ip,
         api_calls,
         site_totals,
+        recent_comments,
     })
 }
 
@@ -150,6 +164,7 @@ fn empty_dashboard_data(specs: &Periods) -> DashboardData {
             album_count: 0,
             friend_count: 0,
         },
+        recent_comments: Vec::new(),
     }
 }
 
@@ -426,4 +441,25 @@ async fn build_site_totals(state: &AppState) -> AppResult<DashboardSiteTotals> {
         album_count: count_table_rows(state, "album").await?,
         friend_count: count_table_rows(state, "friends").await?,
     })
+}
+
+async fn build_recent_comments(state: &AppState) -> AppResult<Vec<DashboardRecentComment>> {
+    sqlx::query_as::<_, DashboardRecentComment>(
+        r#"
+        SELECT
+            id::bigint AS id,
+            nickname,
+            content,
+            target_type,
+            target_id::bigint AS target_id,
+            status::bigint AS status,
+            create_time
+        FROM comment
+        ORDER BY create_time DESC, id DESC
+        LIMIT 5
+        "#,
+    )
+    .fetch_all(&state.db_pool)
+    .await
+    .map_err(|error| AppError::internal(format!("Failed to query recent comments: {error}")))
 }

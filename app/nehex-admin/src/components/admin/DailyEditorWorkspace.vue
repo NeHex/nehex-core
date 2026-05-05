@@ -130,6 +130,7 @@
         <textarea
           ref="markdownInputRef"
           v-model="editorForm.content"
+          @paste="onPasteImage"
           class="markdown-input"
           placeholder="在这里输入 Markdown 内容..."
           spellcheck="false"
@@ -181,6 +182,7 @@ import {
   fetchAdminKumaMovies,
   type KumaMovieCard,
 } from '@/services/kuma'
+import { fetchDailyClassOptions, type ArticleClassOption } from '@/services/settings'
 import { uploadMarkdownImage } from '@/services/storage'
 import ImageUploadHintCard from '@/components/admin/ImageUploadHintCard.vue'
 import MediaLibraryImagePicker from '@/components/admin/MediaLibraryImagePicker.vue'
@@ -199,7 +201,7 @@ const markdown = new MarkdownIt({
 
 type EditorForm = {
   title: string
-  dailyType: 'note' | 'review'
+  dailyType: string
   kumaMovieId: number | null
   weather: string
   content: string
@@ -252,10 +254,11 @@ const isEditing = computed(() => Number.isFinite(props.dailyId))
 const isReviewType = computed(() => editorForm.dailyType === 'review')
 const weatherOptions = ['cloud', 'rain', 'snow', 'sun', 'wind']
 const weatherOptionSet = new Set<string>(weatherOptions)
-const dailyTypeOptions: Array<{ label: string, value: 'note' | 'review' }> = [
+const DEFAULT_DAILY_TYPE_OPTIONS: ArticleClassOption[] = [
   { label: '日常', value: 'note' },
   { label: '影评', value: 'review' },
 ]
+const dailyTypeOptions = ref<ArticleClassOption[]>(DEFAULT_DAILY_TYPE_OPTIONS.map((item) => ({ ...item })))
 const kumaMovieItems = ref<KumaMovieCard[]>([])
 const kumaMovieOptions = computed(() => {
   return kumaMovieItems.value.map((item) => ({
@@ -352,12 +355,23 @@ function stopResize(): void {
 
 function buildPayload(): DailyUpsertPayload | null {
   const title = editorForm.title.trim()
+  const dailyType = editorForm.dailyType.trim()
   if (!title) {
     errorMessage.value = '日常标题不能为空'
     showGlobalError('日常标题不能为空')
     return null
   }
-  if (editorForm.dailyType === 'review' && typeof editorForm.kumaMovieId !== 'number') {
+  if (!dailyType) {
+    errorMessage.value = '请选择日常分类'
+    showGlobalError('请选择日常分类')
+    return null
+  }
+  if (!dailyTypeOptions.value.some((item) => item.value === dailyType)) {
+    errorMessage.value = '日常分类无效，请刷新后重试'
+    showGlobalError('日常分类无效，请刷新后重试')
+    return null
+  }
+  if (dailyType === 'review' && typeof editorForm.kumaMovieId !== 'number') {
     errorMessage.value = '影评类型必须选择电影'
     showGlobalError('影评类型必须选择电影')
     return null
@@ -366,8 +380,8 @@ function buildPayload(): DailyUpsertPayload | null {
   const weather = editorForm.weather.trim().toLowerCase()
   return {
     title,
-    daily_type: editorForm.dailyType,
-    kuma_movie_id: editorForm.dailyType === 'review' ? editorForm.kumaMovieId : null,
+    daily_type: dailyType,
+    kuma_movie_id: dailyType === 'review' ? editorForm.kumaMovieId : null,
     weather: weatherOptionSet.has(weather) ? weather : null,
     content: editorForm.content.trim() || null,
   }
@@ -385,6 +399,20 @@ function _pickFirstImage(files: FileList | null): File | null {
     if (file.type.startsWith('image/')) {
       return file
     }
+  }
+  return null
+}
+
+function _pickClipboardImage(event: ClipboardEvent): File | null {
+  const items = event.clipboardData?.items
+  if (!items) {
+    return null
+  }
+  for (const item of Array.from(items)) {
+    if (item.kind !== 'file' || !item.type.startsWith('image/')) {
+      continue
+    }
+    return item.getAsFile()
   }
   return null
 }
@@ -490,6 +518,15 @@ async function onDropImage(event: DragEvent): Promise<void> {
   await _uploadImageAndInsert(imageFile)
 }
 
+async function onPasteImage(event: ClipboardEvent): Promise<void> {
+  const imageFile = _pickClipboardImage(event)
+  if (!imageFile) {
+    return
+  }
+  event.preventDefault()
+  await _uploadImageAndInsert(imageFile)
+}
+
 function fillEditorForm(daily: {
   title?: string | null
   daily_type?: string | null
@@ -498,7 +535,11 @@ function fillEditorForm(daily: {
   content?: string | null
 }): void {
   const weather = daily.weather?.trim().toLowerCase() || ''
-  const dailyType = daily.daily_type === 'review' ? 'review' : 'note'
+  const fallbackType = dailyTypeOptions.value[0]?.value || 'note'
+  const dailyType = (daily.daily_type || '').trim() || fallbackType
+  if (!dailyTypeOptions.value.some((item) => item.value === dailyType)) {
+    dailyTypeOptions.value.push({ value: dailyType, label: dailyType })
+  }
   editorForm.title = daily.title?.trim() || ''
   editorForm.dailyType = dailyType
   editorForm.kumaMovieId = dailyType === 'review' && typeof daily.kuma_movie_id === 'number'
@@ -539,6 +580,23 @@ async function loadKumaMovies(): Promise<void> {
   }
 }
 
+async function loadDailyTypeOptions(): Promise<void> {
+  try {
+    const options = await fetchDailyClassOptions()
+    dailyTypeOptions.value = options.length > 0
+      ? options
+      : DEFAULT_DAILY_TYPE_OPTIONS.map((item) => ({ ...item }))
+  } catch (error) {
+    const message = error instanceof Error ? error.message : '加载日常分类失败'
+    showGlobalError(message)
+    dailyTypeOptions.value = DEFAULT_DAILY_TYPE_OPTIONS.map((item) => ({ ...item }))
+  } finally {
+    if (!dailyTypeOptions.value.some((item) => item.value === editorForm.dailyType)) {
+      editorForm.dailyType = dailyTypeOptions.value[0]?.value || 'note'
+    }
+  }
+}
+
 async function submitEditor(): Promise<void> {
   successMessage.value = ''
   errorMessage.value = ''
@@ -573,6 +631,7 @@ async function goManage(): Promise<void> {
 }
 
 onMounted(async () => {
+  await loadDailyTypeOptions()
   await loadKumaMovies()
   await loadDailyDetail()
   syncSavedSnapshot()

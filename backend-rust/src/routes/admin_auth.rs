@@ -750,6 +750,12 @@ async fn bootstrap_installation(
         .unwrap_or_else(|| "default".to_string());
 
     let nehex_article_class = serde_json::json!({ "class": class_map });
+    let nehex_daily_class = serde_json::json!({
+        "class": {
+            "note": "日常",
+            "review": "影评",
+        }
+    });
     let now_iso = Utc::now().to_rfc3339();
     let site_notice = if payload.site.site_notice.trim().is_empty() {
         "站点初始化完成，欢迎使用 NeHex。".to_string()
@@ -823,6 +829,12 @@ async fn bootstrap_installation(
             "json",
             Some(nehex_article_class.to_string()),
             Some("文章分类配置".to_string()),
+        ),
+        (
+            "nehex_daily_class",
+            "json",
+            Some(nehex_daily_class.to_string()),
+            Some("日常分类配置".to_string()),
         ),
         (
             "site_url",

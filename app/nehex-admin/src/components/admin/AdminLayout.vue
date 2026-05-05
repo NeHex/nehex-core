@@ -369,8 +369,8 @@ const router = useRouter()
 const route = useRoute()
 const display = useDisplay()
 
-const adminBrandName = 'NeHex'
-const adminVersion = __NEHEX_ADMIN_VERSION__.trim() || '1.2.6'
+const adminBrandName = '𝙉𝙀𝙃𝙀𝙓'
+const adminVersion = __NEHEX_ADMIN_VERSION__.trim() || '1.2.9'
 const expandedMenuKey = ref<string | null>(getDefaultExpandedMenuKey())
 const slots = useSlots()
 const hasSecondaryNav = computed(() => Boolean(slots['secondary-nav']))

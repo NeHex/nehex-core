@@ -1,10 +1,13 @@
 use std::{
     collections::HashMap,
     path::{Component, Path, PathBuf},
+    time::Duration,
 };
 
 use aws_credential_types::Credentials;
-use aws_sdk_s3::{Client as S3Client, config::Region, primitives::ByteStream};
+use aws_sdk_s3::{
+    Client as S3Client, config::Region, presigning::PresigningConfig, primitives::ByteStream,
+};
 use chrono::{Datelike, Timelike, Utc};
 use rand::RngCore;
 use sqlx::Row;
@@ -18,8 +21,10 @@ use crate::{
 const DEFAULT_LOCAL_ROOT: &str = "storage";
 const DEFAULT_LOCAL_PATH_RULE: &str = "/{year}-{month}/{day}/{random_name}.{file_type}";
 const DEFAULT_LOCAL_URL_PREFIX: &str = "/storage";
+const DEFAULT_OBJECT_PROXY_URL_PREFIX: &str = "/storage/object";
 const MAX_IMAGE_SIZE_BYTES: usize = 20 * 1024 * 1024;
 const MAX_MEDIA_SIZE_BYTES: usize = 200 * 1024 * 1024;
+const DEFAULT_HI168_SIGNED_URL_EXPIRES_SECONDS: u64 = 3600;
 
 const STORAGE_PROVIDER_KEY: &str = "object_storage_provider";
 const STORAGE_ENABLED_KEY: &str = "object_storage_enabled";
@@ -205,6 +210,30 @@ pub async fn resolve_local_file(state: &AppState, file_path: &str) -> AppResult<
     Ok(None)
 }
 
+pub async fn resolve_object_access_url(state: &AppState, object_key: &str) -> AppResult<String> {
+    let normalized_key = sanitize_relative_path(object_key)
+        .ok_or_else(|| AppError::not_found("Storage object not found"))?;
+    let config = load_storage_config(state).await?;
+    if !config.enabled {
+        return Err(AppError::not_found("Storage object not found"));
+    }
+
+    match config.provider {
+        StorageProvider::Hi168S3 => {
+            presign_hi168_s3_get_url(&config, &normalized_key, DEFAULT_HI168_SIGNED_URL_EXPIRES_SECONDS)
+                .await
+        }
+        StorageProvider::Local => Ok(build_local_public_url(&config.public_base_url, &normalized_key)),
+        StorageProvider::R2 | StorageProvider::S3 | StorageProvider::AliyunOss => {
+            Err(AppError::not_found("Storage object route only supports hi168_s3 provider"))
+        }
+    }
+}
+
+pub fn build_object_proxy_path(object_key: &str) -> String {
+    build_object_proxy_url("", object_key)
+}
+
 async fn upload_local_to_filesystem(
     state: &AppState,
     config: &StorageConfig,
@@ -319,7 +348,7 @@ async fn upload_hi168_s3_file(
         match upload_s3_compatible_file(&provider, object_key, content_type, content, false, true)
             .await
         {
-            Ok(url) => return Ok(url),
+            Ok(_) => return Ok(build_object_proxy_url(&config.public_base_url, object_key)),
             Err(error) => last_error = error.to_string(),
         }
     }
@@ -328,6 +357,86 @@ async fn upload_hi168_s3_file(
         "HI168 S3 upload failed".to_string()
     } else {
         format!("HI168 S3 upload failed: {last_error}")
+    }))
+}
+
+async fn presign_hi168_s3_get_url(
+    config: &StorageConfig,
+    object_key: &str,
+    expires_seconds: u64,
+) -> AppResult<String> {
+    let mut regions = Vec::<String>::new();
+    let first = config.hi168_s3_region.trim().to_string();
+    if !first.is_empty() && !first.eq_ignore_ascii_case("auto") {
+        regions.push(first);
+    }
+    if !regions
+        .iter()
+        .any(|region| region.eq_ignore_ascii_case("us-east-1"))
+    {
+        regions.push("us-east-1".to_string());
+    }
+    if regions.is_empty() {
+        regions.push("us-east-1".to_string());
+    }
+
+    let provider = S3ProviderConfig {
+        provider_name: "HI168 S3",
+        endpoint: config.hi168_s3_endpoint.clone(),
+        bucket: config.hi168_s3_bucket.clone(),
+        access_key_id: config.hi168_s3_access_key_id.clone(),
+        secret_access_key: config.hi168_s3_secret_access_key.clone(),
+        region: regions[0].clone(),
+        default_virtual_hosted_url: false,
+        public_base_url: config.public_base_url.clone(),
+    };
+
+    let credentials = Credentials::new(
+        provider.access_key_id.clone(),
+        provider.secret_access_key.clone(),
+        None,
+        None,
+        "object-storage",
+    );
+    let region_candidates = build_region_candidates(&provider.region, &provider.endpoint, true);
+
+    let mut last_error = String::new();
+    for region_text in region_candidates {
+        for force_path_style in [true, false] {
+            let conf = aws_sdk_s3::config::Builder::new()
+                .region(Region::new(region_text.clone()))
+                .credentials_provider(credentials.clone())
+                .endpoint_url(provider.endpoint.clone())
+                .force_path_style(force_path_style)
+                .build();
+            let client = S3Client::from_conf(conf);
+
+            let presign_config = PresigningConfig::expires_in(Duration::from_secs(expires_seconds))
+                .map_err(|error| {
+                    AppError::internal(format!("Failed to build HI168 presign config: {error}"))
+                })?;
+
+            match client
+                .get_object()
+                .bucket(provider.bucket.clone())
+                .key(object_key.to_string())
+                .presigned(presign_config)
+                .await
+            {
+                Ok(request) => return Ok(request.uri().to_string()),
+                Err(error) => {
+                    last_error = format!(
+                        "region={region_text}, path_style={force_path_style}, error={error}"
+                    );
+                }
+            }
+        }
+    }
+
+    Err(AppError::Unprocessable(if last_error.is_empty() {
+        "Failed to presign HI168 object url".to_string()
+    } else {
+        format!("Failed to presign HI168 object url: {last_error}")
     }))
 }
 
@@ -920,6 +1029,11 @@ fn build_local_public_url(public_base_url: &str, key: &str) -> String {
     join_public_url(&base, key)
 }
 
+fn build_object_proxy_url(public_base_url: &str, key: &str) -> String {
+    let base = build_object_proxy_base_url(public_base_url);
+    join_public_url(&base, key)
+}
+
 fn build_local_public_base_url(public_base_url: &str) -> String {
     let normalized = normalize_base_url(public_base_url);
     if normalized.is_empty() {
@@ -934,6 +1048,14 @@ fn build_local_public_base_url(public_base_url: &str) -> String {
     }
 
     format!("{normalized}{DEFAULT_LOCAL_URL_PREFIX}")
+}
+
+fn build_object_proxy_base_url(public_base_url: &str) -> String {
+    let normalized = normalize_base_url(public_base_url);
+    if normalized.is_empty() {
+        return DEFAULT_OBJECT_PROXY_URL_PREFIX.to_string();
+    }
+    format!("{normalized}{DEFAULT_OBJECT_PROXY_URL_PREFIX}")
 }
 
 fn join_public_url(base_url: &str, key: &str) -> String {

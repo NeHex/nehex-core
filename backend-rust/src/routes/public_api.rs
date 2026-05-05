@@ -25,6 +25,7 @@ const MAX_ARTICLE_PAGE_SIZE: i64 = 100;
 const LIKE_COOKIE_MAX_ITEMS: usize = 400;
 const LIKE_COOKIE_MAX_AGE_SECONDS: i64 = 60 * 60 * 24 * 365;
 const ARTICLE_LIKE_COOKIE_KEY: &str = "article_liked_ids";
+const ALBUM_LIKE_COOKIE_KEY: &str = "album_liked_ids";
 const COMMENT_LIKE_COOKIE_KEY: &str = "comment_liked_ids";
 
 const COMMENT_CACHE_STATUS_PUBLISHED: i64 = 1;
@@ -55,6 +56,7 @@ const PUBLIC_VISIBLE_SETTING_KEYS: &[&str] = &[
     "theme_card_style",
     "theme_nav",
     "nehex_article_class",
+    "nehex_daily_class",
     "user_social_link",
     "user_headpic",
     "admin_login_background",
@@ -96,6 +98,7 @@ pub fn router() -> Router<AppState> {
         .route("/site-owner", get(get_site_owner_profile))
         .route("/album", get(get_albums))
         .route("/album/{album_id}", get(get_album_detail))
+        .route("/album/{album_id}/like", post(post_album_like))
         .route("/article", get(get_articles))
         .route("/article/{article_id}", get(get_article_detail))
         .route("/article/{article_id}/read", post(post_article_read))
@@ -116,6 +119,7 @@ struct ArticleRow {
     class_name: String,
     read_count: i64,
     like_count: i64,
+    create_time: NaiveDateTime,
     last_edit_time: NaiveDateTime,
     tag: Option<String>,
     top: i64,
@@ -134,6 +138,7 @@ struct ArticleItem {
     #[serde(rename = "read")]
     read_count: i64,
     like_count: i64,
+    create_time: NaiveDateTime,
     #[serde(rename = "lastEditTime")]
     last_edit_time: NaiveDateTime,
     tag: Option<String>,
@@ -204,6 +209,7 @@ async fn get_articles(
             class AS class_name,
             read::bigint AS read_count,
             like_count::bigint AS like_count,
+            create_time,
             "lastEditTime" AS last_edit_time,
             tag,
             top::bigint AS top,
@@ -325,6 +331,7 @@ async fn fetch_published_article(state: &AppState, article_id: i64) -> AppResult
             class AS class_name,
             read::bigint AS read_count,
             like_count::bigint AS like_count,
+            create_time,
             "lastEditTime" AS last_edit_time,
             tag,
             top::bigint AS top,
@@ -351,6 +358,7 @@ fn map_article_item(row: ArticleRow) -> ArticleItem {
         class_name: row.class_name,
         read_count: row.read_count,
         like_count: row.like_count,
+        create_time: row.create_time,
         last_edit_time: row.last_edit_time,
         tag: row.tag,
         top: row.top,
@@ -858,6 +866,57 @@ async fn get_album_detail(
     State(state): State<AppState>,
     Path(album_id): Path<i64>,
 ) -> AppResult<Json<AlbumDetailResponse>> {
+    let row = fetch_album_row_by_id(&state, album_id).await?;
+
+    Ok(Json(AlbumDetailResponse {
+        data: map_album_item(row),
+    }))
+}
+
+async fn post_album_like(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Path(album_id): Path<i64>,
+) -> AppResult<impl IntoResponse> {
+    if album_id <= 0 {
+        return Err(AppError::Unprocessable("Invalid album id".to_string()));
+    }
+
+    let mut liked_ids = parse_liked_cookie(headers.get(header::COOKIE), ALBUM_LIKE_COOKIE_KEY);
+    if liked_ids.contains(&album_id) {
+        return Err(AppError::Conflict("Already liked".to_string()));
+    }
+
+    let updated = sqlx::query("UPDATE album SET like_count = like_count + 1 WHERE id = $1")
+        .bind(album_id)
+        .execute(&state.db_pool)
+        .await
+        .map_err(|error| AppError::internal(format!("Failed to like album: {error}")))?;
+
+    if updated.rows_affected() == 0 {
+        return Err(AppError::not_found("Album not found"));
+    }
+
+    state.runtime_cache.delete(ALBUMS_CACHE_KEY).await;
+
+    let row = fetch_album_row_by_id(&state, album_id).await?;
+
+    liked_ids.push(album_id);
+    if liked_ids.len() > LIKE_COOKIE_MAX_ITEMS {
+        let drain_until = liked_ids.len().saturating_sub(LIKE_COOKIE_MAX_ITEMS);
+        liked_ids.drain(0..drain_until);
+    }
+
+    let cookie_value = format_liked_cookie_value(ALBUM_LIKE_COOKIE_KEY, &liked_ids);
+    Ok((
+        [(header::SET_COOKIE, cookie_value)],
+        Json(AlbumDetailResponse {
+            data: map_album_item(row),
+        }),
+    ))
+}
+
+async fn fetch_album_row_by_id(state: &AppState, album_id: i64) -> AppResult<AlbumRow> {
     let row = sqlx::query_as::<_, AlbumRow>(
         r#"
         SELECT
@@ -883,9 +942,7 @@ async fn get_album_detail(
         return Err(AppError::not_found("Album not found"));
     };
 
-    Ok(Json(AlbumDetailResponse {
-        data: map_album_item(row),
-    }))
+    Ok(row)
 }
 
 fn map_album_item(row: AlbumRow) -> AlbumItem {
