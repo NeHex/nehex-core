@@ -954,16 +954,33 @@ async fn upsert_setting<'a>(
     // Empty content is still treated as "unset" by pick_setting_value().
     let normalized_content = Some(setting_content.unwrap_or_default());
 
+    let result = sqlx::query(
+        r#"
+        UPDATE settings
+        SET
+            setting_type = $2::setting_type,
+            setting_content = $3,
+            description = $4,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE setting_key = $1
+        "#,
+    )
+    .bind(key)
+    .bind(setting_type)
+    .bind(normalized_content.clone())
+    .bind(Some(description.to_string()))
+    .execute(&mut **tx)
+    .await
+    .map_err(|error| AppError::internal(format!("Failed to update setting `{key}`: {error}")))?;
+
+    if result.rows_affected() > 0 {
+        return Ok(());
+    }
+
     sqlx::query(
         r#"
         INSERT INTO settings (setting_key, setting_type, setting_content, description)
-        VALUES ($1, $2, $3, $4)
-        ON CONFLICT (setting_key)
-        DO UPDATE SET
-            setting_type = EXCLUDED.setting_type,
-            setting_content = EXCLUDED.setting_content,
-            description = EXCLUDED.description,
-            updated_at = CURRENT_TIMESTAMP
+        VALUES ($1, $2::setting_type, $3, $4)
         "#,
     )
     .bind(key)
@@ -972,6 +989,7 @@ async fn upsert_setting<'a>(
     .bind(Some(description.to_string()))
     .execute(&mut **tx)
     .await
-    .map_err(|error| AppError::internal(format!("Failed to upsert setting `{key}`: {error}")))?;
+    .map_err(|error| AppError::internal(format!("Failed to insert setting `{key}`: {error}")))?;
+
     Ok(())
 }
