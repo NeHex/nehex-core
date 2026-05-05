@@ -231,6 +231,11 @@ import {
 } from '@/services/comments'
 import { fetchStandalonePageById } from '@/services/pages'
 import { fetchSiteUrl } from '@/services/settings'
+import {
+  buildCommentTargetUrl,
+  canJumpToCommentTarget,
+  mapCommentTargetLabel,
+} from '@/utils/commentTargets'
 
 type EditCommentForm = {
   nickname: string
@@ -287,96 +292,42 @@ function formatDateTime(value: string): string {
 }
 
 function mapTargetLabel(targetType: string): string {
-  if (targetType === 'article') {
-    return '文章'
-  }
-  if (targetType === 'album') {
-    return '相册'
-  }
-  if (targetType === 'singlepage') {
-    return '独立页'
-  }
-  if (targetType === 'friend_page') {
-    return '友链页'
-  }
-  return targetType || '未知'
+  return mapCommentTargetLabel(targetType)
 }
 
 function canJumpToTarget(comment: AdminCommentItem): boolean {
-  if (comment.target_type === 'friend_page') {
-    return true
-  }
-
-  const targetId = Number(comment.target_id)
-  if (!Number.isFinite(targetId) || targetId <= 0) {
-    return false
-  }
-  return comment.target_type === 'article'
-    || comment.target_type === 'album'
-    || comment.target_type === 'singlepage'
+  return canJumpToCommentTarget(comment)
 }
 
-async function buildTargetWebPath(comment: AdminCommentItem): Promise<string> {
-  if (comment.target_type === 'friend_page') {
-    return '/friends'
+async function resolveStandalonePagePath(pageId: number): Promise<string | null> {
+  const normalizedId = Math.max(1, Math.floor(Number(pageId) || 0))
+  const cachedPath = singlePagePathCache[normalizedId]
+  if (cachedPath) {
+    return cachedPath
   }
 
-  const targetId = Number(comment.target_id)
-  if (!Number.isFinite(targetId) || targetId <= 0) {
-    return ''
-  }
-
-  if (comment.target_type === 'article') {
-    return `/article/${targetId}`
-  }
-  if (comment.target_type === 'album') {
-    return `/album/${targetId}`
-  }
-  if (comment.target_type === 'singlepage') {
-    const cachedPath = singlePagePathCache[targetId]
-    if (cachedPath) {
-      return cachedPath
+  try {
+    const page = await fetchStandalonePageById(normalizedId)
+    const pageKey = String(page.page_key ?? '').trim().replace(/^\/+|\/+$/g, '')
+    if (pageKey) {
+      const resolvedPath = `/${pageKey}`
+      singlePagePathCache[normalizedId] = resolvedPath
+      return resolvedPath
     }
-    try {
-      const page = await fetchStandalonePageById(targetId)
-      const pageKey = String(page.page_key ?? '').trim().replace(/^\/+|\/+$/g, '')
-      if (pageKey) {
-        const resolvedPath = `/${pageKey}`
-        singlePagePathCache[targetId] = resolvedPath
-        return resolvedPath
-      }
-    } catch (error) {
-      console.warn('Failed to resolve standalone page path for comment target', error)
-    }
-    return `/page/${targetId}`
+  } catch (error) {
+    console.warn('Failed to resolve standalone page path for comment target', error)
   }
-  return ''
-}
 
-function joinSiteUrl(baseUrl: string, path: string): string {
-  const normalizedPath = `/${path.trim().replace(/^\/+/, '')}`
-  const normalizedBase = baseUrl.trim().replace(/\/+$/, '')
-  if (!normalizedBase) {
-    return normalizedPath
-  }
-  return `${normalizedBase}${normalizedPath}`
-}
-
-function withCommentAnchor(url: string, commentId: number): string {
-  if (!url.trim()) {
-    return ''
-  }
-  return `${url}#comment-${Math.max(1, Math.floor(commentId))}`
+  return null
 }
 
 async function goToTarget(comment: AdminCommentItem): Promise<void> {
-  const path = await buildTargetWebPath(comment)
-  if (!path) {
+  const targetUrl = await buildCommentTargetUrl(comment, siteUrl.value, resolveStandalonePagePath)
+  if (!targetUrl) {
     showGlobalError('无法生成前台页面跳转地址')
     return
   }
 
-  const targetUrl = withCommentAnchor(joinSiteUrl(siteUrl.value, path), comment.id)
   window.open(targetUrl, '_blank', 'noopener')
 }
 

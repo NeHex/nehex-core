@@ -8,10 +8,11 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     error::{AppError, AppResult},
+    routes::comment_targets,
     state::AppState,
 };
 
-use super::{admin_auth, admin_mail};
+use super::{admin_auth, admin_mail, sync_api};
 
 #[derive(Serialize)]
 pub struct AdminActionResponse {
@@ -155,6 +156,7 @@ pub async fn admin_create_comment(
     admin_mail::spawn_comment_notification_mails(state.clone(), notice_comment);
 
     invalidate_comment_cache_for_target(&state, &item.target_type, item.target_id).await;
+    record_comment_sync_event(&state, "create", &item.target_type, item.target_id).await;
 
     Ok(Json(AdminCommentDetailResponse {
         data: with_empty_replies(item),
@@ -378,6 +380,7 @@ pub async fn admin_update_comment(
     .await
     .map_err(|error| AppError::internal(format!("Failed to update comment: {error}")))?;
     invalidate_comment_cache_for_target(&state, &current.target_type, current.target_id).await;
+    record_comment_sync_event(&state, "update", &current.target_type, current.target_id).await;
 
     Ok(Json(AdminCommentDetailResponse {
         data: with_empty_replies(updated),
@@ -424,6 +427,7 @@ pub async fn admin_delete_comment(
     .await
     .map_err(|error| AppError::internal(format!("Failed to delete comment: {error}")))?;
     invalidate_comment_cache_for_target(&state, &target_type, target_id).await;
+    record_comment_sync_event(&state, "delete", &target_type, target_id).await;
 
     Ok(Json(AdminActionResponse {
         success: true,
@@ -465,4 +469,14 @@ fn with_empty_replies(mut item: CommentItem) -> CommentItem {
 async fn invalidate_comment_cache_for_target(state: &AppState, target_type: &str, target_id: i64) {
     let prefix = format!("comments:list:{target_type}:{target_id}:");
     state.runtime_cache.delete_prefix(&prefix).await;
+}
+
+async fn record_comment_sync_event(
+    state: &AppState,
+    action: &str,
+    target_type: &str,
+    target_id: i64,
+) {
+    let token = comment_targets::build_comment_sync_token(target_type, target_id);
+    sync_api::record_content_change_best_effort(state, "comment", action, vec![token]).await;
 }

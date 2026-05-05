@@ -22,6 +22,8 @@ const SENSITIVE_ADMIN_SETTING_KEYS: &[&str] = &["user_account", "user_account_pa
 const SETTINGS_CACHE_KEY: &str = "settings:list";
 const SETTINGS_WITH_THEME_DETAILS_CACHE_KEY: &str = "settings:list:with-theme-details";
 const INSTALL_STATUS_CACHE_KEY: &str = "admin:install:status";
+const KUMA_MOVIE_CACHE_KEY: &str = "kuma:movie:list";
+const DAILIES_CACHE_KEY: &str = "dailies:list";
 const KUMA_API_DEFAULT_HELLO: &str =
     "hello,welcome to Kuma API; Visite: https://github.com/nehex/kuma-api";
 const KUMA_API_TEST_TIMEOUT_SECONDS: u64 = 8;
@@ -40,6 +42,20 @@ struct SettingItem {
 #[derive(Serialize)]
 pub struct AdminSettingListResponse {
     data: Vec<SettingItem>,
+}
+
+#[derive(Serialize)]
+pub struct AdminSiteOwnerProfileData {
+    avatar: String,
+    nickname: String,
+    homepage: String,
+    email: String,
+    bio: String,
+}
+
+#[derive(Serialize)]
+pub struct AdminSiteOwnerProfileResponse {
+    data: AdminSiteOwnerProfileData,
 }
 
 #[derive(Deserialize)]
@@ -182,6 +198,16 @@ pub async fn admin_list_settings(
     Ok(Json(AdminSettingListResponse { data }))
 }
 
+pub async fn admin_get_site_owner_profile(
+    State(state): State<AppState>,
+    method: Method,
+    headers: HeaderMap,
+) -> AppResult<Json<AdminSiteOwnerProfileResponse>> {
+    let _principal = admin_auth::require_admin_principal(&state, &method, &headers)?;
+    let data = load_admin_site_owner_profile(&state).await?;
+    Ok(Json(AdminSiteOwnerProfileResponse { data }))
+}
+
 pub async fn admin_update_settings(
     State(state): State<AppState>,
     method: Method,
@@ -305,7 +331,8 @@ pub async fn admin_update_settings(
         let mut guard = state.admin_path_cache.write().await;
         *guard = None;
     }
-    sync_api::record_content_change_best_effort(&state, "setting", "update", vec![]).await;
+    sync_api::record_content_change_best_effort(&state, "setting", "update", Vec::<i64>::new())
+        .await;
 
     let data = list_admin_settings(&state).await?;
     Ok(Json(AdminSettingListResponse { data }))
@@ -394,7 +421,8 @@ pub async fn admin_update_account_settings(
     })?;
     invalidate_settings_cache(&state).await;
     admin_mail::invalidate_mail_settings_cache();
-    sync_api::record_content_change_best_effort(&state, "setting", "update", vec![]).await;
+    sync_api::record_content_change_best_effort(&state, "setting", "update", Vec::<i64>::new())
+        .await;
 
     let data = list_admin_settings(&state).await?;
     Ok(Json(AdminSettingListResponse { data }))
@@ -540,8 +568,8 @@ pub async fn admin_create_kuma_movie(
     .await
     .map_err(|error| AppError::internal(format!("Failed to query kuma movie: {error}")))?;
 
-    let row = if let Some(id) = existing_id {
-        sqlx::query_as::<_, AdminKumaMovieCard>(
+    let (row, action) = if let Some(id) = existing_id {
+        let row = sqlx::query_as::<_, AdminKumaMovieCard>(
             r#"
             UPDATE kuma_movie
             SET
@@ -579,9 +607,10 @@ pub async fn admin_create_kuma_movie(
         .bind(item.url)
         .fetch_one(&state.db_pool)
         .await
-        .map_err(|error| AppError::internal(format!("Failed to update kuma movie: {error}")))?
+        .map_err(|error| AppError::internal(format!("Failed to update kuma movie: {error}")))?;
+        (row, "update")
     } else {
-        sqlx::query_as::<_, AdminKumaMovieCard>(
+        let row = sqlx::query_as::<_, AdminKumaMovieCard>(
             r#"
             INSERT INTO kuma_movie (
                 provider,
@@ -621,8 +650,12 @@ pub async fn admin_create_kuma_movie(
         .bind(item.url)
         .fetch_one(&state.db_pool)
         .await
-        .map_err(|error| AppError::internal(format!("Failed to create kuma movie: {error}")))?
+        .map_err(|error| AppError::internal(format!("Failed to create kuma movie: {error}")))?;
+        (row, "create")
     };
+
+    invalidate_kuma_related_cache(&state).await;
+    sync_api::record_content_change_best_effort(&state, "movie", action, vec![row.id]).await;
 
     Ok(Json(AdminKumaMovieDetailResponse { data: row }))
 }
@@ -708,6 +741,9 @@ pub async fn admin_update_kuma_movie(
     .map_err(|error| AppError::internal(format!("Failed to update kuma movie: {error}")))?
     .ok_or_else(|| AppError::not_found("电影卡片不存在或已删除".to_string()))?;
 
+    invalidate_kuma_related_cache(&state).await;
+    sync_api::record_content_change_best_effort(&state, "movie", "update", vec![row.id]).await;
+
     Ok(Json(AdminKumaMovieDetailResponse { data: row }))
 }
 
@@ -729,6 +765,9 @@ pub async fn admin_delete_kuma_movie(
     if result.rows_affected() == 0 {
         return Err(AppError::not_found("电影卡片不存在或已删除".to_string()));
     }
+
+    invalidate_kuma_related_cache(&state).await;
+    sync_api::record_content_change_best_effort(&state, "movie", "delete", vec![id]).await;
 
     Ok(Json(AdminKumaMovieActionResponse {
         success: true,
@@ -781,6 +820,29 @@ async fn list_admin_settings(state: &AppState) -> AppResult<Vec<SettingItem>> {
     Ok(items)
 }
 
+async fn load_admin_site_owner_profile(state: &AppState) -> AppResult<AdminSiteOwnerProfileData> {
+    let items = list_admin_settings(state).await?;
+    let mut map = HashMap::<String, Value>::new();
+    for item in items {
+        map.insert(item.setting_key, item.setting_content);
+    }
+
+    let avatar = read_setting_value_text(map.get("site_owner_avatar"), "/images/head.jpg");
+    let nickname = read_setting_value_text(map.get("site_owner_nickname"), "站长");
+    let mut homepage = read_setting_value_text(map.get("site_owner_homepage"), "");
+    if homepage.is_empty() {
+        homepage = read_setting_value_text(map.get("site_url"), "");
+    }
+
+    Ok(AdminSiteOwnerProfileData {
+        avatar,
+        nickname,
+        homepage,
+        email: read_setting_value_text(map.get("site_owner_email"), ""),
+        bio: read_setting_value_text(map.get("site_owner_bio"), ""),
+    })
+}
+
 fn parse_setting_content(setting_type: &str, raw_content: Option<&str>) -> Value {
     let raw = raw_content.unwrap_or_default();
     match setting_type {
@@ -825,6 +887,23 @@ fn is_supported_setting_type(value: &str) -> bool {
     matches!(value, "string" | "int" | "float" | "boolean" | "json")
 }
 
+fn read_setting_value_text(value: Option<&Value>, fallback: &str) -> String {
+    match value {
+        Some(Value::String(text)) => {
+            let normalized = text.trim();
+            if normalized.is_empty() {
+                fallback.to_string()
+            } else {
+                normalized.to_string()
+            }
+        }
+        Some(Value::Number(number)) => number.to_string(),
+        Some(Value::Bool(boolean)) => boolean.to_string(),
+        Some(Value::Array(_) | Value::Object(_)) => fallback.to_string(),
+        Some(Value::Null) | None => fallback.to_string(),
+    }
+}
+
 fn should_bypass_env_proxy_for_kuma() -> bool {
     [
         "HTTPS_PROXY",
@@ -861,9 +940,7 @@ fn is_loopback_proxy(raw: &str) -> bool {
 fn normalize_kuma_api_url(raw: String) -> AppResult<String> {
     let text = raw.trim();
     if text.is_empty() {
-        return Err(AppError::Unprocessable(
-            "Kuma API 地址不能为空".to_string(),
-        ));
+        return Err(AppError::Unprocessable("Kuma API 地址不能为空".to_string()));
     }
 
     let normalized = if text.starts_with("http://") || text.starts_with("https://") {
@@ -898,11 +975,17 @@ async fn load_kuma_api_url_from_settings(state: &AppState) -> AppResult<String> 
         .fetch_optional(&state.db_pool)
         .await
         .map_err(|error| {
-            AppError::internal(format!("Failed to load kuma_api_url from settings: {error}"))
+            AppError::internal(format!(
+                "Failed to load kuma_api_url from settings: {error}"
+            ))
         })?;
 
     let raw_value = row
-        .and_then(|item| item.try_get::<Option<String>, _>("setting_content").ok().flatten())
+        .and_then(|item| {
+            item.try_get::<Option<String>, _>("setting_content")
+                .ok()
+                .flatten()
+        })
         .unwrap_or_default();
 
     if raw_value.trim().is_empty() {
@@ -1203,4 +1286,9 @@ async fn invalidate_settings_cache(state: &AppState) {
         .delete(SETTINGS_WITH_THEME_DETAILS_CACHE_KEY)
         .await;
     state.runtime_cache.delete(INSTALL_STATUS_CACHE_KEY).await;
+}
+
+async fn invalidate_kuma_related_cache(state: &AppState) {
+    state.runtime_cache.delete(KUMA_MOVIE_CACHE_KEY).await;
+    state.runtime_cache.delete(DAILIES_CACHE_KEY).await;
 }

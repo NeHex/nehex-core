@@ -10,6 +10,7 @@ pub mod admin_mail;
 pub mod admin_media;
 pub mod admin_settings;
 pub mod admin_static;
+pub mod comment_targets;
 pub mod health;
 pub mod public_api;
 pub mod storage_files;

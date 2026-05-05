@@ -99,59 +99,21 @@ function normalizeAdminFriendItem(raw: Partial<AdminFriendItem>): AdminFriendIte
   }
 }
 
-function filterFriendsByKeyword(items: AdminFriendItem[], keyword: string): AdminFriendItem[] {
-  const normalized = keyword.trim().toLowerCase()
-  if (!normalized) {
-    return items
-  }
-
-  return items.filter((item) => {
-    const text = [
-      item.id,
-      item.title,
-      item.description || '',
-      item.category,
-      item.url,
-      item.status,
-    ]
-      .map((value) => String(value).toLowerCase())
-      .join(' ')
-    return text.includes(normalized)
-  })
-}
-
-async function fetchPublicFriendsFallback(keyword = ''): Promise<AdminFriendItem[] | null> {
-  try {
-    const response = await fetch('/friend', {
-      method: 'GET',
-      credentials: 'same-origin',
-    })
-    if (!response.ok) {
-      return null
-    }
-
-    const payload = await parseJson<AdminFriendListResponse>(response)
-    if (!Array.isArray(payload?.data)) {
-      return null
-    }
-
-    const mapped = payload.data
-      .map((item) => normalizeAdminFriendItem(item))
-      .filter((item): item is AdminFriendItem => item !== null)
-    return filterFriendsByKeyword(mapped, keyword)
-  } catch {
-    return null
-  }
-}
-
 export async function fetchAdminFriends(keyword = ''): Promise<AdminFriendItem[]> {
   const normalized = keyword.trim()
-  // Use the same source API as public frontend to avoid data-source divergence.
-  const data = await fetchPublicFriendsFallback(normalized)
-  if (data !== null) {
-    return data
+  const query = normalized ? `?keyword=${encodeURIComponent(normalized)}` : ''
+  const response = await adminFetch(`/admin-api/friends${query}`, {
+    method: 'GET',
+  })
+
+  const payload = await parseJson<AdminFriendListResponse>(response)
+  if (!Array.isArray(payload?.data)) {
+    throw new Error('Unexpected friend list response format')
   }
-  throw new Error('加载友链失败：无法从 /friend 读取数据')
+
+  return payload.data
+    .map((item) => normalizeAdminFriendItem(item))
+    .filter((item): item is AdminFriendItem => item !== null)
 }
 
 export async function createAdminFriend(

@@ -42,14 +42,9 @@ async function parseJson<T>(response: Response): Promise<T> {
 }
 
 export async function fetchProjects(): Promise<ProjectItem[]> {
-  const response = await fetch('/project', {
+  const response = await adminFetch('/admin-api/projects', {
     method: 'GET',
-    credentials: 'same-origin',
   })
-
-  if (!response.ok) {
-    throw new Error(`Failed to request projects: ${response.status}`)
-  }
 
   const payload = await parseJson<ProjectListResponse>(response)
   if (!Array.isArray(payload?.data)) {
@@ -60,14 +55,9 @@ export async function fetchProjects(): Promise<ProjectItem[]> {
 }
 
 export async function fetchProjectById(projectId: number): Promise<ProjectItem> {
-  const response = await fetch(`/project/${projectId}`, {
+  const response = await adminFetch(`/admin-api/projects/${projectId}`, {
     method: 'GET',
-    credentials: 'same-origin',
   })
-
-  if (!response.ok) {
-    throw new Error(`Failed to request project detail: ${response.status}`)
-  }
 
   const payload = await parseJson<ProjectDetailResponse>(response)
   if (!payload?.data) {

@@ -46,10 +46,17 @@ async function requestSiteOwnerProfile(path: string): Promise<SiteOwnerProfile> 
 
 export async function fetchSiteOwnerProfile(): Promise<SiteOwnerProfile> {
   try {
-    return await requestSiteOwnerProfile('/site-owner')
+    return await requestSiteOwnerProfile('/admin-api/settings/site-owner')
   } catch (error) {
     if (error instanceof Error && error.message.endsWith(': 404')) {
-      return requestSiteOwnerProfile('/setting/site-owner')
+      try {
+        return await requestSiteOwnerProfile('/site-owner')
+      } catch (fallbackError) {
+        if (fallbackError instanceof Error && fallbackError.message.endsWith(': 404')) {
+          return requestSiteOwnerProfile('/setting/site-owner')
+        }
+        throw fallbackError
+      }
     }
     throw error
   }

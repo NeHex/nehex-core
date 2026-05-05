@@ -155,6 +155,17 @@
                   <span class="recent-comment-time">{{ formatDateTime(item.create_time) }}</span>
                 </div>
                 <div class="recent-comment-content">{{ item.content || '（无内容）' }}</div>
+                <div class="recent-comment-actions">
+                  <v-btn
+                    prepend-icon="mdi-open-in-new"
+                    size="small"
+                    variant="text"
+                    :disabled="!canOpenCommentTarget(item)"
+                    @click="openCommentTarget(item)"
+                  >
+                    前台直达
+                  </v-btn>
+                </div>
               </div>
             </div>
             <div v-else class="recent-comment-empty">暂无评论记录</div>
@@ -176,6 +187,13 @@ import {
   type DashboardRecentComment,
   type DashboardSeries,
 } from '@/services/dashboard'
+import { fetchStandalonePageById } from '@/services/pages'
+import { fetchSiteUrl } from '@/services/settings'
+import {
+  buildCommentTargetUrl,
+  canJumpToCommentTarget,
+  mapCommentTargetLabel,
+} from '@/utils/commentTargets'
 import { computed, onMounted, ref } from 'vue'
 
 const periodOptions: Array<{ value: DashboardPeriodKey, label: string }> = [
@@ -191,6 +209,8 @@ const visitPeriod = ref<DashboardPeriodKey>('day')
 const apiPeriod = ref<DashboardPeriodKey>('day')
 const dashboardData = ref<DashboardData | null>(null)
 const { showGlobalError } = useGlobalSnackbar()
+const siteUrl = ref('')
+const singlePagePathCache = ref<Record<number, string>>({})
 
 const emptySeries: DashboardSeries = {
   labels: [],
@@ -231,8 +251,45 @@ function formatDateTime(value: string): string {
 }
 
 function formatCommentTarget(type: string, id: number): string {
-  const targetType = type.trim() || 'unknown'
-  return `${targetType} #${Math.max(0, id)}`
+  return `${mapCommentTargetLabel(type)} #${Math.max(0, id)}`
+}
+
+function canOpenCommentTarget(comment: DashboardRecentComment): boolean {
+  return canJumpToCommentTarget(comment)
+}
+
+async function resolveStandalonePagePath(pageId: number): Promise<string | null> {
+  const normalizedId = Math.max(1, Math.floor(Number(pageId) || 0))
+  const cachedPath = singlePagePathCache.value[normalizedId]
+  if (cachedPath) {
+    return cachedPath
+  }
+
+  try {
+    const page = await fetchStandalonePageById(normalizedId)
+    const pageKey = String(page.page_key ?? '').trim().replace(/^\/+|\/+$/g, '')
+    if (pageKey) {
+      const resolvedPath = `/${pageKey}`
+      singlePagePathCache.value = {
+        ...singlePagePathCache.value,
+        [normalizedId]: resolvedPath,
+      }
+      return resolvedPath
+    }
+  } catch (error) {
+    console.warn('Failed to resolve dashboard comment target path', error)
+  }
+
+  return null
+}
+
+async function openCommentTarget(comment: DashboardRecentComment): Promise<void> {
+  const targetUrl = await buildCommentTargetUrl(comment, siteUrl.value, resolveStandalonePagePath)
+  if (!targetUrl) {
+    showGlobalError('无法生成前台页面跳转地址')
+    return
+  }
+  window.open(targetUrl, '_blank', 'noopener')
 }
 
 async function loadDashboard(): Promise<void> {
@@ -251,6 +308,11 @@ async function loadDashboard(): Promise<void> {
 }
 
 onMounted(async () => {
+  try {
+    siteUrl.value = await fetchSiteUrl()
+  } catch (error) {
+    console.warn('Failed to load site_url for dashboard comment jump', error)
+  }
   await loadDashboard()
 })
 </script>
@@ -387,6 +449,12 @@ onMounted(async () => {
   color: #e2e8f0;
   white-space: pre-wrap;
   word-break: break-word;
+}
+
+.recent-comment-actions {
+  margin-top: 8px;
+  display: flex;
+  justify-content: flex-end;
 }
 
 .recent-comment-empty {

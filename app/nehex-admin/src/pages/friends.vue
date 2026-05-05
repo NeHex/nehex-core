@@ -14,14 +14,24 @@
             <div class="exchange-title">友链交换信息</div>
             <div class="exchange-subtitle">对方添加你站点友链时可直接使用。留空时默认继承网站设置。</div>
           </div>
-          <v-btn
-            color="primary"
-            prepend-icon="mdi-content-save-outline"
-            :loading="exchangeInfoSaving"
-            @click="saveFriendExchangeInfo"
-          >
-            保存
-          </v-btn>
+          <div class="exchange-actions">
+            <v-btn
+              variant="text"
+              prepend-icon="mdi-restore"
+              :disabled="exchangeInfoSaving || exchangeInfoLoading"
+              @click="resetFriendExchangeInfoToDefault"
+            >
+              恢复默认
+            </v-btn>
+            <v-btn
+              color="primary"
+              prepend-icon="mdi-content-save-outline"
+              :loading="exchangeInfoSaving"
+              @click="saveFriendExchangeInfo"
+            >
+              保存
+            </v-btn>
+          </div>
         </div>
 
         <v-progress-linear
@@ -556,6 +566,41 @@ function applyFriendExchangeForm(data: FriendExchangeInfo): void {
   friendExchangeForm.site_description = data.site_description || ''
 }
 
+function resetFriendExchangeInfoToDefault(): void {
+  friendExchangeForm.site_title = ''
+  friendExchangeForm.site_url = ''
+  friendExchangeForm.site_icon = ''
+  friendExchangeForm.site_description = ''
+}
+
+function buildFriendExchangePayload(): FriendExchangeInfo | null {
+  const siteTitle = friendExchangeForm.site_title.trim()
+  const siteUrlInput = friendExchangeForm.site_url.trim()
+  const siteIconInput = friendExchangeForm.site_icon.trim()
+  const siteDescription = friendExchangeForm.site_description.trim()
+
+  const siteUrl = siteUrlInput ? normalizeHttpUrl(siteUrlInput) : ''
+  if (siteUrlInput && !siteUrl) {
+    errorMessage.value = '站点链接格式错误，请输入 http:// 或 https:// 地址'
+    showGlobalError(errorMessage.value)
+    return null
+  }
+
+  const siteIcon = siteIconInput ? normalizeHttpUrl(siteIconInput) : ''
+  if (siteIconInput && !siteIcon) {
+    errorMessage.value = '图标地址格式错误，请输入 http:// 或 https:// 地址'
+    showGlobalError(errorMessage.value)
+    return null
+  }
+
+  return {
+    site_title: siteTitle,
+    site_url: siteUrl,
+    site_icon: siteIcon,
+    site_description: siteDescription,
+  }
+}
+
 async function loadFriendExchangeInfo(): Promise<void> {
   exchangeInfoLoading.value = true
   errorMessage.value = ''
@@ -572,16 +617,16 @@ async function loadFriendExchangeInfo(): Promise<void> {
 }
 
 async function saveFriendExchangeInfo(): Promise<void> {
+  const payload = buildFriendExchangePayload()
+  if (!payload) {
+    return
+  }
+
   exchangeInfoSaving.value = true
   errorMessage.value = ''
   successMessage.value = ''
   try {
-    const data = await updateAdminFriendExchangeInfo({
-      site_title: friendExchangeForm.site_title,
-      site_url: friendExchangeForm.site_url,
-      site_icon: friendExchangeForm.site_icon,
-      site_description: friendExchangeForm.site_description,
-    })
+    const data = await updateAdminFriendExchangeInfo(payload)
     applyFriendExchangeForm(data)
     successMessage.value = '友链交换信息已保存'
   } catch (error) {
@@ -832,6 +877,13 @@ watch(successMessage, (nextMessage) => {
   justify-content: space-between;
   align-items: flex-start;
   gap: 10px;
+}
+
+.exchange-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
 }
 
 .exchange-title {

@@ -16,7 +16,7 @@ use url::Url;
 
 use crate::{
     error::{AppError, AppResult},
-    routes::{admin_auth, admin_mail},
+    routes::{admin_auth, admin_friends, admin_mail, comment_targets, sync_api},
     state::AppState,
 };
 
@@ -37,7 +37,14 @@ const FRIEND_APPLY_RATE_LIMIT_SECONDS: i64 = 300;
 const FRIEND_APPLY_RATE_LIMIT_PER_IP: usize = 5;
 const FRIEND_APPLY_DUPLICATE_WINDOW_DAYS: i64 = 14;
 
-const SUPPORTED_COMMENT_TARGET_TYPES: &[&str] = &["article", "album", "singlepage", "friend_page"];
+const SUPPORTED_COMMENT_TARGET_TYPES: &[&str] = &[
+    "article",
+    "album",
+    "daily",
+    "project",
+    "singlepage",
+    "friend_page",
+];
 
 const PUBLIC_VISIBLE_SETTING_KEYS: &[&str] = &[
     "site_title",
@@ -88,6 +95,7 @@ static LINK_RE: Lazy<Regex> =
 pub fn router() -> Router<AppState> {
     Router::new()
         .route("/daily", get(get_dailies))
+        .route("/daily/{daily_id}", get(get_daily_detail))
         .route("/project", get(get_projects))
         .route("/project/{project_id}", get(get_project_detail))
         .route("/comment", get(get_comments).post(post_comment))
@@ -95,6 +103,7 @@ pub fn router() -> Router<AppState> {
         .route("/setting", get(get_settings))
         .route("/setting/theme", get(get_theme_settings))
         .route("/setting/site-owner", get(get_site_owner_profile))
+        .route("/friend-exchange-info", get(get_friend_exchange_info))
         .route("/site-owner", get(get_site_owner_profile))
         .route("/album", get(get_albums))
         .route("/album/{album_id}", get(get_album_detail))
@@ -687,6 +696,11 @@ struct DailyListResponse {
     data: Vec<DailyItem>,
 }
 
+#[derive(Serialize)]
+struct DailyDetailResponse {
+    data: DailyItem,
+}
+
 async fn get_dailies(State(state): State<AppState>) -> AppResult<Json<DailyListResponse>> {
     if let Some(cached) = state
         .runtime_cache
@@ -723,35 +737,78 @@ async fn get_dailies(State(state): State<AppState>) -> AppResult<Json<DailyListR
     .await
     .map_err(|error| AppError::internal(format!("Failed to list dailies: {error}")))?;
 
-    let data = rows
-        .into_iter()
-        .map(|row| DailyItem {
-            id: row.id,
-            title: row.title,
-            content: row.content,
-            create_time: row.create_time,
-            weather: row.weather,
-            daily_type: row.daily_type,
-            kuma_movie_id: row.kuma_movie_id,
-            movie: row.kuma_movie_id.map(|movie_id| DailyMovieItem {
-                id: movie_id,
-                provider: row.movie_provider.unwrap_or_default(),
-                movie_id: row.movie_movie_id.unwrap_or_default(),
-                watch_status: row.movie_watch_status.unwrap_or_else(|| "want".to_string()),
-                cover: row.movie_cover.unwrap_or_default(),
-                title: row.movie_title.unwrap_or_default(),
-                years: row.movie_years.unwrap_or_default(),
-                score: row.movie_score,
-                url: row.movie_url.unwrap_or_default(),
-            }),
-        })
-        .collect::<Vec<_>>();
+    let data = rows.into_iter().map(map_daily_item).collect::<Vec<_>>();
 
     state
         .runtime_cache
         .set(DAILIES_CACHE_KEY, data.clone(), DAILIES_CACHE_TTL_SECONDS)
         .await;
     Ok(Json(DailyListResponse { data }))
+}
+
+async fn get_daily_detail(
+    State(state): State<AppState>,
+    Path(daily_id): Path<i64>,
+) -> AppResult<Json<DailyDetailResponse>> {
+    let row = fetch_daily_row_by_id(&state, daily_id).await?;
+    Ok(Json(DailyDetailResponse {
+        data: map_daily_item(row),
+    }))
+}
+
+async fn fetch_daily_row_by_id(state: &AppState, daily_id: i64) -> AppResult<DailyRow> {
+    sqlx::query_as::<_, DailyRow>(
+        r#"
+        SELECT
+            d.id::bigint AS id,
+            d.title,
+            d.content,
+            d.create_time,
+            d.weather,
+            COALESCE(d.daily_type, 'note') AS daily_type,
+            d.kuma_movie_id::bigint AS kuma_movie_id,
+            km.provider AS movie_provider,
+            km.movie_id AS movie_movie_id,
+            COALESCE(km.watch_status, 'want') AS movie_watch_status,
+            km.cover AS movie_cover,
+            km.title AS movie_title,
+            km.years AS movie_years,
+            km.score AS movie_score,
+            km.source_url AS movie_url
+        FROM daily d
+        LEFT JOIN kuma_movie km ON km.id = d.kuma_movie_id
+        WHERE d.id = $1
+        LIMIT 1
+        "#,
+    )
+    .bind(daily_id)
+    .fetch_optional(&state.db_pool)
+    .await
+    .map_err(|error| AppError::internal(format!("Failed to query daily detail: {error}")))?
+    .ok_or_else(|| AppError::not_found("Daily not found"))
+}
+
+fn map_daily_item(row: DailyRow) -> DailyItem {
+    DailyItem {
+        id: row.id,
+        title: row.title,
+        content: row.content,
+        create_time: row.create_time,
+        weather: row.weather,
+        daily_type: row.daily_type,
+        kuma_movie_id: row.kuma_movie_id,
+        movie: row.kuma_movie_id.map(|movie_id| DailyMovieItem {
+            id: movie_id,
+            provider: row.movie_provider.unwrap_or_default(),
+            movie_id: row.movie_movie_id.unwrap_or_default(),
+            watch_status: row.movie_watch_status.unwrap_or_else(|| "want".to_string()),
+            cover: row.movie_cover.unwrap_or_default(),
+            title: row.movie_title.unwrap_or_default(),
+            years: row.movie_years.unwrap_or_default(),
+            score: row.movie_score,
+            url: row.movie_url.unwrap_or_default(),
+        }),
+    }
 }
 
 async fn table_exists(state: &AppState, table_name: &str) -> AppResult<bool> {
@@ -1137,6 +1194,11 @@ struct SiteOwnerProfileResponse {
     data: SiteOwnerProfileData,
 }
 
+#[derive(Serialize)]
+struct FriendExchangeInfoResponse {
+    data: admin_friends::FriendExchangeInfoItem,
+}
+
 async fn get_settings(State(state): State<AppState>) -> AppResult<Json<SettingListResponse>> {
     let data = list_settings(&state, false).await;
     Ok(Json(SettingListResponse { data }))
@@ -1312,6 +1374,13 @@ async fn get_site_owner_profile(
             bio,
         },
     }))
+}
+
+async fn get_friend_exchange_info(
+    State(state): State<AppState>,
+) -> AppResult<Json<FriendExchangeInfoResponse>> {
+    let data = admin_friends::load_friend_exchange_info(&state).await?;
+    Ok(Json(FriendExchangeInfoResponse { data }))
 }
 
 fn read_setting_text(map: &HashMap<String, SettingItem>, key: &str, fallback: &str) -> String {
@@ -1689,6 +1758,7 @@ async fn post_comment(
         .runtime_cache
         .delete_prefix(&comment_cache_prefix)
         .await;
+    record_comment_sync_event(&state, "create", &row.target_type, row.target_id).await;
 
     Ok(Json(CommentDetailResponse {
         data: map_comment_item(row),
@@ -1751,6 +1821,12 @@ async fn post_comment_like(
         return Err(AppError::not_found("Comment not found"));
     };
 
+    let comment_cache_prefix = format!("comments:list:{}:{}:", row.target_type, row.target_id);
+    state
+        .runtime_cache
+        .delete_prefix(&comment_cache_prefix)
+        .await;
+
     liked_ids.push(comment_id);
     if liked_ids.len() > LIKE_COOKIE_MAX_ITEMS {
         let drain_until = liked_ids.len().saturating_sub(LIKE_COOKIE_MAX_ITEMS);
@@ -1758,6 +1834,7 @@ async fn post_comment_like(
     }
 
     let cookie_value = format_liked_cookie_value(COMMENT_LIKE_COOKIE_KEY, &liked_ids);
+    record_comment_sync_event(&state, "update", &row.target_type, row.target_id).await;
     Ok((
         [(header::SET_COOKIE, cookie_value)],
         Json(CommentDetailResponse {
@@ -2062,6 +2139,16 @@ fn looks_like_spam(content: &str) -> bool {
         return true;
     }
     LINK_RE.find_iter(content).count() > COMMENT_MAX_LINKS
+}
+
+async fn record_comment_sync_event(
+    state: &AppState,
+    action: &str,
+    target_type: &str,
+    target_id: i64,
+) {
+    let token = comment_targets::build_comment_sync_token(target_type, target_id);
+    sync_api::record_content_change_best_effort(state, "comment", action, vec![token]).await;
 }
 
 fn has_long_repeated_char_run(content: &str, min_run: usize) -> bool {

@@ -26,6 +26,7 @@ use tracing::warn;
 
 use crate::{
     error::{AppError, AppResult},
+    routes::comment_targets,
     state::AppState,
 };
 
@@ -922,59 +923,39 @@ async fn build_target_path(
     target_type: &str,
     target_id: i64,
 ) -> AppResult<String> {
-    let normalized_type = target_type.trim().to_lowercase();
+    let normalized_type = comment_targets::normalize_comment_target_type(target_type);
     let normalized_id = target_id.max(1);
 
-    match normalized_type.as_str() {
-        "article" => Ok(format!("/article/{normalized_id}")),
-        "album" => Ok(format!("/album/{normalized_id}")),
-        "friend_page" => Ok("/friends".to_string()),
-        "singlepage" => {
-            let page_key = sqlx::query_scalar::<_, String>(
-                "SELECT page_key FROM singlepage WHERE id = $1 LIMIT 1",
-            )
-            .bind(normalized_id)
-            .fetch_optional(&state.db_pool)
-            .await
-            .map_err(|error| {
-                AppError::internal(format!("Failed to resolve singlepage path: {error}"))
-            })?;
-            if let Some(page_key) = page_key {
-                let normalized = page_key.trim().trim_matches('/').to_string();
-                if !normalized.is_empty() {
-                    return Ok(format!("/{normalized}"));
-                }
-            }
-            Ok(format!("/page/{normalized_id}"))
-        }
-        _ => Ok("/".to_string()),
+    if normalized_type == "singlepage" {
+        let page_key = sqlx::query_scalar::<_, String>(
+            "SELECT page_key FROM singlepage WHERE id = $1 LIMIT 1",
+        )
+        .bind(normalized_id)
+        .fetch_optional(&state.db_pool)
+        .await
+        .map_err(|error| {
+            AppError::internal(format!("Failed to resolve singlepage path: {error}"))
+        })?;
+        return Ok(comment_targets::build_comment_target_path(
+            &normalized_type,
+            normalized_id,
+            page_key.as_deref(),
+        ));
     }
+
+    Ok(comment_targets::build_comment_target_path(
+        &normalized_type,
+        normalized_id,
+        None,
+    ))
 }
 
 fn join_site_url(site_url: &str, path: &str) -> String {
-    let normalized_path = if path.trim().is_empty() {
-        "/".to_string()
-    } else {
-        format!("/{}", path.trim().trim_start_matches('/'))
-    };
-
-    if site_url.trim().is_empty() {
-        normalized_path
-    } else {
-        format!(
-            "{}{}",
-            site_url.trim().trim_end_matches('/'),
-            normalized_path
-        )
-    }
+    comment_targets::join_site_url(site_url, path)
 }
 
 fn with_comment_anchor(target_url: &str, comment_id: i64) -> String {
-    if target_url.trim().is_empty() {
-        String::new()
-    } else {
-        format!("{}#comment-{}", target_url, comment_id.max(1))
-    }
+    comment_targets::with_comment_anchor(target_url, comment_id)
 }
 
 fn append_direct_link_if_missing(body: &str, comment_url: &str) -> String {

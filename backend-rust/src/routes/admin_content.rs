@@ -80,6 +80,11 @@ struct DailyItem {
 }
 
 #[derive(Serialize)]
+pub struct AdminDailyListResponse {
+    data: Vec<DailyItem>,
+}
+
+#[derive(Serialize)]
 pub struct AdminDailyDetailResponse {
     data: DailyItem,
 }
@@ -95,6 +100,11 @@ struct AlbumItem {
     img_urls: Option<String>,
     create_time: NaiveDateTime,
     update_time: NaiveDateTime,
+}
+
+#[derive(Serialize)]
+pub struct AdminAlbumListResponse {
+    data: Vec<AlbumItem>,
 }
 
 #[derive(Serialize)]
@@ -500,6 +510,37 @@ pub async fn admin_create_daily(
     Ok(Json(AdminDailyDetailResponse { data: item }))
 }
 
+pub async fn admin_list_dailies(
+    State(state): State<AppState>,
+    method: Method,
+    headers: HeaderMap,
+) -> AppResult<Json<AdminDailyListResponse>> {
+    let _principal = admin_auth::require_admin_principal(&state, &method, &headers)?;
+
+    let data = sqlx::query_as::<_, DailyItem>(
+        r#"
+        SELECT
+            d.id::bigint AS id,
+            d.title,
+            d.content,
+            d.create_time,
+            d.weather,
+            COALESCE(d.daily_type, 'note') AS daily_type,
+            d.kuma_movie_id::bigint AS kuma_movie_id,
+            km.title AS movie_title,
+            km.cover AS movie_cover
+        FROM daily d
+        LEFT JOIN kuma_movie km ON km.id = d.kuma_movie_id
+        ORDER BY d.create_time DESC, d.id DESC
+        "#,
+    )
+    .fetch_all(&state.db_pool)
+    .await
+    .map_err(|error| AppError::internal(format!("Failed to list dailies: {error}")))?;
+
+    Ok(Json(AdminDailyListResponse { data }))
+}
+
 pub async fn admin_update_daily(
     State(state): State<AppState>,
     method: Method,
@@ -611,6 +652,35 @@ pub async fn admin_create_album(
     Ok(Json(AdminAlbumDetailResponse { data: item }))
 }
 
+pub async fn admin_list_albums(
+    State(state): State<AppState>,
+    method: Method,
+    headers: HeaderMap,
+) -> AppResult<Json<AdminAlbumListResponse>> {
+    let _principal = admin_auth::require_admin_principal(&state, &method, &headers)?;
+
+    let data = sqlx::query_as::<_, AlbumItem>(
+        r#"
+        SELECT
+            id::bigint AS id,
+            title,
+            cover,
+            class AS class_name,
+            like_count::bigint AS like_count,
+            img_urls,
+            create_time,
+            update_time
+        FROM album
+        ORDER BY update_time DESC, id DESC
+        "#,
+    )
+    .fetch_all(&state.db_pool)
+    .await
+    .map_err(|error| AppError::internal(format!("Failed to list albums: {error}")))?;
+
+    Ok(Json(AdminAlbumListResponse { data }))
+}
+
 pub async fn admin_update_album(
     State(state): State<AppState>,
     method: Method,
@@ -651,6 +721,17 @@ pub async fn admin_update_album(
     invalidate_cache_key(&state, ALBUMS_CACHE_KEY).await;
     sync_api::record_content_change_best_effort(&state, "album", "update", vec![item.id]).await;
 
+    Ok(Json(AdminAlbumDetailResponse { data: item }))
+}
+
+pub async fn admin_get_album(
+    State(state): State<AppState>,
+    method: Method,
+    headers: HeaderMap,
+    Path(album_id): Path<i64>,
+) -> AppResult<Json<AdminAlbumDetailResponse>> {
+    let _principal = admin_auth::require_admin_principal(&state, &method, &headers)?;
+    let item = fetch_album_item_by_id(&state, album_id).await?;
     Ok(Json(AdminAlbumDetailResponse { data: item }))
 }
 
@@ -745,6 +826,7 @@ pub async fn admin_create_page(
     .await
     .map_err(map_unique_violation("Page key already exists"))?;
     invalidate_cache_key(&state, PAGES_CACHE_KEY).await;
+    sync_api::record_content_change_best_effort(&state, "page", "create", vec![item.id]).await;
 
     Ok(Json(AdminPageDetailResponse { data: item }))
 }
@@ -829,6 +911,7 @@ pub async fn admin_update_page(
     .map_err(map_unique_violation("Page key already exists"))?
     .ok_or_else(|| AppError::not_found("Standalone page not found"))?;
     invalidate_cache_key(&state, PAGES_CACHE_KEY).await;
+    sync_api::record_content_change_best_effort(&state, "page", "update", vec![item.id]).await;
 
     Ok(Json(AdminPageDetailResponse { data: item }))
 }
@@ -851,6 +934,7 @@ pub async fn admin_delete_page(
         return Err(AppError::not_found("Standalone page not found"));
     }
     invalidate_cache_key(&state, PAGES_CACHE_KEY).await;
+    sync_api::record_content_change_best_effort(&state, "page", "delete", vec![page_id]).await;
 
     Ok(Json(AdminActionResponse {
         success: true,
@@ -948,6 +1032,17 @@ pub async fn admin_create_project(
     invalidate_cache_key(&state, PROJECTS_CACHE_KEY).await;
     sync_api::record_content_change_best_effort(&state, "project", "create", vec![item.id]).await;
 
+    Ok(Json(AdminProjectDetailResponse { data: item }))
+}
+
+pub async fn admin_get_project(
+    State(state): State<AppState>,
+    method: Method,
+    headers: HeaderMap,
+    Path(project_id): Path<i64>,
+) -> AppResult<Json<AdminProjectDetailResponse>> {
+    let _principal = admin_auth::require_admin_principal(&state, &method, &headers)?;
+    let item = fetch_project_item_by_id(&state, project_id).await?;
     Ok(Json(AdminProjectDetailResponse { data: item }))
 }
 
@@ -1144,11 +1239,12 @@ async fn normalize_daily_payload(
     let title = normalize_required_text(payload.title, "title")?;
     let allow_set = load_daily_type_allow_list(state).await?;
     let daily_type = normalize_daily_type(payload.daily_type, &allow_set)?;
-    let requested_movie_id = payload.kuma_movie_id.and_then(|id| if id > 0 { Some(id) } else { None });
+    let requested_movie_id = payload
+        .kuma_movie_id
+        .and_then(|id| if id > 0 { Some(id) } else { None });
     let kuma_movie_id = if daily_type == "review" {
-        let movie_id = requested_movie_id.ok_or_else(|| {
-            AppError::Unprocessable("影评类型必须选择一条 Kuma 电影".to_string())
-        })?;
+        let movie_id = requested_movie_id
+            .ok_or_else(|| AppError::Unprocessable("影评类型必须选择一条 Kuma 电影".to_string()))?;
         let exists = sqlx::query_scalar::<_, i64>(
             "SELECT id::bigint AS id FROM kuma_movie WHERE id = $1 LIMIT 1",
         )
@@ -1263,4 +1359,57 @@ async fn fetch_daily_item_by_id(state: &AppState, daily_id: i64) -> AppResult<Da
     .await
     .map_err(|error| AppError::internal(format!("Failed to get daily: {error}")))?
     .ok_or_else(|| AppError::not_found("Daily not found"))
+}
+
+async fn fetch_album_item_by_id(state: &AppState, album_id: i64) -> AppResult<AlbumItem> {
+    sqlx::query_as::<_, AlbumItem>(
+        r#"
+        SELECT
+            id::bigint AS id,
+            title,
+            cover,
+            class AS class_name,
+            like_count::bigint AS like_count,
+            img_urls,
+            create_time,
+            update_time
+        FROM album
+        WHERE id = $1
+        LIMIT 1
+        "#,
+    )
+    .bind(album_id)
+    .fetch_optional(&state.db_pool)
+    .await
+    .map_err(|error| AppError::internal(format!("Failed to get album: {error}")))?
+    .ok_or_else(|| AppError::not_found("Album not found"))
+}
+
+async fn fetch_project_item_by_id(state: &AppState, project_id: i64) -> AppResult<ProjectItem> {
+    sqlx::query_as::<_, ProjectItem>(
+        r#"
+        SELECT
+            id::bigint AS id,
+            title,
+            cover,
+            category,
+            description,
+            content,
+            tech_stack,
+            project_url,
+            github_url,
+            sort::bigint AS sort,
+            status::bigint AS status,
+            create_time,
+            update_time
+        FROM project
+        WHERE id = $1
+        LIMIT 1
+        "#,
+    )
+    .bind(project_id)
+    .fetch_optional(&state.db_pool)
+    .await
+    .map_err(|error| AppError::internal(format!("Failed to get project: {error}")))?
+    .ok_or_else(|| AppError::not_found("Project not found"))
 }

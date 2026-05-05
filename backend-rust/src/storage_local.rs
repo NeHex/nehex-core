@@ -220,13 +220,20 @@ pub async fn resolve_object_access_url(state: &AppState, object_key: &str) -> Ap
 
     match config.provider {
         StorageProvider::Hi168S3 => {
-            presign_hi168_s3_get_url(&config, &normalized_key, DEFAULT_HI168_SIGNED_URL_EXPIRES_SECONDS)
-                .await
+            presign_hi168_s3_get_url(
+                &config,
+                &normalized_key,
+                DEFAULT_HI168_SIGNED_URL_EXPIRES_SECONDS,
+            )
+            .await
         }
-        StorageProvider::Local => Ok(build_local_public_url(&config.public_base_url, &normalized_key)),
-        StorageProvider::R2 | StorageProvider::S3 | StorageProvider::AliyunOss => {
-            Err(AppError::not_found("Storage object route only supports hi168_s3 provider"))
-        }
+        StorageProvider::Local => Ok(build_local_public_url(
+            &config.public_base_url,
+            &normalized_key,
+        )),
+        StorageProvider::R2 | StorageProvider::S3 | StorageProvider::AliyunOss => Err(
+            AppError::not_found("Storage object route only supports hi168_s3 provider"),
+        ),
     }
 }
 

@@ -32,14 +32,9 @@ async function parseJson<T>(response: Response): Promise<T> {
 }
 
 export async function fetchAlbums(): Promise<AlbumItem[]> {
-  const response = await fetch('/album', {
+  const response = await adminFetch('/admin-api/albums', {
     method: 'GET',
-    credentials: 'same-origin',
   })
-
-  if (!response.ok) {
-    throw new Error(`Failed to request albums: ${response.status}`)
-  }
 
   const payload = await parseJson<AlbumListResponse>(response)
   if (!Array.isArray(payload?.data)) {
@@ -50,14 +45,9 @@ export async function fetchAlbums(): Promise<AlbumItem[]> {
 }
 
 export async function fetchAlbumById(albumId: number): Promise<AlbumItem> {
-  const response = await fetch(`/album/${albumId}`, {
+  const response = await adminFetch(`/admin-api/albums/${albumId}`, {
     method: 'GET',
-    credentials: 'same-origin',
   })
-
-  if (!response.ok) {
-    throw new Error(`Failed to request album detail: ${response.status}`)
-  }
 
   const payload = await parseJson<AlbumDetailResponse>(response)
   if (!payload?.data) {

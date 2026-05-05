@@ -81,7 +81,7 @@ pub struct AdminFriendApplyDetailResponse {
 }
 
 #[derive(Serialize, Clone)]
-pub struct FriendExchangeInfoItem {
+pub(crate) struct FriendExchangeInfoItem {
     site_title: String,
     site_url: String,
     site_icon: String,
@@ -235,11 +235,9 @@ pub async fn admin_update_friend_exchange_info(
     };
     let site_description = normalize_optional_text(Some(payload.site_description));
 
-    let mut tx = state
-        .db_pool
-        .begin()
-        .await
-        .map_err(|error| AppError::internal(format!("Failed to begin friend exchange tx: {error}")))?;
+    let mut tx = state.db_pool.begin().await.map_err(|error| {
+        AppError::internal(format!("Failed to begin friend exchange tx: {error}"))
+    })?;
 
     upsert_setting(
         &mut tx,
@@ -274,12 +272,15 @@ pub async fn admin_update_friend_exchange_info(
     )
     .await?;
 
-    tx.commit()
-        .await
-        .map_err(|error| AppError::internal(format!("Failed to commit friend exchange settings: {error}")))?;
+    tx.commit().await.map_err(|error| {
+        AppError::internal(format!(
+            "Failed to commit friend exchange settings: {error}"
+        ))
+    })?;
 
     let data = load_friend_exchange_info(&state).await?;
-    sync_api::record_content_change_best_effort(&state, "setting", "update", vec![]).await;
+    sync_api::record_content_change_best_effort(&state, "setting", "update", Vec::<i64>::new())
+        .await;
     Ok(Json(FriendExchangeInfoResponse { data }))
 }
 
@@ -766,7 +767,8 @@ pub async fn admin_update_friend_apply_status(
         AppError::internal(format!("Failed to update friend apply status: {error}"))
     })?;
     invalidate_friends_cache(&state).await;
-    sync_api::record_content_change_best_effort(&state, "friend", "update", vec![]).await;
+    sync_api::record_content_change_best_effort(&state, "friend", "update", Vec::<i64>::new())
+        .await;
 
     Ok(Json(AdminFriendApplyDetailResponse { data }))
 }
@@ -870,7 +872,9 @@ async fn invalidate_friends_cache(state: &AppState) {
     state.runtime_cache.delete(FRIENDS_CACHE_KEY).await;
 }
 
-async fn load_friend_exchange_info(state: &AppState) -> AppResult<FriendExchangeInfoItem> {
+pub(crate) async fn load_friend_exchange_info(
+    state: &AppState,
+) -> AppResult<FriendExchangeInfoItem> {
     let keys = vec![
         FRIEND_EXCHANGE_SITE_TITLE_KEY,
         FRIEND_EXCHANGE_SITE_URL_KEY,
@@ -888,7 +892,9 @@ async fn load_friend_exchange_info(state: &AppState) -> AppResult<FriendExchange
     .bind(keys)
     .fetch_all(&state.db_pool)
     .await
-    .map_err(|error| AppError::internal(format!("Failed to load friend exchange settings: {error}")))?;
+    .map_err(|error| {
+        AppError::internal(format!("Failed to load friend exchange settings: {error}"))
+    })?;
 
     let mut settings = HashMap::<String, String>::new();
     for row in rows {

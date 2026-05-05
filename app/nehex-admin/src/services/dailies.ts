@@ -44,14 +44,9 @@ async function parseJson<T>(response: Response): Promise<T> {
 }
 
 export async function fetchDailies(): Promise<DailyItem[]> {
-  const response = await fetch('/daily', {
+  const response = await adminFetch('/admin-api/dailies', {
     method: 'GET',
-    credentials: 'same-origin',
   })
-
-  if (!response.ok) {
-    throw new Error(`Failed to request dailies: ${response.status}`)
-  }
 
   const payload = await parseJson<DailyListResponse>(response)
   if (!Array.isArray(payload?.data)) {

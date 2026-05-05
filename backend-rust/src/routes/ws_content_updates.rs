@@ -31,7 +31,7 @@ pub struct ContentUpdateEvent {
     pub seq: i64,
     pub resource: String,
     pub action: String,
-    pub ids: Vec<i64>,
+    pub ids: Vec<String>,
     pub updated_at: String,
 }
 

@@ -19,7 +19,9 @@ use super::ws_content_updates::{self, ContentUpdateEvent};
 
 const MAX_SYNC_CHANGES_LIMIT: i64 = 500;
 const DEFAULT_SYNC_CHANGES_LIMIT: i64 = 200;
-const KNOWN_RESOURCES: &[&str] = &["article", "daily", "album", "project", "friend", "setting"];
+const KNOWN_RESOURCES: &[&str] = &[
+    "article", "daily", "album", "project", "friend", "setting", "page", "movie", "comment",
+];
 
 #[derive(Serialize)]
 pub struct SyncVersionResponse {
@@ -125,12 +127,15 @@ pub async fn get_sync_changes(
     }))
 }
 
-pub async fn record_content_change_best_effort(
+pub async fn record_content_change_best_effort<I, T>(
     state: &AppState,
     resource: &str,
     action: &str,
-    ids: Vec<i64>,
-) {
+    ids: I,
+) where
+    I: IntoIterator<Item = T>,
+    T: ToString,
+{
     if let Err(error) = record_content_change(state, resource, action, ids).await {
         warn!(
             "[content-sync] failed to record change event resource={} action={}: {}",
@@ -139,12 +144,16 @@ pub async fn record_content_change_best_effort(
     }
 }
 
-pub async fn record_content_change(
+pub async fn record_content_change<I, T>(
     state: &AppState,
     resource: &str,
     action: &str,
-    ids: Vec<i64>,
-) -> AppResult<ContentUpdateEvent> {
+    ids: I,
+) -> AppResult<ContentUpdateEvent>
+where
+    I: IntoIterator<Item = T>,
+    T: ToString,
+{
     let normalized_resource = resource.trim().to_lowercase();
     let normalized_action = action.trim().to_lowercase();
 
@@ -154,8 +163,11 @@ pub async fn record_content_change(
         ));
     }
 
-    let ids_json = serde_json::to_string(&ids)
-        .map_err(|error| AppError::internal(format!("Failed to serialize change ids: {error}")))?;
+    let normalized_ids = ids
+        .into_iter()
+        .map(|item| item.to_string())
+        .filter(|value| !value.trim().is_empty())
+        .collect::<Vec<_>>();
 
     let row = sqlx::query(
         r#"
@@ -172,7 +184,9 @@ pub async fn record_content_change(
     )
     .bind(&normalized_resource)
     .bind(&normalized_action)
-    .bind(ids_json)
+    .bind(serde_json::to_string(&normalized_ids).map_err(|error| {
+        AppError::internal(format!("Failed to serialize change ids: {error}"))
+    })?)
     .fetch_one(&state.db_pool)
     .await
     .map_err(|error| AppError::internal(format!("Failed to append content change log: {error}")))?;
@@ -197,11 +211,30 @@ fn map_row_to_event(row: &sqlx::postgres::PgRow) -> AppResult<ContentUpdateEvent
         .try_get::<NaiveDateTime, _>("updated_at")
         .unwrap_or_else(|_| Utc::now().naive_utc());
 
-    let ids = serde_json::from_str::<Vec<i64>>(&ids_json).map_err(|error| {
+    let ids_value = serde_json::from_str::<serde_json::Value>(&ids_json).map_err(|error| {
         AppError::internal(format!(
             "Failed to decode content change ids payload `{ids_json}`: {error}"
         ))
     })?;
+    let ids = match ids_value {
+        serde_json::Value::Array(items) => items
+            .into_iter()
+            .filter_map(|item| match item {
+                serde_json::Value::String(value) => {
+                    let normalized = value.trim().to_string();
+                    if normalized.is_empty() {
+                        None
+                    } else {
+                        Some(normalized)
+                    }
+                }
+                serde_json::Value::Number(value) => Some(value.to_string()),
+                serde_json::Value::Bool(value) => Some(value.to_string()),
+                _ => None,
+            })
+            .collect::<Vec<_>>(),
+        _ => Vec::new(),
+    };
 
     Ok(ContentUpdateEvent {
         event_type,

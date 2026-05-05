@@ -28,17 +28,25 @@ pub fn router() -> Router<AppState> {
                 .put(admin_content::admin_update_article)
                 .delete(admin_content::admin_delete_article),
         )
-        .route("/dailies", post(admin_content::admin_create_daily))
+        .route(
+            "/dailies",
+            get(admin_content::admin_list_dailies).post(admin_content::admin_create_daily),
+        )
         .route(
             "/dailies/{daily_id}",
             get(admin_content::admin_get_daily)
                 .put(admin_content::admin_update_daily)
                 .delete(admin_content::admin_delete_daily),
         )
-        .route("/albums", post(admin_content::admin_create_album))
+        .route(
+            "/albums",
+            get(admin_content::admin_list_albums).post(admin_content::admin_create_album),
+        )
         .route(
             "/albums/{album_id}",
-            put(admin_content::admin_update_album).delete(admin_content::admin_delete_album),
+            get(admin_content::admin_get_album)
+                .put(admin_content::admin_update_album)
+                .delete(admin_content::admin_delete_album),
         )
         .route(
             "/pages",
@@ -56,7 +64,9 @@ pub fn router() -> Router<AppState> {
         )
         .route(
             "/projects/{project_id}",
-            put(admin_content::admin_update_project).delete(admin_content::admin_delete_project),
+            get(admin_content::admin_get_project)
+                .put(admin_content::admin_update_project)
+                .delete(admin_content::admin_delete_project),
         )
         .route(
             "/comments",
@@ -122,6 +132,10 @@ pub fn router() -> Router<AppState> {
             get(admin_settings::admin_list_settings).put(admin_settings::admin_update_settings),
         )
         .route(
+            "/settings/site-owner",
+            get(admin_settings::admin_get_site_owner_profile),
+        )
+        .route(
             "/developer/cli/execute",
             post(admin_developer::admin_execute_developer_cli),
         )
@@ -143,11 +157,13 @@ pub fn router() -> Router<AppState> {
         )
         .route(
             "/kuma/movies",
-            get(admin_settings::admin_list_kuma_movies).post(admin_settings::admin_create_kuma_movie),
+            get(admin_settings::admin_list_kuma_movies)
+                .post(admin_settings::admin_create_kuma_movie),
         )
         .route(
             "/kuma/movies/{id}",
-            put(admin_settings::admin_update_kuma_movie).delete(admin_settings::admin_delete_kuma_movie),
+            put(admin_settings::admin_update_kuma_movie)
+                .delete(admin_settings::admin_delete_kuma_movie),
         )
         .route(
             "/backups",

@@ -18,7 +18,10 @@ use crate::{
 
 pub fn router() -> Router<AppState> {
     Router::new()
-        .route("/storage/object/{*object_key}", get(get_storage_object_redirect))
+        .route(
+            "/storage/object/{*object_key}",
+            get(get_storage_object_redirect),
+        )
         .route("/storage/{*file_path}", get(get_local_storage_file))
 }
 
