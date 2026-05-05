@@ -950,6 +950,10 @@ async fn upsert_setting<'a>(
     setting_content: Option<String>,
     description: &str,
 ) -> AppResult<()> {
+    // Keep compatibility with legacy schemas where settings.setting_content may be NOT NULL.
+    // Empty content is still treated as "unset" by pick_setting_value().
+    let normalized_content = Some(setting_content.unwrap_or_default());
+
     sqlx::query(
         r#"
         INSERT INTO settings (setting_key, setting_type, setting_content, description)
@@ -964,7 +968,7 @@ async fn upsert_setting<'a>(
     )
     .bind(key)
     .bind(setting_type)
-    .bind(setting_content)
+    .bind(normalized_content)
     .bind(Some(description.to_string()))
     .execute(&mut **tx)
     .await
