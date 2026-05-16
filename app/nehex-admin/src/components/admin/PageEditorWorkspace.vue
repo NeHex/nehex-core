@@ -740,12 +740,12 @@ onMounted(async () => {
 .header-text h1 {
   margin: 0;
   font-size: 28px;
-  color: #f1f4ff;
+  color: var(--admin-text-heading);
 }
 
 .header-text p {
   margin: 6px 0 0;
-  color: #aeb8cc;
+  color: var(--admin-text-muted);
 }
 
 .header-actions {
@@ -765,9 +765,9 @@ onMounted(async () => {
 .editor-card {
   min-width: 0;
   min-height: 0;
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: 1px solid var(--admin-border);
   border-radius: 16px;
-  background: #111826;
+  background: var(--admin-surface);
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -775,8 +775,8 @@ onMounted(async () => {
 
 .editor-card-head {
   padding: 10px 12px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(255, 255, 255, 0.05);
+  border-bottom: 1px solid var(--admin-border-soft);
+  background: var(--admin-card-bg-soft);
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
@@ -792,12 +792,12 @@ onMounted(async () => {
 .editor-card-title {
   font-size: 13px;
   font-weight: 700;
-  color: #dbe7ff;
+  color: var(--admin-text-secondary);
   letter-spacing: 0.4px;
 }
 
 .editor-card-subtitle {
-  color: #9fb0d4;
+  color: var(--admin-text-faint);
   font-size: 12px;
 }
 
@@ -835,8 +835,8 @@ onMounted(async () => {
   width: 100%;
   height: 100%;
   border: 0;
-  background: #0f1624;
-  color: #f4f7ff;
+  background: var(--admin-surface-2);
+  color: var(--admin-text-primary);
   font-size: 14px;
   line-height: 1.7;
   padding: 14px;
@@ -849,7 +849,7 @@ onMounted(async () => {
   height: 100%;
   overflow: auto;
   padding: 16px;
-  color: #dde6fb;
+  color: var(--admin-text-secondary);
   line-height: 1.75;
 }
 
@@ -858,10 +858,10 @@ onMounted(async () => {
   inset: 10px;
   display: grid;
   place-items: center;
-  border: 2px dashed rgba(115, 164, 255, 0.88);
+  border: 2px dashed var(--admin-accent-border-strong);
   border-radius: 12px;
-  background: rgba(16, 24, 39, 0.82);
-  color: #d7e6ff;
+  background: var(--admin-overlay-panel);
+  color: var(--admin-accent-text);
   font-size: 14px;
   font-weight: 600;
   pointer-events: none;
@@ -876,9 +876,9 @@ onMounted(async () => {
 .settings-card {
   min-width: 0;
   min-height: 0;
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: 1px solid var(--admin-border);
   border-radius: 16px;
-  background: #111826;
+  background: var(--admin-surface);
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -886,18 +886,18 @@ onMounted(async () => {
 
 .settings-head {
   padding: 14px 14px 10px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  border-bottom: 1px solid var(--admin-border-soft);
 }
 
 .settings-head h2 {
   margin: 0;
   font-size: 18px;
-  color: #edf3ff;
+  color: var(--admin-text-primary);
 }
 
 .settings-head p {
   margin: 6px 0 0;
-  color: #9fb0d4;
+  color: var(--admin-text-faint);
   font-size: 13px;
 }
 
@@ -919,19 +919,19 @@ onMounted(async () => {
 :deep(.markdown-preview h2),
 :deep(.markdown-preview h3),
 :deep(.markdown-preview h4) {
-  color: #ffffff;
+  color: var(--admin-text-heading);
   margin: 18px 0 10px;
   line-height: 1.35;
 }
 
 :deep(.markdown-preview a) {
-  color: #8ab5ff;
+  color: var(--admin-link);
 }
 
 :deep(.markdown-preview code) {
   padding: 1px 5px;
   border-radius: 6px;
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--admin-border-soft);
   font-size: 13px;
 }
 
@@ -939,7 +939,7 @@ onMounted(async () => {
   overflow: auto;
   padding: 10px;
   border-radius: 10px;
-  background: rgba(0, 0, 0, 0.34);
+  background: var(--admin-overlay-mask);
 }
 
 :deep(.markdown-preview pre code) {
@@ -950,8 +950,8 @@ onMounted(async () => {
 :deep(.markdown-preview blockquote) {
   margin: 12px 0;
   padding: 8px 12px;
-  border-left: 3px solid rgba(126, 163, 237, 0.85);
-  background: rgba(126, 163, 237, 0.12);
+  border-left: 3px solid var(--admin-accent-border-strong);
+  background: var(--admin-accent-bg-soft);
 }
 
 :deep(.markdown-preview ul),
@@ -960,7 +960,7 @@ onMounted(async () => {
 }
 
 :deep(.preview-empty) {
-  color: #97a4bf;
+  color: var(--admin-text-faint);
 }
 
 @media (max-width: 1100px) {

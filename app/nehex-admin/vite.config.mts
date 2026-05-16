@@ -12,7 +12,7 @@ import { readFileSync } from 'node:fs'
 const adminPackage = JSON.parse(
   readFileSync(new URL('./package.json', import.meta.url), 'utf-8'),
 ) as { version?: string }
-const adminVersion = String(adminPackage.version ?? '').trim() || '1.2.9'
+const adminVersion = String(adminPackage.version ?? '').trim() || '1.3.1'
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => {

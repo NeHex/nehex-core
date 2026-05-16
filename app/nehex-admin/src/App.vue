@@ -7,7 +7,14 @@
         </transition>
 
         <transition name="route-loading-fade">
-          <div v-if="isRouteLoading" class="route-loading-overlay">
+          <div
+            v-if="isRouteLoading"
+            class="route-loading-overlay"
+            :class="{
+              'route-loading-overlay--dark': isDarkTheme,
+              'route-loading-overlay--light': !isDarkTheme,
+            }"
+          >
             <div class="route-loading-card">
               <v-progress-circular
                 color="primary"
@@ -26,12 +33,16 @@
 </template>
 
 <script lang="ts" setup>
+import { computed } from 'vue'
 import { useRoute } from 'vue-router'
+import { useTheme } from 'vuetify'
 import GlobalToast from '@/components/common/GlobalToast.vue'
 import { useRouteLoading } from '@/composables/useRouteLoading'
 
 const route = useRoute()
 const { isRouteLoading } = useRouteLoading()
+const vuetifyTheme = useTheme()
+const isDarkTheme = computed(() => String(vuetifyTheme.global.name.value).includes('dark'))
 </script>
 
 <style scoped>
@@ -41,6 +52,10 @@ const { isRouteLoading } = useRouteLoading()
 }
 
 .route-loading-overlay {
+  --overlay-bg: rgba(8, 12, 18, 0.36);
+  --card-border: rgba(162, 184, 236, 0.35);
+  --card-bg: rgba(20, 28, 40, 0.95);
+  --card-text: #f3f7ff;
   position: fixed;
   inset: 0;
   z-index: 3000;
@@ -48,8 +63,15 @@ const { isRouteLoading } = useRouteLoading()
   align-items: center;
   justify-content: center;
   padding: 20px;
-  background: rgba(8, 12, 18, 0.36);
+  background: var(--overlay-bg);
   backdrop-filter: blur(2px);
+}
+
+.route-loading-overlay--light {
+  --overlay-bg: rgba(74, 111, 165, 0.2);
+  --card-border: rgba(74, 111, 165, 0.28);
+  --card-bg: rgba(255, 255, 255, 0.95);
+  --card-text: #2a4267;
 }
 
 .route-loading-card {
@@ -58,9 +80,9 @@ const { isRouteLoading } = useRouteLoading()
   gap: 10px;
   padding: 10px 14px;
   border-radius: 999px;
-  border: 1px solid rgba(162, 184, 236, 0.35);
-  background: rgba(20, 28, 40, 0.95);
-  color: #f3f7ff;
+  border: 1px solid var(--card-border);
+  background: var(--card-bg);
+  color: var(--card-text);
   font-size: 13px;
   font-weight: 600;
 }

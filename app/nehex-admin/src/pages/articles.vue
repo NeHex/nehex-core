@@ -279,7 +279,7 @@ function getArticleCardStyle(article: ArticleItem): Record<string, string> {
   const raw = (article.articleTopImage || '').trim()
   if (!raw) {
     return {
-      background: 'linear-gradient(140deg, #1e2433 0%, #131827 100%)',
+      background: 'linear-gradient(140deg, var(--admin-surface) 0%, var(--admin-surface-2) 100%)',
     }
   }
 
@@ -330,12 +330,12 @@ watch(currentPage, async (page, previous) => {
 .header-text h1 {
   margin: 0;
   font-size: 28px;
-  color: #f1f4ff;
+  color: var(--admin-text-heading);
 }
 
 .header-text p {
   margin: 6px 0 0;
-  color: #aeb8cc;
+  color: var(--admin-text-muted);
 }
 
 .quick-create-btn {
@@ -343,7 +343,7 @@ watch(currentPage, async (page, previous) => {
 }
 
 .list-head {
-  color: #aeb8cc;
+  color: var(--admin-text-muted);
   font-size: 14px;
 }
 
@@ -357,18 +357,18 @@ watch(currentPage, async (page, previous) => {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
-  color: #c8d3ea;
+  color: var(--admin-text-faint);
 }
 
 .section-head h2 {
   margin: 0;
   font-size: 18px;
-  color: #eef4ff;
+  color: var(--admin-text-heading);
 }
 
 .section-head span {
   font-size: 13px;
-  color: #aeb8cc;
+  color: var(--admin-text-muted);
 }
 
 .articles-grid {
@@ -380,9 +380,9 @@ watch(currentPage, async (page, previous) => {
 .section-empty {
   grid-column: 1 / -1;
   padding: 28px 16px;
-  border: 1px dashed rgba(255, 255, 255, 0.18);
+  border: 1px dashed var(--admin-empty-border);
   border-radius: 14px;
-  color: #9eabc5;
+  color: var(--admin-text-faint);
   text-align: center;
 }
 
@@ -390,7 +390,7 @@ watch(currentPage, async (page, previous) => {
 .add-card {
   position: relative;
   min-height: 240px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  border: 1px solid var(--admin-border);
 }
 
 .article-card {
@@ -402,7 +402,7 @@ watch(currentPage, async (page, previous) => {
 
 .article-card:hover {
   transform: translateY(-3px);
-  box-shadow: 0 16px 30px rgba(0, 0, 0, 0.28);
+  box-shadow: var(--admin-shadow-hover);
 }
 
 .article-overlay {
@@ -439,8 +439,8 @@ watch(currentPage, async (page, previous) => {
 .article-title {
   font-size: 18px;
   font-weight: 700;
-  color: #ffffff;
-  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.65);
+  color: var(--admin-text-heading);
+  text-shadow: var(--admin-cover-shadow);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -465,8 +465,8 @@ watch(currentPage, async (page, previous) => {
   flex-direction: column;
   gap: 8px;
   border-style: dashed;
-  color: #b8c5e6;
-  background: linear-gradient(140deg, rgba(28, 34, 47, 0.92), rgba(19, 24, 36, 0.92));
+  color: var(--admin-accent-muted);
+  background: var(--admin-add-card-bg);
   transition:
     border-color 0.2s ease,
     color 0.2s ease,
@@ -474,8 +474,8 @@ watch(currentPage, async (page, previous) => {
 }
 
 .add-card:hover {
-  border-color: rgba(255, 255, 255, 0.34);
-  color: #e8efff;
+  border-color: var(--admin-border-strong);
+  color: var(--admin-accent-text);
   filter: brightness(1.04);
 }
 
@@ -490,8 +490,8 @@ watch(currentPage, async (page, previous) => {
 }
 
 .dialog-card {
-  background: linear-gradient(180deg, #151c2a, #121826);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: var(--admin-card-bg-strong);
+  border: 1px solid var(--admin-border);
 }
 
 .dialog-title {

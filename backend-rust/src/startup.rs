@@ -119,6 +119,9 @@ pub async fn apply_startup_schema_maintenance(settings: &Settings, pool: &PgPool
     if let Err(error) = ensure_schema_compatibility_numeric_types(pool).await {
         warn!("[startup] skip ensure_schema_compatibility_numeric_types: {error}");
     }
+    if let Err(error) = ensure_schema_compatibility_columns(pool).await {
+        warn!("[startup] skip ensure_schema_compatibility_columns: {error}");
+    }
 
     if settings.db_auto_create_tables {
         if let Err(error) = ensure_core_content_tables(pool).await {
@@ -126,9 +129,6 @@ pub async fn apply_startup_schema_maintenance(settings: &Settings, pool: &PgPool
         }
         if let Err(error) = ensure_system_tables(pool).await {
             warn!("[startup] skip ensure_system_tables: {error}");
-        }
-        if let Err(error) = ensure_schema_compatibility_columns(pool).await {
-            warn!("[startup] skip ensure_schema_compatibility_columns: {error}");
         }
         if let Err(error) = ensure_performance_indexes(pool).await {
             warn!("[startup] skip ensure_performance_indexes: {error}");
@@ -207,6 +207,7 @@ async fn ensure_core_content_tables(pool: &PgPool) -> AppResult<()> {
             id BIGSERIAL PRIMARY KEY,
             title VARCHAR(255) NOT NULL,
             "articleTopImage" VARCHAR(500),
+            ai_summary TEXT,
             class VARCHAR(100) NOT NULL,
             read BIGINT NOT NULL DEFAULT 0,
             like_count BIGINT NOT NULL DEFAULT 0,
@@ -467,6 +468,12 @@ async fn ensure_schema_compatibility_columns(pool: &PgPool) -> AppResult<()> {
             pool,
             "ALTER TABLE article ADD COLUMN IF NOT EXISTS status BIGINT NOT NULL DEFAULT 1",
             "article.status",
+        )
+        .await?;
+        run_ddl(
+            pool,
+            "ALTER TABLE article ADD COLUMN IF NOT EXISTS ai_summary TEXT",
+            "article.ai_summary",
         )
         .await?;
         run_ddl(

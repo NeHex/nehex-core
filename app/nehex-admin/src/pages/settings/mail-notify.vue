@@ -541,12 +541,12 @@ onMounted(async () => {
 .header-text h1 {
   margin: 0;
   font-size: 28px;
-  color: #f1f4ff;
+  color: var(--admin-text-heading);
 }
 
 .header-text p {
   margin: 6px 0 0;
-  color: #aeb8cc;
+  color: var(--admin-text-muted);
 }
 
 .header-actions {
@@ -555,9 +555,9 @@ onMounted(async () => {
 }
 
 .section-card {
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background: linear-gradient(180deg, rgba(24, 30, 41, 0.96), rgba(19, 24, 34, 0.96));
-  color: #edf1ff;
+  border: 1px solid var(--admin-border-soft);
+  background: var(--admin-card-bg);
+  color: var(--admin-text-primary);
 }
 
 .form-grid {
@@ -601,7 +601,7 @@ onMounted(async () => {
 
 .hint-text {
   margin: 6px 0 0;
-  color: #9eb1d8;
+  color: var(--admin-text-faint);
   font-size: 13px;
   line-height: 1.6;
 }

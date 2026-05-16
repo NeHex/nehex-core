@@ -324,8 +324,8 @@ onMounted(async () => {
 
 .metric-card,
 .summary-card {
-  border-color: rgba(148, 163, 184, 0.28);
-  background: rgba(15, 23, 42, 0.35);
+  border-color: var(--admin-border-strong);
+  background: var(--admin-card-bg-soft);
 }
 
 .metric-card--sparkline {
@@ -342,7 +342,7 @@ onMounted(async () => {
 
 .metric-title {
   font-size: 14px;
-  color: rgba(226, 232, 240, 0.82);
+  color: var(--admin-text-faint);
 }
 
 .metric-value {
@@ -378,15 +378,15 @@ onMounted(async () => {
 }
 
 .summary-item {
-  border: 1px solid rgba(148, 163, 184, 0.24);
+  border: 1px solid var(--admin-border);
   border-radius: 12px;
   padding: 12px 14px;
-  background: rgba(15, 23, 42, 0.45);
+  background: var(--admin-card-bg-softer);
 }
 
 .summary-label {
   font-size: 13px;
-  color: rgba(203, 213, 225, 0.8);
+  color: var(--admin-text-faint);
 }
 
 .summary-value {
@@ -403,10 +403,10 @@ onMounted(async () => {
 }
 
 .recent-comment-item {
-  border: 1px solid rgba(148, 163, 184, 0.24);
+  border: 1px solid var(--admin-border);
   border-radius: 12px;
   padding: 10px 12px;
-  background: rgba(15, 23, 42, 0.45);
+  background: var(--admin-card-bg-softer);
 }
 
 .recent-comment-meta {
@@ -414,13 +414,13 @@ onMounted(async () => {
   flex-wrap: wrap;
   gap: 8px;
   align-items: center;
-  color: rgba(203, 213, 225, 0.8);
+  color: var(--admin-text-faint);
   font-size: 12px;
 }
 
 .recent-comment-author {
   font-weight: 600;
-  color: rgba(241, 245, 249, 0.95);
+  color: var(--admin-text-heading);
 }
 
 .recent-comment-status {
@@ -446,7 +446,7 @@ onMounted(async () => {
   margin-top: 6px;
   font-size: 13px;
   line-height: 1.6;
-  color: #e2e8f0;
+  color: var(--admin-text-secondary);
   white-space: pre-wrap;
   word-break: break-word;
 }
@@ -458,7 +458,7 @@ onMounted(async () => {
 }
 
 .recent-comment-empty {
-  color: rgba(203, 213, 225, 0.8);
+  color: var(--admin-text-faint);
   font-size: 14px;
 }
 

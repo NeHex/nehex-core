@@ -436,12 +436,12 @@ watch(successMessage, (nextMessage) => {
 .header-text h1 {
   margin: 0;
   font-size: 28px;
-  color: #f1f4ff;
+  color: var(--admin-text-heading);
 }
 
 .header-text p {
   margin: 6px 0 0;
-  color: #aeb8cc;
+  color: var(--admin-text-muted);
 }
 
 .header-actions {
@@ -460,10 +460,10 @@ watch(successMessage, (nextMessage) => {
   min-height: 560px;
   height: calc(100vh - 320px);
   display: flex;
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: 1px solid var(--admin-border);
   border-radius: 16px;
   overflow: hidden;
-  background: #111826;
+  background: var(--admin-surface);
 }
 
 .panel {
@@ -477,17 +477,17 @@ watch(successMessage, (nextMessage) => {
   font-size: 13px;
   font-weight: 700;
   letter-spacing: 0.4px;
-  color: #dbe7ff;
-  background: rgba(255, 255, 255, 0.05);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  color: var(--admin-text-secondary);
+  background: var(--admin-card-bg-soft);
+  border-bottom: 1px solid var(--admin-border-soft);
 }
 
 .markdown-input {
   flex: 1;
   width: 100%;
   border: 0;
-  background: #0f1624;
-  color: #f4f7ff;
+  background: var(--admin-surface-2);
+  color: var(--admin-text-primary);
   font-size: 14px;
   line-height: 1.7;
   padding: 14px;
@@ -500,7 +500,7 @@ watch(successMessage, (nextMessage) => {
   flex: 1;
   overflow: auto;
   padding: 16px;
-  color: #dde6fb;
+  color: var(--admin-text-secondary);
   line-height: 1.75;
 }
 
@@ -508,7 +508,7 @@ watch(successMessage, (nextMessage) => {
   width: 12px;
   flex-shrink: 0;
   cursor: col-resize;
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--admin-card-bg-soft);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -516,20 +516,20 @@ watch(successMessage, (nextMessage) => {
 }
 
 .splitter:hover {
-  background: rgba(121, 151, 219, 0.2);
+  background: var(--admin-accent-bg);
 }
 
 .splitter-handle {
   width: 3px;
   height: 72px;
   border-radius: 999px;
-  background: rgba(196, 213, 255, 0.72);
+  background: var(--admin-accent-bg-strong);
 }
 
 .markdown-preview :deep(h1),
 .markdown-preview :deep(h2),
 .markdown-preview :deep(h3) {
-  color: #ffffff;
+  color: var(--admin-text-heading);
   margin-top: 1.1em;
 }
 
@@ -540,7 +540,7 @@ watch(successMessage, (nextMessage) => {
 .markdown-preview :deep(code) {
   padding: 2px 6px;
   border-radius: 6px;
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--admin-border-soft);
   font-family: 'Cascadia Code', 'Consolas', 'Monaco', monospace;
 }
 
@@ -548,20 +548,20 @@ watch(successMessage, (nextMessage) => {
   overflow: auto;
   padding: 12px;
   border-radius: 10px;
-  background: #0b1220;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: var(--admin-surface-3);
+  border: 1px solid var(--admin-border-soft);
 }
 
 .markdown-preview :deep(blockquote) {
   margin: 1em 0;
   padding: 10px 12px;
-  border-left: 3px solid rgba(144, 173, 241, 0.85);
-  background: rgba(142, 167, 231, 0.12);
-  color: #dbe7ff;
+  border-left: 3px solid var(--admin-accent-border-strong);
+  background: var(--admin-accent-bg-soft);
+  color: var(--admin-text-secondary);
 }
 
 .markdown-preview :deep(a) {
-  color: #8db3ff;
+  color: var(--admin-link);
 }
 
 .markdown-preview :deep(img) {

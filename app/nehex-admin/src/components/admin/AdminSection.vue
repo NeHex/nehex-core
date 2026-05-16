@@ -21,9 +21,9 @@ defineProps<{
 
 <style scoped>
 .section-card {
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background: linear-gradient(180deg, rgba(24, 30, 41, 0.96), rgba(19, 24, 34, 0.96));
-  color: #edf1ff;
+  border: 1px solid var(--admin-border-soft);
+  background: var(--admin-card-bg);
+  color: var(--admin-text-primary);
 }
 
 .placeholder {
@@ -31,8 +31,8 @@ defineProps<{
   display: grid;
   place-items: center;
   border-radius: 12px;
-  border: 1px dashed rgba(255, 255, 255, 0.16);
-  color: #aeb8cd;
+  border: 1px dashed var(--admin-empty-border);
+  color: var(--admin-text-muted);
   text-align: center;
   padding: 20px;
 }

@@ -681,7 +681,7 @@ onMounted(async () => {
   padding: 8px 8px 0;
   font-size: 16px;
   font-weight: 700;
-  color: #f2f5ff;
+  color: var(--admin-text-heading);
   letter-spacing: 0.3px;
 }
 
@@ -693,7 +693,7 @@ onMounted(async () => {
 :deep(.subnav-item) {
   min-height: 42px;
   margin-bottom: 6px;
-  color: #b6c3de;
+  color: var(--admin-text-faint);
   border: 1px solid transparent;
   transition:
     background 0.2s ease,
@@ -701,13 +701,13 @@ onMounted(async () => {
 }
 
 :deep(.subnav-item:hover) {
-  color: #eef3ff;
-  background: linear-gradient(90deg, rgba(103, 121, 170, 0.14) 0%, rgba(112, 133, 186, 0.24) 100%);
+  color: var(--admin-text-heading);
+  background: var(--admin-add-card-bg);
 }
 
 :deep(.subnav-item.v-list-item--active) {
-  color: #ffffff;
-  background: linear-gradient(90deg, rgba(103, 121, 170, 0.28) 0%, rgba(112, 133, 186, 0.42) 100%);
+  color: var(--admin-text-heading);
+  background: var(--admin-card-bg-strong);
 }
 
 .kuma-page {
@@ -726,18 +726,18 @@ onMounted(async () => {
 .header-text h1 {
   margin: 0;
   font-size: 28px;
-  color: #f1f4ff;
+  color: var(--admin-text-heading);
 }
 
 .header-text p {
   margin: 6px 0 0;
-  color: #aeb8cc;
+  color: var(--admin-text-muted);
 }
 
 .section-card {
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background: linear-gradient(180deg, rgba(24, 30, 41, 0.96), rgba(19, 24, 34, 0.96));
-  color: #edf1ff;
+  border: 1px solid var(--admin-border-soft);
+  background: var(--admin-card-bg);
+  color: var(--admin-text-primary);
 }
 
 .movie-cards-grid {
@@ -747,9 +747,9 @@ onMounted(async () => {
 }
 
 .movie-card {
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background: linear-gradient(180deg, rgba(24, 30, 41, 0.96), rgba(19, 24, 34, 0.96));
-  color: #edf1ff;
+  border: 1px solid var(--admin-border-soft);
+  background: var(--admin-card-bg);
+  color: var(--admin-text-primary);
   overflow: hidden;
 }
 
@@ -765,8 +765,8 @@ onMounted(async () => {
   justify-content: center;
   flex-direction: column;
   gap: 8px;
-  color: #b7c4e4;
-  background: linear-gradient(180deg, rgba(39, 47, 64, 0.8), rgba(31, 38, 53, 0.8));
+  color: var(--admin-accent-muted);
+  background: var(--admin-card-bg-strong);
 }
 
 .movie-card-body {
@@ -796,20 +796,20 @@ onMounted(async () => {
 .movie-title {
   font-size: 18px;
   font-weight: 700;
-  color: #f2f5ff;
+  color: var(--admin-text-heading);
   line-height: 1.3;
 }
 
 .movie-years {
   margin-left: 6px;
   font-size: 14px;
-  color: #aeb8cc;
+  color: var(--admin-text-muted);
   font-weight: 500;
 }
 
 .movie-desc {
   margin: 0;
-  color: #d2dcf3;
+  color: var(--admin-text-secondary);
   line-height: 1.6;
   font-size: 14px;
   display: -webkit-box;
@@ -837,9 +837,9 @@ onMounted(async () => {
 }
 
 .movie-edit-dialog-card {
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background: linear-gradient(180deg, rgba(24, 30, 41, 0.98), rgba(19, 24, 34, 0.98));
-  color: #edf1ff;
+  border: 1px solid var(--admin-border-soft);
+  background: var(--admin-card-bg);
+  color: var(--admin-text-primary);
 }
 
 .movie-edit-dialog-title {
@@ -850,7 +850,7 @@ onMounted(async () => {
 }
 
 .movie-edit-dialog-text {
-  color: #d2dcf3;
+  color: var(--admin-text-secondary);
   line-height: 1.7;
   max-height: 62vh;
   overflow: auto;
@@ -861,9 +861,9 @@ onMounted(async () => {
 }
 
 .movie-delete-dialog-card {
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background: linear-gradient(180deg, rgba(24, 30, 41, 0.98), rgba(19, 24, 34, 0.98));
-  color: #edf1ff;
+  border: 1px solid var(--admin-border-soft);
+  background: var(--admin-card-bg);
+  color: var(--admin-text-primary);
 }
 
 .movie-delete-dialog-title {
@@ -874,7 +874,7 @@ onMounted(async () => {
 }
 
 .movie-delete-dialog-text {
-  color: #d2dcf3;
+  color: var(--admin-text-secondary);
   line-height: 1.7;
 }
 

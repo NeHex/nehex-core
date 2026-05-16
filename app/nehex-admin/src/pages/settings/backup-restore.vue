@@ -433,23 +433,23 @@ watch(errorMessage, (nextMessage) => {
 .header-text h1 {
   margin: 0;
   font-size: 28px;
-  color: #f1f4ff;
+  color: var(--admin-text-heading);
 }
 
 .header-text p {
   margin: 6px 0 0;
-  color: #aeb8cc;
+  color: var(--admin-text-muted);
 }
 
 .section-card {
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background: linear-gradient(180deg, rgba(24, 30, 41, 0.96), rgba(19, 24, 34, 0.96));
-  color: #edf1ff;
+  border: 1px solid var(--admin-border-soft);
+  background: var(--admin-card-bg);
+  color: var(--admin-text-primary);
 }
 
 .list-head {
   margin: 6px 0 10px;
-  color: #aeb8cc;
+  color: var(--admin-text-muted);
   font-size: 14px;
 }
 
@@ -460,8 +460,8 @@ watch(errorMessage, (nextMessage) => {
 }
 
 .backup-item {
-  border-color: rgba(255, 255, 255, 0.14);
-  background: linear-gradient(180deg, rgba(30, 37, 49, 0.82), rgba(22, 28, 39, 0.82));
+  border-color: var(--admin-border-strong);
+  background: var(--admin-card-bg-strong);
   padding: 12px;
 }
 
@@ -475,7 +475,7 @@ watch(errorMessage, (nextMessage) => {
   display: flex;
   align-items: center;
   gap: 8px;
-  color: #d7e0f5;
+  color: var(--admin-accent-text);
 }
 
 .filename {
@@ -483,7 +483,7 @@ watch(errorMessage, (nextMessage) => {
 }
 
 .meta-right {
-  color: #9eb1d8;
+  color: var(--admin-text-faint);
   font-size: 13px;
   white-space: nowrap;
 }
@@ -493,7 +493,7 @@ watch(errorMessage, (nextMessage) => {
   display: flex;
   flex-wrap: wrap;
   gap: 14px;
-  color: #b8c7e8;
+  color: var(--admin-accent-muted);
   font-size: 13px;
 }
 
@@ -506,31 +506,31 @@ watch(errorMessage, (nextMessage) => {
 
 .empty-card {
   border-style: dashed;
-  border-color: rgba(255, 255, 255, 0.2);
+  border-color: var(--admin-border-strong);
   padding: 20px;
   text-align: center;
-  color: #aeb8cc;
+  color: var(--admin-text-muted);
 }
 
 .dialog-card {
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  background: linear-gradient(180deg, rgba(23, 29, 40, 0.98), rgba(18, 24, 34, 0.98));
-  color: #edf1ff;
+  border: 1px solid var(--admin-border-strong);
+  background: var(--admin-card-bg);
+  color: var(--admin-text-primary);
 }
 
 .dialog-tip {
   margin: 0 0 6px;
-  color: #ffb4a9;
+  color: var(--admin-danger-text);
 }
 
 .dialog-source {
   margin: 0 0 6px;
-  color: #b8c7e8;
+  color: var(--admin-accent-muted);
 }
 
 .dialog-file {
   margin: 0 0 12px;
-  color: #d7e0f5;
+  color: var(--admin-accent-text);
   word-break: break-all;
 }
 

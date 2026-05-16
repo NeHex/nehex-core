@@ -633,7 +633,7 @@ export function useSettingsPage() {
   const kumaApiTestResult = ref('')
   const kumaApiTestError = ref('')
 
-  const buildVersion = __NEHEX_ADMIN_VERSION__.trim() || '1.2.9'
+  const buildVersion = __NEHEX_ADMIN_VERSION__.trim() || '1.3.1'
 
   const nehexSnapshot = ref<NehexSnapshot>(getNehexSnapshotData())
   const siteSnapshot = ref<SiteForm>(getSiteFormData())

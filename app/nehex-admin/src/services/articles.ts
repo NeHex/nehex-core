@@ -4,6 +4,7 @@ export type ArticleItem = {
   id: number
   title: string
   articleTopImage?: string | null
+  aiSummary?: string | null
   class: string
   read: number
   like_count: number
@@ -31,6 +32,7 @@ type ArticleDetailResponse = {
 export type ArticleUpsertPayload = {
   title: string
   articleTopImage?: string | null
+  aiSummary?: string | null
   class: string
   read: number
   like_count?: number

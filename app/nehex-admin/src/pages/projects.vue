@@ -178,7 +178,7 @@ function getProjectCardStyle(project: ProjectItem): Record<string, string> {
   const cover = (project.cover || '').trim()
   if (!cover) {
     return {
-      background: 'linear-gradient(140deg, #22243f 0%, #161b2d 100%)',
+      background: 'linear-gradient(140deg, var(--admin-surface) 0%, var(--admin-surface-2) 100%)',
     }
   }
 
@@ -221,12 +221,12 @@ watch(isManageRoute, async (active, previous) => {
 .header-text h1 {
   margin: 0;
   font-size: 28px;
-  color: #f1f4ff;
+  color: var(--admin-text-heading);
 }
 
 .header-text p {
   margin: 6px 0 0;
-  color: #aeb8cc;
+  color: var(--admin-text-muted);
 }
 
 .quick-create-btn {
@@ -243,7 +243,7 @@ watch(isManageRoute, async (active, previous) => {
 .add-card {
   position: relative;
   min-height: 240px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  border: 1px solid var(--admin-border);
 }
 
 .project-card {
@@ -255,7 +255,7 @@ watch(isManageRoute, async (active, previous) => {
 
 .project-card:hover {
   transform: translateY(-3px);
-  box-shadow: 0 16px 30px rgba(0, 0, 0, 0.28);
+  box-shadow: var(--admin-shadow-hover);
 }
 
 .project-content {
@@ -287,8 +287,8 @@ watch(isManageRoute, async (active, previous) => {
 .project-title {
   font-size: 20px;
   font-weight: 700;
-  color: #ffffff;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.45);
+  color: var(--admin-text-heading);
+  text-shadow: var(--admin-cover-shadow);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -298,9 +298,9 @@ watch(isManageRoute, async (active, previous) => {
   display: flex;
   align-items: center;
   gap: 8px;
-  color: #d4dfff;
+  color: var(--admin-accent-text);
   font-size: 13px;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.45);
+  text-shadow: var(--admin-cover-shadow);
 }
 
 .add-card {
@@ -311,8 +311,8 @@ watch(isManageRoute, async (active, previous) => {
   flex-direction: column;
   gap: 8px;
   border-style: dashed;
-  color: #b8c5e6;
-  background: linear-gradient(140deg, rgba(28, 34, 47, 0.92), rgba(19, 24, 36, 0.92));
+  color: var(--admin-accent-muted);
+  background: var(--admin-add-card-bg);
   transition:
     border-color 0.2s ease,
     color 0.2s ease,
@@ -320,8 +320,8 @@ watch(isManageRoute, async (active, previous) => {
 }
 
 .add-card:hover {
-  border-color: rgba(255, 255, 255, 0.34);
-  color: #e8efff;
+  border-color: var(--admin-border-strong);
+  color: var(--admin-accent-text);
   filter: brightness(1.04);
 }
 
@@ -336,9 +336,9 @@ watch(isManageRoute, async (active, previous) => {
 }
 
 .dialog-card {
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background: linear-gradient(180deg, rgba(24, 30, 41, 0.96), rgba(19, 24, 34, 0.96));
-  color: #edf1ff;
+  border: 1px solid var(--admin-border-soft);
+  background: var(--admin-card-bg);
+  color: var(--admin-text-primary);
 }
 
 .dialog-title {

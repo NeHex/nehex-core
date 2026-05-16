@@ -36,7 +36,7 @@
       />
       <v-icon
         v-else
-        color="#9fb4de"
+        color="var(--admin-text-faint)"
         :icon="resolvedIcon"
         size="18"
       />
@@ -185,9 +185,9 @@ function onDrop(event: DragEvent): void {
   display: flex;
   align-items: center;
   gap: 10px;
-  border: 1px dashed rgba(171, 192, 245, 0.55);
+  border: 1px dashed var(--admin-accent-border-strong);
   border-radius: 12px;
-  background: rgba(144, 166, 219, 0.08);
+  background: var(--admin-accent-bg-soft);
   padding: 10px 12px;
   cursor: pointer;
   user-select: none;
@@ -198,14 +198,14 @@ function onDrop(event: DragEvent): void {
 }
 
 .image-upload-card:hover {
-  border-color: rgba(191, 210, 255, 0.9);
-  background: rgba(144, 166, 219, 0.16);
+  border-color: var(--admin-accent-border-strong);
+  background: var(--admin-accent-bg);
   transform: translateY(-1px);
 }
 
 .image-upload-card--active {
-  border-color: rgba(191, 210, 255, 0.95);
-  background: rgba(144, 166, 219, 0.22);
+  border-color: var(--admin-accent-border-strong);
+  background: var(--admin-accent-bg);
 }
 
 .image-upload-card--loading {
@@ -237,14 +237,14 @@ function onDrop(event: DragEvent): void {
 }
 
 .image-upload-title {
-  color: #dbe7ff;
+  color: var(--admin-text-secondary);
   font-size: 13px;
   font-weight: 700;
   line-height: 1.2;
 }
 
 .image-upload-hint {
-  color: #a6b8dc;
+  color: var(--admin-text-faint);
   font-size: 12px;
   line-height: 1.3;
 }

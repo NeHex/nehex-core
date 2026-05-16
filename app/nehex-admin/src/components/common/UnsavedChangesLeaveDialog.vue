@@ -49,9 +49,9 @@ function handleCancel(): void {
 
 <style scoped>
 .unsaved-dialog {
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  background: linear-gradient(180deg, rgba(25, 32, 44, 0.98), rgba(18, 24, 34, 0.98));
-  color: #edf2ff;
+  border: 1px solid var(--admin-border);
+  background: var(--admin-card-bg);
+  color: var(--admin-text-primary);
 }
 
 .unsaved-dialog-title {
@@ -60,7 +60,7 @@ function handleCancel(): void {
 }
 
 .unsaved-dialog-text {
-  color: #c8d6f5;
+  color: var(--admin-accent-text);
   line-height: 1.7;
 }
 

@@ -9,7 +9,7 @@
   padding: 8px 8px 0;
   font-size: 16px;
   font-weight: 700;
-  color: #f2f5ff;
+  color: var(--admin-text-heading);
   letter-spacing: 0.3px;
 }
 
@@ -21,7 +21,7 @@
 :deep(.subnav-item) {
   min-height: 42px;
   margin-bottom: 6px;
-  color: #b6c3de;
+  color: var(--admin-text-faint);
   border: 1px solid transparent;
   transition:
     background 0.2s ease,
@@ -29,13 +29,13 @@
 }
 
 :deep(.subnav-item:hover) {
-  color: #eef3ff;
-  background: linear-gradient(90deg, rgba(103, 121, 170, 0.14) 0%, rgba(112, 133, 186, 0.24) 100%);
+  color: var(--admin-text-heading);
+  background: var(--admin-add-card-bg);
 }
 
 :deep(.subnav-item.v-list-item--active) {
-  color: #ffffff;
-  background: linear-gradient(90deg, rgba(103, 121, 170, 0.28) 0%, rgba(112, 133, 186, 0.42) 100%);
+  color: var(--admin-text-heading);
+  background: var(--admin-card-bg-strong);
 }
 
 .settings-page {
@@ -54,12 +54,12 @@
 .header-text h1 {
   margin: 0;
   font-size: 28px;
-  color: #f1f4ff;
+  color: var(--admin-text-heading);
 }
 
 .header-text p {
   margin: 6px 0 0;
-  color: #aeb8cc;
+  color: var(--admin-text-muted);
 }
 
 .header-actions {
@@ -73,9 +73,9 @@
 }
 
 .section-card {
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background: linear-gradient(180deg, rgba(24, 30, 41, 0.96), rgba(19, 24, 34, 0.96));
-  color: #edf1ff;
+  border: 1px solid var(--admin-border-soft);
+  background: var(--admin-card-bg);
+  color: var(--admin-text-primary);
 }
 
 .stack-block {
@@ -87,18 +87,18 @@
 .block-title {
   font-size: 15px;
   font-weight: 700;
-  color: #e3ebff;
+  color: var(--admin-accent-text);
 }
 
 .block-subtitle {
   margin-top: 2px;
-  color: #aeb8cc;
+  color: var(--admin-text-muted);
   font-size: 13px;
 }
 
 .path-hint {
   margin-top: -4px;
-  color: #9eb1d8;
+  color: var(--admin-text-faint);
   font-size: 12px;
 }
 
@@ -133,8 +133,8 @@
 }
 
 .class-item-card {
-  border-color: rgba(160, 184, 236, 0.36);
-  background: linear-gradient(180deg, rgba(39, 47, 64, 0.8), rgba(31, 38, 53, 0.8));
+  border-color: var(--admin-accent-border);
+  background: var(--admin-card-bg-strong);
 }
 
 .class-item-card-content {
@@ -156,7 +156,7 @@
 }
 
 .release-meta {
-  color: #d2dcf3;
+  color: var(--admin-text-secondary);
   font-size: 13px;
   line-height: 1.7;
 }
@@ -188,7 +188,7 @@
 }
 
 .theme-editor-hint {
-  color: #aeb8cc;
+  color: var(--admin-text-muted);
   font-size: 13px;
 }
 

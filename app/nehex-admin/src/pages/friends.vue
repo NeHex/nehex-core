@@ -867,8 +867,8 @@ watch(successMessage, (nextMessage) => {
 }
 
 .exchange-card {
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  background: linear-gradient(180deg, #151c2a, #121826);
+  border: 1px solid var(--admin-border);
+  background: var(--admin-card-bg-strong);
   padding: 12px 14px;
 }
 
@@ -889,12 +889,12 @@ watch(successMessage, (nextMessage) => {
 .exchange-title {
   font-size: 16px;
   font-weight: 700;
-  color: #f2f6ff;
+  color: var(--admin-text-heading);
 }
 
 .exchange-subtitle {
   margin-top: 4px;
-  color: #aeb8cc;
+  color: var(--admin-text-muted);
   font-size: 13px;
 }
 
@@ -915,12 +915,12 @@ watch(successMessage, (nextMessage) => {
 .header-text h1 {
   margin: 0;
   font-size: 28px;
-  color: #f1f4ff;
+  color: var(--admin-text-heading);
 }
 
 .header-text p {
   margin: 6px 0 0;
-  color: #aeb8cc;
+  color: var(--admin-text-muted);
 }
 
 .tab-window {
@@ -949,7 +949,7 @@ watch(successMessage, (nextMessage) => {
 }
 
 .list-head {
-  color: #aeb8cc;
+  color: var(--admin-text-muted);
   font-size: 14px;
   margin-bottom: 8px;
 }
@@ -962,8 +962,8 @@ watch(successMessage, (nextMessage) => {
 
 .friend-card,
 .apply-card {
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  background: linear-gradient(180deg, #151c2a, #121826);
+  border: 1px solid var(--admin-border);
+  background: var(--admin-card-bg-strong);
   padding: 12px 14px;
 }
 
@@ -983,13 +983,13 @@ watch(successMessage, (nextMessage) => {
 .name {
   font-size: 17px;
   font-weight: 700;
-  color: #f2f6ff;
+  color: var(--admin-text-heading);
   word-break: break-word;
 }
 
 .meta {
   margin-top: 4px;
-  color: #9fb0d4;
+  color: var(--admin-text-faint);
   font-size: 13px;
   display: flex;
   gap: 8px;
@@ -1009,18 +1009,18 @@ watch(successMessage, (nextMessage) => {
 }
 
 .info-row {
-  color: #c4d2f0;
+  color: var(--admin-text-faint);
   font-size: 14px;
   margin: 4px 0;
   word-break: break-all;
 }
 
 .label {
-  color: #8fa3cc;
+  color: var(--admin-text-faint);
 }
 
 .link {
-  color: #8db3ff;
+  color: var(--admin-link);
   text-decoration: none;
 }
 
@@ -1030,14 +1030,14 @@ watch(successMessage, (nextMessage) => {
 
 .description {
   margin-top: 8px;
-  color: #dbe4f8;
+  color: var(--admin-text-secondary);
   line-height: 1.7;
   white-space: pre-wrap;
 }
 
 .time {
   margin-top: 8px;
-  color: #90a2ca;
+  color: var(--admin-text-faint);
   font-size: 12px;
 }
 
@@ -1049,7 +1049,7 @@ watch(successMessage, (nextMessage) => {
 
 .meta-tail {
   margin-top: 8px;
-  color: #90a2ca;
+  color: var(--admin-text-faint);
   font-size: 12px;
   display: flex;
   flex-wrap: wrap;
@@ -1057,16 +1057,16 @@ watch(successMessage, (nextMessage) => {
 }
 
 .empty-card {
-  border: 1px dashed rgba(255, 255, 255, 0.18);
-  background: rgba(18, 24, 38, 0.65);
-  color: #9fb0d4;
+  border: 1px dashed var(--admin-empty-border);
+  background: var(--admin-dashed-bg);
+  color: var(--admin-text-faint);
   text-align: center;
   padding: 22px;
 }
 
 .dialog-card {
-  background: linear-gradient(180deg, #151c2a, #121826);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: var(--admin-card-bg-strong);
+  border: 1px solid var(--admin-border);
 }
 
 .dialog-title {

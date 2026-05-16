@@ -208,18 +208,18 @@ onMounted(async () => {
 .header-text h1 {
   margin: 0;
   font-size: 28px;
-  color: #f1f4ff;
+  color: var(--admin-text-heading);
 }
 
 .header-text p {
   margin: 6px 0 0;
-  color: #aeb8cc;
+  color: var(--admin-text-muted);
 }
 
 .section-card {
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background: linear-gradient(180deg, rgba(24, 30, 41, 0.96), rgba(19, 24, 34, 0.96));
-  color: #edf1ff;
+  border: 1px solid var(--admin-border-soft);
+  background: var(--admin-card-bg);
+  color: var(--admin-text-primary);
   flex: 1;
   min-height: 0;
   display: flex;
@@ -236,7 +236,7 @@ onMounted(async () => {
 
 .list-head {
   margin: 12px 0 10px;
-  color: #aeb8cc;
+  color: var(--admin-text-muted);
   font-size: 14px;
 }
 
@@ -251,8 +251,8 @@ onMounted(async () => {
 }
 
 .log-item {
-  border-color: rgba(255, 255, 255, 0.14);
-  background: linear-gradient(180deg, rgba(30, 37, 49, 0.82), rgba(22, 28, 39, 0.82));
+  border-color: var(--admin-border-strong);
+  background: var(--admin-card-bg-strong);
   padding: 12px;
 }
 
@@ -266,25 +266,25 @@ onMounted(async () => {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  color: #d7e0f5;
+  color: var(--admin-accent-text);
   font-size: 13px;
 }
 
 .meta-right {
-  color: #9eb1d8;
+  color: var(--admin-text-faint);
   font-size: 13px;
 }
 
 .subject-line {
   margin-top: 8px;
   font-size: 14px;
-  color: #f1f4ff;
+  color: var(--admin-text-heading);
   font-weight: 600;
 }
 
 .body-preview {
   margin-top: 6px;
-  color: #c7d2eb;
+  color: var(--admin-accent-text);
   font-size: 13px;
   line-height: 1.6;
   white-space: pre-wrap;
@@ -293,7 +293,7 @@ onMounted(async () => {
 .empty-card {
   padding: 20px;
   text-align: center;
-  color: #9eb1d8;
+  color: var(--admin-text-faint);
 }
 
 .pagination-row {

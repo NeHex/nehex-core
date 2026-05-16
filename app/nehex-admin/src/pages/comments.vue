@@ -566,12 +566,12 @@ watch(currentPage, async (page, previous) => {
 .header-text h1 {
   margin: 0;
   font-size: 28px;
-  color: #f1f4ff;
+  color: var(--admin-text-heading);
 }
 
 .header-text p {
   margin: 6px 0 0;
-  color: #aeb8cc;
+  color: var(--admin-text-muted);
 }
 
 .search-row {
@@ -585,7 +585,7 @@ watch(currentPage, async (page, previous) => {
 }
 
 .list-head {
-  color: #aeb8cc;
+  color: var(--admin-text-muted);
   font-size: 14px;
 }
 
@@ -603,8 +603,8 @@ watch(currentPage, async (page, previous) => {
 
 .comment-card {
   display: block;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  background: linear-gradient(180deg, #151c2a, #121826);
+  border: 1px solid var(--admin-border);
+  background: var(--admin-card-bg-strong);
   transition:
     transform 0.22s ease,
     box-shadow 0.22s ease;
@@ -612,7 +612,7 @@ watch(currentPage, async (page, previous) => {
 
 .comment-card:hover {
   transform: translateY(-2px);
-  box-shadow: 0 14px 24px rgba(0, 0, 0, 0.25);
+  box-shadow: var(--admin-shadow-hover);
 }
 
 .comment-card-shell {
@@ -636,7 +636,7 @@ watch(currentPage, async (page, previous) => {
 }
 
 .time {
-  color: #9fb0d4;
+  color: var(--admin-text-faint);
   font-size: 12px;
   white-space: nowrap;
 }
@@ -646,8 +646,8 @@ watch(currentPage, async (page, previous) => {
   gap: 6px;
   padding: 8px 9px;
   border-radius: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--admin-border-soft);
+  background: var(--admin-card-bg-softer);
 }
 
 .summary-item {
@@ -659,13 +659,13 @@ watch(currentPage, async (page, previous) => {
 .summary-label {
   flex-shrink: 0;
   font-size: 12px;
-  color: #8fa2c9;
+  color: var(--admin-text-faint);
 }
 
 .summary-value {
   min-width: 0;
   font-size: 12px;
-  color: #d5def0;
+  color: var(--admin-text-secondary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -675,9 +675,9 @@ watch(currentPage, async (page, previous) => {
   margin: 0;
   padding: 8px 9px;
   border-radius: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(3, 7, 16, 0.26);
-  color: #dce5f8;
+  border: 1px solid var(--admin-border-soft);
+  background: var(--admin-card-bg-softer);
+  color: var(--admin-accent-text);
   font-size: 13px;
   line-height: 1.56;
   display: -webkit-box;
@@ -695,9 +695,9 @@ watch(currentPage, async (page, previous) => {
 
 .empty-card {
   grid-column: 1 / -1;
-  border: 1px dashed rgba(255, 255, 255, 0.18);
-  background: rgba(18, 24, 38, 0.65);
-  color: #9fb0d4;
+  border: 1px dashed var(--admin-empty-border);
+  background: var(--admin-dashed-bg);
+  color: var(--admin-text-faint);
   text-align: center;
   padding: 22px;
 }
@@ -719,8 +719,8 @@ watch(currentPage, async (page, previous) => {
 }
 
 .dialog-card {
-  background: linear-gradient(180deg, #151c2a, #121826);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: var(--admin-card-bg-strong);
+  border: 1px solid var(--admin-border);
 }
 
 .dialog-title {

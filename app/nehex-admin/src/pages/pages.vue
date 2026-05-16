@@ -177,7 +177,7 @@ function getPageCardStyle(page: StandalonePageItem): Record<string, string> {
   const raw = (page.cover_image || '').trim()
   if (!raw) {
     return {
-      background: 'linear-gradient(140deg, #1e2433 0%, #131827 100%)',
+      background: 'linear-gradient(140deg, var(--admin-surface) 0%, var(--admin-surface-2) 100%)',
     }
   }
 
@@ -220,12 +220,12 @@ watch(isManageRoute, async (active, previous) => {
 .header-text h1 {
   margin: 0;
   font-size: 28px;
-  color: #f1f4ff;
+  color: var(--admin-text-heading);
 }
 
 .header-text p {
   margin: 6px 0 0;
-  color: #aeb8cc;
+  color: var(--admin-text-muted);
 }
 
 .quick-create-btn {
@@ -242,7 +242,7 @@ watch(isManageRoute, async (active, previous) => {
 .add-card {
   position: relative;
   min-height: 240px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  border: 1px solid var(--admin-border);
 }
 
 .page-card {
@@ -254,7 +254,7 @@ watch(isManageRoute, async (active, previous) => {
 
 .page-card:hover {
   transform: translateY(-3px);
-  box-shadow: 0 16px 30px rgba(0, 0, 0, 0.28);
+  box-shadow: var(--admin-shadow-hover);
 }
 
 .page-overlay {
@@ -286,8 +286,8 @@ watch(isManageRoute, async (active, previous) => {
 .page-title {
   font-size: 20px;
   font-weight: 700;
-  color: #ffffff;
-  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.65);
+  color: var(--admin-text-heading);
+  text-shadow: var(--admin-cover-shadow);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -297,9 +297,9 @@ watch(isManageRoute, async (active, previous) => {
   display: flex;
   align-items: center;
   gap: 8px;
-  color: #d4dfff;
+  color: var(--admin-accent-text);
   font-size: 13px;
-  text-shadow: 0 1px 8px rgba(0, 0, 0, 0.6);
+  text-shadow: var(--admin-cover-shadow);
 }
 
 .add-card {
@@ -310,8 +310,8 @@ watch(isManageRoute, async (active, previous) => {
   flex-direction: column;
   gap: 8px;
   border-style: dashed;
-  color: #b8c5e6;
-  background: linear-gradient(140deg, rgba(28, 34, 47, 0.92), rgba(19, 24, 36, 0.92));
+  color: var(--admin-accent-muted);
+  background: var(--admin-add-card-bg);
   transition:
     border-color 0.2s ease,
     color 0.2s ease,
@@ -319,8 +319,8 @@ watch(isManageRoute, async (active, previous) => {
 }
 
 .add-card:hover {
-  border-color: rgba(255, 255, 255, 0.34);
-  color: #e8efff;
+  border-color: var(--admin-border-strong);
+  color: var(--admin-accent-text);
   filter: brightness(1.04);
 }
 
@@ -335,8 +335,8 @@ watch(isManageRoute, async (active, previous) => {
 }
 
 .dialog-card {
-  background: linear-gradient(180deg, #151c2a, #121826);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: var(--admin-card-bg-strong);
+  border: 1px solid var(--admin-border);
 }
 
 .dialog-title {

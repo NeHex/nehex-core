@@ -304,25 +304,25 @@ function insertSelectedImage(): void {
 
 <style scoped>
 .media-picker-card {
-  background: #111826;
-  color: #edf3ff;
+  background: var(--admin-surface);
+  color: var(--admin-text-primary);
 }
 
 .media-picker-head {
   padding: 14px 16px 12px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  border-bottom: 1px solid var(--admin-border-soft);
 }
 
 .media-picker-title {
   font-size: 18px;
   font-weight: 700;
-  color: #edf3ff;
+  color: var(--admin-text-heading);
 }
 
 .media-picker-subtitle {
   margin-top: 4px;
   font-size: 13px;
-  color: #9fb0d4;
+  color: var(--admin-text-faint);
 }
 
 .media-picker-body {
@@ -337,10 +337,10 @@ function insertSelectedImage(): void {
 }
 
 .folder-sidebar {
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--admin-border-soft);
   border-radius: 12px;
   padding: 8px;
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--admin-card-bg-soft);
   overflow: auto;
   display: flex;
   flex-direction: column;
@@ -348,10 +348,10 @@ function insertSelectedImage(): void {
 }
 
 .folder-item {
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--admin-border-soft);
   border-radius: 10px;
-  background: rgba(255, 255, 255, 0.04);
-  color: #d9e6ff;
+  background: var(--admin-card-bg-soft);
+  color: var(--admin-text-secondary);
   padding: 8px 10px;
   text-align: left;
   display: flex;
@@ -362,12 +362,12 @@ function insertSelectedImage(): void {
 }
 
 .folder-item:hover {
-  border-color: rgba(160, 191, 255, 0.6);
+  border-color: var(--admin-accent-border);
 }
 
 .folder-item--active {
-  border-color: rgba(160, 191, 255, 0.85);
-  background: rgba(116, 147, 216, 0.2);
+  border-color: var(--admin-accent-border-strong);
+  background: var(--admin-accent-bg);
 }
 
 .folder-item-name {
@@ -379,14 +379,14 @@ function insertSelectedImage(): void {
 
 .folder-item-count {
   font-size: 12px;
-  color: #9fb0d4;
+  color: var(--admin-text-faint);
 }
 
 .image-panel {
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--admin-border-soft);
   border-radius: 12px;
   padding: 10px;
-  background: rgba(255, 255, 255, 0.02);
+  background: var(--admin-card-bg-softer);
   overflow: auto;
 }
 
@@ -397,9 +397,9 @@ function insertSelectedImage(): void {
 }
 
 .image-item {
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--admin-border-soft);
   border-radius: 10px;
-  background: #0f1624;
+  background: var(--admin-surface-2);
   padding: 8px;
   text-align: left;
   cursor: pointer;
@@ -407,13 +407,13 @@ function insertSelectedImage(): void {
 }
 
 .image-item:hover {
-  border-color: rgba(160, 191, 255, 0.6);
+  border-color: var(--admin-accent-border);
   transform: translateY(-1px);
 }
 
 .image-item--active {
-  border-color: rgba(160, 191, 255, 0.95);
-  box-shadow: 0 0 0 1px rgba(160, 191, 255, 0.25);
+  border-color: var(--admin-accent-border-strong);
+  box-shadow: 0 0 0 1px var(--admin-accent-bg);
 }
 
 .image-item img {
@@ -427,7 +427,7 @@ function insertSelectedImage(): void {
 .image-item-name {
   margin-top: 6px;
   font-size: 12px;
-  color: #c7d7f5;
+  color: var(--admin-accent-text);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -437,13 +437,13 @@ function insertSelectedImage(): void {
   min-height: 220px;
   display: grid;
   place-items: center;
-  color: #9fb0d4;
+  color: var(--admin-text-faint);
   font-size: 13px;
 }
 
 .media-picker-actions {
   padding: 8px 16px 14px;
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  border-top: 1px solid var(--admin-border-soft);
 }
 
 @media (max-width: 900px) {

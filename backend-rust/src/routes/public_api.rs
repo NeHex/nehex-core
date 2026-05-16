@@ -125,6 +125,7 @@ struct ArticleRow {
     id: i64,
     title: String,
     article_top_image: Option<String>,
+    ai_summary: Option<String>,
     class_name: String,
     read_count: i64,
     like_count: i64,
@@ -142,6 +143,8 @@ struct ArticleItem {
     title: String,
     #[serde(rename = "articleTopImage")]
     article_top_image: Option<String>,
+    #[serde(rename = "aiSummary")]
+    ai_summary: Option<String>,
     #[serde(rename = "class")]
     class_name: String,
     #[serde(rename = "read")]
@@ -215,6 +218,7 @@ async fn get_articles(
             id::bigint AS id,
             title,
             "articleTopImage" AS article_top_image,
+            ai_summary,
             class AS class_name,
             read::bigint AS read_count,
             like_count::bigint AS like_count,
@@ -337,6 +341,7 @@ async fn fetch_published_article(state: &AppState, article_id: i64) -> AppResult
             id::bigint AS id,
             title,
             "articleTopImage" AS article_top_image,
+            ai_summary,
             class AS class_name,
             read::bigint AS read_count,
             like_count::bigint AS like_count,
@@ -364,6 +369,7 @@ fn map_article_item(row: ArticleRow) -> ArticleItem {
         id: row.id,
         title: row.title,
         article_top_image: row.article_top_image,
+        ai_summary: row.ai_summary,
         class_name: row.class_name,
         read_count: row.read_count,
         like_count: row.like_count,

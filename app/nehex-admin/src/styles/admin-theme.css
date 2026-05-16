@@ -1,0 +1,137 @@
+:root {
+  --admin-text-primary: #edf1ff;
+  --admin-text-heading: #f2f6ff;
+  --admin-text-secondary: #dbe7ff;
+  --admin-text-muted: #aeb8cc;
+  --admin-text-faint: #9eb1d8;
+
+  --admin-border: rgba(255, 255, 255, 0.1);
+  --admin-border-soft: rgba(255, 255, 255, 0.08);
+  --admin-border-strong: rgba(255, 255, 255, 0.18);
+
+  --admin-surface: #111826;
+  --admin-surface-2: #0f1624;
+  --admin-surface-3: #0b1220;
+
+  --admin-card-bg: linear-gradient(180deg, rgba(24, 30, 41, 0.96), rgba(19, 24, 34, 0.96));
+  --admin-card-bg-strong: linear-gradient(180deg, #151c2a, #121826);
+  --admin-card-bg-soft: rgba(255, 255, 255, 0.03);
+  --admin-card-bg-softer: rgba(255, 255, 255, 0.02);
+
+  --admin-overlay-mask: rgba(0, 0, 0, 0.34);
+  --admin-overlay-panel: rgba(16, 24, 39, 0.82);
+  --admin-overlay-panel-soft: rgba(10, 14, 22, 0.6);
+  --admin-shadow-hover: 0 16px 30px rgba(0, 0, 0, 0.28);
+  --admin-cover-shadow: 0 2px 12px rgba(0, 0, 0, 0.62);
+
+  --admin-dashed-bg: rgba(18, 24, 38, 0.65);
+  --admin-empty-border: rgba(255, 255, 255, 0.18);
+
+  --admin-add-card-color: #b8c5e6;
+  --admin-add-card-hover-color: #e8efff;
+  --admin-add-card-bg: linear-gradient(140deg, rgba(28, 34, 47, 0.92), rgba(19, 24, 36, 0.92));
+
+  --admin-link: #8fb0ff;
+  --admin-accent-text: #dbe7ff;
+  --admin-accent-muted: #b8c5e6;
+  --admin-accent-border: rgba(173, 193, 241, 0.42);
+  --admin-accent-border-strong: rgba(182, 203, 255, 0.86);
+  --admin-accent-bg-soft: rgba(142, 165, 219, 0.12);
+  --admin-accent-bg: rgba(142, 165, 219, 0.2);
+  --admin-accent-bg-strong: rgba(205, 218, 255, 0.6);
+  --admin-danger-border: rgba(255, 97, 97, 0.4);
+  --admin-danger-bg: linear-gradient(180deg, rgba(45, 15, 15, 0.96), rgba(26, 11, 11, 0.96));
+  --admin-danger-text: #ffd3d3;
+}
+
+.v-theme--nehex-dark {
+  --admin-text-primary: #edf1ff;
+  --admin-text-heading: #f2f6ff;
+  --admin-text-secondary: #dbe7ff;
+  --admin-text-muted: #aeb8cc;
+  --admin-text-faint: #9eb1d8;
+
+  --admin-border: rgba(255, 255, 255, 0.1);
+  --admin-border-soft: rgba(255, 255, 255, 0.08);
+  --admin-border-strong: rgba(255, 255, 255, 0.18);
+
+  --admin-surface: #111826;
+  --admin-surface-2: #0f1624;
+  --admin-surface-3: #0b1220;
+
+  --admin-card-bg: linear-gradient(180deg, rgba(24, 30, 41, 0.96), rgba(19, 24, 34, 0.96));
+  --admin-card-bg-strong: linear-gradient(180deg, #151c2a, #121826);
+  --admin-card-bg-soft: rgba(255, 255, 255, 0.03);
+  --admin-card-bg-softer: rgba(255, 255, 255, 0.02);
+
+  --admin-overlay-mask: rgba(0, 0, 0, 0.34);
+  --admin-overlay-panel: rgba(16, 24, 39, 0.82);
+  --admin-overlay-panel-soft: rgba(10, 14, 22, 0.6);
+  --admin-shadow-hover: 0 16px 30px rgba(0, 0, 0, 0.28);
+  --admin-cover-shadow: 0 2px 12px rgba(0, 0, 0, 0.62);
+
+  --admin-dashed-bg: rgba(18, 24, 38, 0.65);
+  --admin-empty-border: rgba(255, 255, 255, 0.18);
+
+  --admin-add-card-color: #b8c5e6;
+  --admin-add-card-hover-color: #e8efff;
+  --admin-add-card-bg: linear-gradient(140deg, rgba(28, 34, 47, 0.92), rgba(19, 24, 36, 0.92));
+
+  --admin-link: #8fb0ff;
+  --admin-accent-text: #dbe7ff;
+  --admin-accent-muted: #b8c5e6;
+  --admin-accent-border: rgba(173, 193, 241, 0.42);
+  --admin-accent-border-strong: rgba(182, 203, 255, 0.86);
+  --admin-accent-bg-soft: rgba(142, 165, 219, 0.12);
+  --admin-accent-bg: rgba(142, 165, 219, 0.2);
+  --admin-accent-bg-strong: rgba(205, 218, 255, 0.6);
+  --admin-danger-border: rgba(255, 97, 97, 0.4);
+  --admin-danger-bg: linear-gradient(180deg, rgba(45, 15, 15, 0.96), rgba(26, 11, 11, 0.96));
+  --admin-danger-text: #ffd3d3;
+}
+
+.v-theme--nehex-light {
+  --admin-text-primary: #233a5b;
+  --admin-text-heading: #1f3352;
+  --admin-text-secondary: #2f4a72;
+  --admin-text-muted: #647892;
+  --admin-text-faint: #768aa1;
+
+  --admin-border: rgba(74, 111, 165, 0.22);
+  --admin-border-soft: rgba(74, 111, 165, 0.18);
+  --admin-border-strong: rgba(74, 111, 165, 0.3);
+
+  --admin-surface: #ffffff;
+  --admin-surface-2: #f6efe0;
+  --admin-surface-3: #f2ead9;
+
+  --admin-card-bg: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(247, 241, 228, 0.98));
+  --admin-card-bg-strong: linear-gradient(180deg, #ffffff, #f7f1e4);
+  --admin-card-bg-soft: rgba(74, 111, 165, 0.08);
+  --admin-card-bg-softer: rgba(74, 111, 165, 0.06);
+
+  --admin-overlay-mask: rgba(20, 35, 56, 0.24);
+  --admin-overlay-panel: rgba(74, 111, 165, 0.14);
+  --admin-overlay-panel-soft: rgba(74, 111, 165, 0.12);
+  --admin-shadow-hover: 0 14px 28px rgba(74, 111, 165, 0.18);
+  --admin-cover-shadow: 0 1px 8px rgba(35, 58, 91, 0.24);
+
+  --admin-dashed-bg: rgba(74, 111, 165, 0.09);
+  --admin-empty-border: rgba(74, 111, 165, 0.3);
+
+  --admin-add-card-color: #4a6fa5;
+  --admin-add-card-hover-color: #1f3352;
+  --admin-add-card-bg: linear-gradient(140deg, rgba(74, 111, 165, 0.13), rgba(74, 111, 165, 0.06));
+
+  --admin-link: #4a6fa5;
+  --admin-accent-text: #2f4a72;
+  --admin-accent-muted: #4a6fa5;
+  --admin-accent-border: rgba(74, 111, 165, 0.34);
+  --admin-accent-border-strong: rgba(74, 111, 165, 0.5);
+  --admin-accent-bg-soft: rgba(74, 111, 165, 0.1);
+  --admin-accent-bg: rgba(74, 111, 165, 0.16);
+  --admin-accent-bg-strong: rgba(74, 111, 165, 0.24);
+  --admin-danger-border: rgba(188, 58, 58, 0.4);
+  --admin-danger-bg: linear-gradient(180deg, rgba(255, 235, 235, 0.98), rgba(248, 216, 216, 0.98));
+  --admin-danger-text: #8b2727;
+}

@@ -3,7 +3,7 @@
     <header class="editor-header">
       <div class="header-text">
         <h1>{{ isEditing ? '编辑文章' : '新增文章' }}</h1>
-        <p>Nehex Editor Ver1.2.1</p>
+        <p>Nehex Editor Ver1.3.1</p>
       </div>
       <div class="header-actions">
         <v-btn
@@ -16,17 +16,17 @@
         <v-btn
           color="secondary"
           prepend-icon="mdi-file-document-edit-outline"
-          :loading="submitting"
+          :loading="submitting && activeSubmitAction === 'draft'"
           variant="tonal"
-          @click="submitEditor(0, true)"
+          @click="submitDraft"
         >
           保存草稿
         </v-btn>
         <v-btn
           color="primary"
           prepend-icon="mdi-publish"
-          :loading="submitting"
-          @click="submitEditor(1)"
+          :loading="submitting && activeSubmitAction === 'publish'"
+          @click="submitPublish"
         >
           {{ isEditing ? '发布并返回' : '发布文章' }}
         </v-btn>
@@ -282,6 +282,26 @@
             label="发布状态（status）"
             variant="outlined"
           />
+
+          <v-textarea
+            v-model="editorForm.aiSummary"
+            auto-grow
+            label="AI总结（aiSummary）"
+            min-rows="3"
+            rows="4"
+            variant="outlined"
+          />
+
+          <v-btn
+            color="primary"
+            prepend-icon="mdi-creation-outline"
+            :loading="generatingAiSummary"
+            :disabled="!editorForm.content.trim()"
+            variant="tonal"
+            @click="generateAiSummaryText"
+          >
+            生成AI总结
+          </v-btn>
         </div>
       </aside>
     </div>
@@ -310,6 +330,7 @@ import {
 import { useGlobalSnackbar } from '@/composables/useGlobalSnackbar'
 import { fetchArticleClassOptions, type ArticleClassOption } from '@/services/settings'
 import { uploadMarkdownImage } from '@/services/storage'
+import { generateArticleSummary } from '@/services/ai'
 import ImageUploadHintCard from '@/components/admin/ImageUploadHintCard.vue'
 import MediaLibraryImagePicker from '@/components/admin/MediaLibraryImagePicker.vue'
 import UnsavedChangesLeaveDialog from '@/components/common/UnsavedChangesLeaveDialog.vue'
@@ -332,6 +353,7 @@ type EditorForm = {
   className: string
   tag: string
   articleTopImage: string
+  aiSummary: string
   top: number
   read: number
   status: number
@@ -354,6 +376,7 @@ type EditorSnapshot = {
   className: string
   tag: string
   articleTopImage: string
+  aiSummary: string
   top: number
   read: number
   status: 0 | 1
@@ -373,7 +396,9 @@ const statusOptions = [
 
 const loading = ref(false)
 const submitting = ref(false)
+const activeSubmitAction = ref<'draft' | 'publish' | null>(null)
 const uploadingImage = ref(false)
+const generatingAiSummary = ref(false)
 const mediaPickerVisible = ref(false)
 const errorMessage = ref('')
 const successMessage = ref('')
@@ -397,6 +422,7 @@ const editorForm = reactive<EditorForm>({
   className: 'default',
   tag: '',
   articleTopImage: '',
+  aiSummary: '',
   top: 0,
   read: 0,
   status: 1,
@@ -419,6 +445,7 @@ function _buildEditorSnapshot(): EditorSnapshot {
     className: editorForm.className.trim(),
     tag: editorForm.tag.trim(),
     articleTopImage: editorForm.articleTopImage.trim(),
+    aiSummary: editorForm.aiSummary.trim(),
     top: normalizeNumber(editorForm.top),
     read: normalizeNumber(editorForm.read),
     status: normalizeStatus(editorForm.status),
@@ -796,6 +823,7 @@ function buildPayload(statusOverride?: 0 | 1): ArticleUpsertPayload | null {
     class: className,
     tag: editorForm.tag.trim() || null,
     articleTopImage: editorForm.articleTopImage.trim() || null,
+    aiSummary: editorForm.aiSummary.trim() || null,
     top: normalizeNumber(editorForm.top),
     read: normalizeNumber(editorForm.read),
     status,
@@ -808,6 +836,7 @@ function fillEditorForm(article: {
   class?: string | null
   tag?: string | null
   articleTopImage?: string | null
+  aiSummary?: string | null
   top?: number | null
   read?: number | null
   status?: number | null
@@ -819,11 +848,35 @@ function fillEditorForm(article: {
   editorForm.className = className
   editorForm.tag = article.tag?.trim() || ''
   editorForm.articleTopImage = article.articleTopImage?.trim() || ''
+  editorForm.aiSummary = article.aiSummary?.trim() || ''
   editorForm.top = Number.isFinite(article.top) ? Number(article.top) : 0
   editorForm.read = Number.isFinite(article.read) ? Number(article.read) : 0
   const rawStatus = Number(article.status)
   editorForm.status = Number.isFinite(rawStatus) ? normalizeStatus(rawStatus) : 1
   editorForm.content = article.content || ''
+}
+
+async function generateAiSummaryText(): Promise<void> {
+  const content = editorForm.content.trim()
+  if (!content) {
+    showGlobalError('请先填写文章内容后再生成 AI 总结')
+    return
+  }
+  if (generatingAiSummary.value) {
+    return
+  }
+
+  generatingAiSummary.value = true
+  try {
+    const summary = await generateArticleSummary(content)
+    editorForm.aiSummary = summary
+    showGlobalSuccess('AI 总结已生成')
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'AI 总结生成失败'
+    showGlobalError(message)
+  } finally {
+    generatingAiSummary.value = false
+  }
 }
 
 async function loadClassOptions(): Promise<void> {
@@ -858,7 +911,11 @@ async function loadArticleDetail(): Promise<void> {
   }
 }
 
-async function submitEditor(nextStatus?: 0 | 1, stayOnPage = false): Promise<void> {
+async function submitEditor(
+  nextStatus?: 0 | 1,
+  stayOnPage = false,
+  action: 'draft' | 'publish' = 'publish',
+): Promise<void> {
   successMessage.value = ''
   errorMessage.value = ''
 
@@ -867,6 +924,7 @@ async function submitEditor(nextStatus?: 0 | 1, stayOnPage = false): Promise<voi
     return
   }
 
+  activeSubmitAction.value = action
   submitting.value = true
 
   try {
@@ -901,8 +959,17 @@ async function submitEditor(nextStatus?: 0 | 1, stayOnPage = false): Promise<voi
     errorMessage.value = message
     showGlobalError(message)
   } finally {
+    activeSubmitAction.value = null
     submitting.value = false
   }
+}
+
+async function submitDraft(): Promise<void> {
+  await submitEditor(0, true, 'draft')
+}
+
+async function submitPublish(): Promise<void> {
+  await submitEditor(1, false, 'publish')
 }
 
 async function goManage(): Promise<void> {
@@ -936,12 +1003,12 @@ onMounted(async () => {
 .header-text h1 {
   margin: 0;
   font-size: 28px;
-  color: #f1f4ff;
+  color: var(--admin-text-heading);
 }
 
 .header-text p {
   margin: 6px 0 0;
-  color: #aeb8cc;
+  color: var(--admin-text-muted);
 }
 
 .header-actions {
@@ -961,9 +1028,9 @@ onMounted(async () => {
 
 .editor-card,
 .settings-card {
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: 1px solid var(--admin-border);
   border-radius: 16px;
-  background: #111826;
+  background: var(--admin-surface);
   min-height: 0;
 }
 
@@ -979,8 +1046,8 @@ onMounted(async () => {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(255, 255, 255, 0.04);
+  border-bottom: 1px solid var(--admin-border-soft);
+  background: var(--admin-card-bg-soft);
 }
 
 .editor-title-wrap {
@@ -993,12 +1060,12 @@ onMounted(async () => {
 .editor-card-title {
   font-size: 14px;
   font-weight: 700;
-  color: #dbe7ff;
+  color: var(--admin-text-secondary);
 }
 
 .editor-card-subtitle {
   font-size: 12px;
-  color: #9eb0ce;
+  color: var(--admin-text-faint);
 }
 
 .editor-toolbar {
@@ -1042,8 +1109,8 @@ onMounted(async () => {
 
 .markdown-input {
   resize: none;
-  background: #0f1624;
-  color: #f4f7ff;
+  background: var(--admin-surface-2);
+  color: var(--admin-text-primary);
   font-size: 14px;
   line-height: 1.7;
   padding: 14px;
@@ -1053,7 +1120,7 @@ onMounted(async () => {
 .markdown-preview {
   overflow: auto;
   padding: 16px;
-  color: #dde6fb;
+  color: var(--admin-text-secondary);
   line-height: 1.75;
 }
 
@@ -1069,10 +1136,10 @@ onMounted(async () => {
   inset: 10px;
   display: grid;
   place-items: center;
-  border: 2px dashed rgba(115, 164, 255, 0.88);
+  border: 2px dashed var(--admin-accent-border-strong);
   border-radius: 12px;
-  background: rgba(16, 24, 39, 0.82);
-  color: #d7e6ff;
+  background: var(--admin-overlay-panel);
+  color: var(--admin-accent-text);
   font-size: 14px;
   font-weight: 600;
   pointer-events: none;
@@ -1089,12 +1156,12 @@ onMounted(async () => {
 .settings-head h2 {
   margin: 0;
   font-size: 18px;
-  color: #e8efff;
+  color: var(--admin-accent-text);
 }
 
 .settings-head p {
   margin: 6px 0 0;
-  color: #9eb0ce;
+  color: var(--admin-text-faint);
   font-size: 13px;
 }
 
@@ -1117,19 +1184,19 @@ onMounted(async () => {
 :deep(.markdown-preview h2),
 :deep(.markdown-preview h3),
 :deep(.markdown-preview h4) {
-  color: #ffffff;
+  color: var(--admin-text-heading);
   margin: 18px 0 10px;
   line-height: 1.35;
 }
 
 :deep(.markdown-preview a) {
-  color: #8ab5ff;
+  color: var(--admin-link);
 }
 
 :deep(.markdown-preview code) {
   padding: 1px 5px;
   border-radius: 6px;
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--admin-border-soft);
   font-size: 13px;
 }
 
@@ -1137,7 +1204,7 @@ onMounted(async () => {
   overflow: auto;
   padding: 10px;
   border-radius: 10px;
-  background: rgba(0, 0, 0, 0.34);
+  background: var(--admin-overlay-mask);
 }
 
 :deep(.markdown-preview pre code) {
@@ -1148,8 +1215,8 @@ onMounted(async () => {
 :deep(.markdown-preview blockquote) {
   margin: 12px 0;
   padding: 8px 12px;
-  border-left: 3px solid rgba(126, 163, 237, 0.85);
-  background: rgba(126, 163, 237, 0.12);
+  border-left: 3px solid var(--admin-accent-border-strong);
+  background: var(--admin-accent-bg-soft);
 }
 
 :deep(.markdown-preview ul),
@@ -1158,7 +1225,7 @@ onMounted(async () => {
 }
 
 :deep(.preview-empty) {
-  color: #97a4bf;
+  color: var(--admin-text-faint);
 }
 
 @media (max-width: 1100px) {

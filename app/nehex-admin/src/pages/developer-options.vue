@@ -324,18 +324,18 @@ function persistWarningAccepted(): void {
 .header-text h1 {
   margin: 0;
   font-size: 28px;
-  color: #f1f4ff;
+  color: var(--admin-text-heading);
 }
 
 .header-text p {
   margin: 6px 0 0;
-  color: #aeb8cc;
+  color: var(--admin-text-muted);
 }
 
 .section-card {
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background: linear-gradient(180deg, rgba(24, 30, 41, 0.96), rgba(19, 24, 34, 0.96));
-  color: #edf1ff;
+  border: 1px solid var(--admin-border-soft);
+  background: var(--admin-card-bg);
+  color: var(--admin-text-primary);
 }
 
 .section-title {
@@ -372,19 +372,19 @@ function persistWarningAccepted(): void {
 }
 
 .result-meta {
-  color: #b7c6e6;
+  color: var(--admin-accent-muted);
   font-size: 13px;
 }
 
 .terminal-card {
-  background: #0c1118;
-  border-color: rgba(113, 138, 179, 0.42);
+  background: var(--admin-surface-3);
+  border-color: var(--admin-accent-border);
 }
 
 .terminal-pre {
   margin: 0;
   padding: 12px;
-  color: #d5e3ff;
+  color: var(--admin-accent-text);
   line-height: 1.5;
   font-size: 12px;
   max-height: 360px;
@@ -409,22 +409,22 @@ function persistWarningAccepted(): void {
 }
 
 .log-meta {
-  color: #9eb1d8;
+  color: var(--admin-text-faint);
   font-size: 13px;
 }
 
 .warning-card {
-  border: 1px solid rgba(255, 97, 97, 0.4);
-  background: linear-gradient(180deg, rgba(45, 15, 15, 0.96), rgba(26, 11, 11, 0.96));
+  border: 1px solid var(--admin-danger-border);
+  background: var(--admin-danger-bg);
 }
 
 .warning-title {
-  color: #ffd3d3;
+  color: var(--admin-danger-text);
   font-weight: 700;
 }
 
 .warning-text {
-  color: #ffd6d6;
+  color: var(--admin-danger-text);
   line-height: 1.7;
 }
 

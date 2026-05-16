@@ -1,4 +1,5 @@
 pub mod admin_api;
+pub mod admin_ai;
 pub mod admin_auth;
 pub mod admin_backup;
 pub mod admin_comments;

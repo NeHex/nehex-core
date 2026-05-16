@@ -528,12 +528,12 @@ onMounted(async () => {
 .header-text h1 {
   margin: 0;
   font-size: 28px;
-  color: #f1f4ff;
+  color: var(--admin-text-heading);
 }
 
 .header-text p {
   margin: 6px 0 0;
-  color: #aeb8cc;
+  color: var(--admin-text-muted);
 }
 
 .header-actions {
@@ -563,8 +563,8 @@ onMounted(async () => {
 }
 
 .panel-card {
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  background: linear-gradient(180deg, #151c2a, #121826);
+  border: 1px solid var(--admin-border);
+  background: var(--admin-card-bg-strong);
   min-height: 0;
   display: flex;
   flex-direction: column;
@@ -578,7 +578,7 @@ onMounted(async () => {
 }
 
 .link-editor-tip {
-  color: #9fb0d4;
+  color: var(--admin-text-faint);
   font-size: 13px;
 }
 
@@ -604,7 +604,7 @@ onMounted(async () => {
 }
 
 .preview-count {
-  color: #9fb0d4;
+  color: var(--admin-text-faint);
   font-size: 13px;
 }
 
@@ -619,10 +619,10 @@ onMounted(async () => {
 }
 
 .preview-item {
-  border: 1px solid rgba(255, 255, 255, 0.14);
+  border: 1px solid var(--admin-border-strong);
   border-radius: 12px;
   overflow: hidden;
-  background: rgba(10, 14, 22, 0.6);
+  background: var(--admin-overlay-panel-soft);
   cursor: grab;
   transition: border-color 0.2s ease, transform 0.2s ease;
 }
@@ -632,7 +632,7 @@ onMounted(async () => {
   width: 100%;
   height: 110px;
   object-fit: cover;
-  background: #0f1624;
+  background: var(--admin-surface-2);
 }
 
 .preview-item-meta {
@@ -640,7 +640,7 @@ onMounted(async () => {
   align-items: center;
   gap: 4px;
   padding: 6px;
-  color: #c8d6f3;
+  color: var(--admin-accent-text);
   font-size: 12px;
 }
 
@@ -650,7 +650,7 @@ onMounted(async () => {
 
 .preview-item:hover {
   transform: translateY(-1px);
-  border-color: rgba(205, 218, 255, 0.6);
+  border-color: var(--admin-accent-bg-strong);
 }
 
 .preview-item--dragging {
@@ -658,12 +658,12 @@ onMounted(async () => {
 }
 
 .preview-item--drop-target {
-  border-color: rgba(205, 218, 255, 0.9);
-  box-shadow: 0 0 0 2px rgba(157, 185, 255, 0.28);
+  border-color: var(--admin-accent-border-strong);
+  box-shadow: 0 0 0 2px var(--admin-accent-bg);
 }
 
 .preview-empty {
-  color: #93a4c7;
+  color: var(--admin-text-faint);
   font-size: 14px;
 }
 

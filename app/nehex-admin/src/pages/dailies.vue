@@ -280,12 +280,12 @@ watch(isManageRoute, async (active, previous) => {
 .header-text h1 {
   margin: 0;
   font-size: 28px;
-  color: #f1f4ff;
+  color: var(--admin-text-heading);
 }
 
 .header-text p {
   margin: 6px 0 0;
-  color: #aeb8cc;
+  color: var(--admin-text-muted);
 }
 
 .quick-create-btn {
@@ -302,7 +302,7 @@ watch(isManageRoute, async (active, previous) => {
 .add-card {
   position: relative;
   min-height: 220px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  border: 1px solid var(--admin-border);
 }
 
 .daily-card {
@@ -314,7 +314,7 @@ watch(isManageRoute, async (active, previous) => {
 
 .daily-card:hover {
   transform: translateY(-3px);
-  border-color: rgba(255, 255, 255, 0.28);
+  border-color: var(--admin-border-strong);
 }
 
 .daily-content {
@@ -328,7 +328,7 @@ watch(isManageRoute, async (active, previous) => {
   border-radius: 10px;
   overflow: hidden;
   margin-bottom: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.15);
+  border: 1px solid var(--admin-border-strong);
 }
 
 .card-header {
@@ -350,7 +350,7 @@ watch(isManageRoute, async (active, previous) => {
 .daily-title {
   font-size: 18px;
   font-weight: 700;
-  color: #ffffff;
+  color: var(--admin-text-heading);
   overflow: hidden;
   display: -webkit-box;
   -webkit-line-clamp: 2;
@@ -366,7 +366,7 @@ watch(isManageRoute, async (active, previous) => {
 
 .daily-body {
   margin-top: 10px;
-  color: #d2ddf6;
+  color: var(--admin-accent-text);
   font-size: 14px;
   line-height: 1.65;
   white-space: pre-wrap;
@@ -385,16 +385,16 @@ watch(isManageRoute, async (active, previous) => {
   display: flex;
   align-items: center;
   gap: 8px;
-  color: #c6d3ef;
+  color: var(--admin-text-faint);
   font-size: 13px;
 }
 
 .daily-weather {
   padding: 2px 8px;
   border-radius: 999px;
-  background: rgba(124, 151, 207, 0.28);
-  border: 1px solid rgba(158, 180, 233, 0.38);
-  color: #e7efff;
+  background: var(--admin-accent-bg);
+  border: 1px solid var(--admin-accent-border);
+  color: var(--admin-accent-text);
 }
 
 .add-card {
@@ -405,7 +405,7 @@ watch(isManageRoute, async (active, previous) => {
   flex-direction: column;
   gap: 8px;
   border-style: dashed;
-  color: #b8c5e6;
+  color: var(--admin-accent-muted);
   background: transparent;
   transition:
     border-color 0.2s ease,
@@ -414,8 +414,8 @@ watch(isManageRoute, async (active, previous) => {
 }
 
 .add-card:hover {
-  border-color: rgba(255, 255, 255, 0.34);
-  color: #e8efff;
+  border-color: var(--admin-border-strong);
+  color: var(--admin-accent-text);
   filter: brightness(1.04);
 }
 
@@ -430,8 +430,8 @@ watch(isManageRoute, async (active, previous) => {
 }
 
 .dialog-card {
-  background: linear-gradient(180deg, #151c2a, #121826);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: var(--admin-card-bg-strong);
+  border: 1px solid var(--admin-border);
 }
 
 .dialog-title {

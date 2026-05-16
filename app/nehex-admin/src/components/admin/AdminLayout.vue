@@ -4,20 +4,20 @@
     :class="{
       'admin-layout--with-subnav': hasSecondaryNav && !isMobile,
       'admin-layout--mobile': isMobile,
+      'admin-layout--dark': isDarkTheme,
+      'admin-layout--light': !isDarkTheme,
     }"
   >
     <v-app-bar
       v-if="isMobile"
       class="mobile-topbar"
-      color="#161b24"
       density="comfortable"
       flat
-      theme="dark"
+      :theme="resolvedVuetifyTheme"
     >
       <v-btn
         aria-label="打开导航菜单"
         icon="mdi-menu"
-        color="#edf3ff"
         variant="text"
         @click="toggleMainDrawer"
       />
@@ -33,7 +33,6 @@
         v-if="hasSecondaryNav"
         aria-label="打开二级导航"
         icon="mdi-tune-variant"
-        color="#edf3ff"
         variant="text"
         @click="toggleSecondaryDrawer"
       />
@@ -44,12 +43,16 @@
             v-bind="props"
             aria-label="更多操作"
             icon="mdi-dots-vertical"
-            color="#edf3ff"
             variant="text"
           />
         </template>
 
-        <v-list density="comfortable" min-width="170" theme="dark">
+        <v-list density="comfortable" min-width="170" :theme="resolvedVuetifyTheme">
+          <v-list-item
+            :prepend-icon="themeModeIcon"
+            :title="`主题模式：${themeModeLabel}（点击切换）`"
+            @click="cycleThemeMode"
+          />
           <v-list-item
             prepend-icon="mdi-open-in-new"
             title="前往站点"
@@ -71,7 +74,7 @@
       location="left"
       :scrim="true"
       temporary
-      theme="dark"
+      :theme="resolvedVuetifyTheme"
       width="288"
     >
       <div class="mobile-drawer-content">
@@ -84,7 +87,6 @@
             aria-label="关闭导航菜单"
             icon="mdi-close"
             size="small"
-            color="#edf3ff"
             variant="text"
             @click="mobileMainDrawer = false"
           />
@@ -118,10 +120,20 @@
           </template>
         </v-list>
 
-        <div class="sidebar-footer sidebar-footer--mobile">
-          <v-btn
-            class="site-btn"
-            block
+      <div class="sidebar-footer sidebar-footer--mobile">
+        <v-btn
+          class="theme-btn-mobile"
+          block
+          :aria-label="`切换主题模式，当前${themeModeLabel}`"
+          :prepend-icon="themeModeIcon"
+          variant="tonal"
+          @click="cycleThemeMode"
+        >
+          {{ `主题：${themeModeLabel}` }}
+        </v-btn>
+        <v-btn
+          class="site-btn"
+          block
             color="primary"
             prepend-icon="mdi-open-in-new"
             variant="tonal"
@@ -180,6 +192,19 @@
       </v-list>
 
       <div class="sidebar-footer">
+        <v-tooltip location="top" :text="`主题模式：${themeModeLabel}（点击切换）`">
+          <template #activator="{ props }">
+            <v-btn
+              v-bind="props"
+              class="theme-mode-btn"
+              :aria-label="`切换主题模式，当前${themeModeLabel}`"
+              :icon="themeModeIcon"
+              size="small"
+              variant="text"
+              @click="cycleThemeMode"
+            />
+          </template>
+        </v-tooltip>
         <v-btn
           class="site-btn"
           color="primary"
@@ -210,7 +235,7 @@
       location="right"
       :scrim="true"
       temporary
-      theme="dark"
+      :theme="resolvedVuetifyTheme"
       width="288"
     >
       <div class="mobile-secondary-nav">
@@ -220,7 +245,6 @@
             aria-label="关闭二级导航"
             icon="mdi-close"
             size="small"
-            color="#edf3ff"
             variant="text"
             @click="mobileSecondaryDrawer = false"
           />
@@ -262,9 +286,9 @@
 </template>
 
 <script lang="ts" setup>
-import { computed, ref, useSlots, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, useSlots, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { useDisplay } from 'vuetify'
+import { useDisplay, useTheme } from 'vuetify'
 import { adminLogout, resetAdminSessionCache } from '@/services/admin-api'
 import { fetchSiteUrl } from '@/services/settings'
 import { fetchAdminSettings } from '@/services/admin-settings'
@@ -284,6 +308,11 @@ type MenuItem = {
   dividerAfter?: boolean
   children?: MenuChildItem[]
 }
+
+type ThemeMode = 'dark' | 'light' | 'system'
+
+const THEME_MODE_STORAGE_KEY = 'nehex:admin-theme-mode'
+const THEME_MODES: ThemeMode[] = ['dark', 'light', 'system']
 
 const menuItems: MenuItem[] = [
   { icon: 'mdi-view-dashboard-outline', label: '仪表盘', to: '/' },
@@ -342,10 +371,15 @@ const menuItems: MenuItem[] = [
     ],
   },
   {
+    icon: 'mdi-robot-outline',
+    label: 'AI',
+    to: '/ai',
+    dividerBefore: true,
+  },
+  {
     icon: 'mdi-folder-image',
     label: '媒体库',
     to: '/media',
-    dividerBefore: true,
   },
   {
     icon: 'mdi-console',
@@ -368,9 +402,10 @@ const menuItems: MenuItem[] = [
 const router = useRouter()
 const route = useRoute()
 const display = useDisplay()
+const vuetifyTheme = useTheme()
 
 const adminBrandName = '𝙉𝙀𝙃𝙀𝙓'
-const adminVersion = __NEHEX_ADMIN_VERSION__.trim() || '1.2.9'
+const adminVersion = __NEHEX_ADMIN_VERSION__.trim() || '1.3.1'
 const expandedMenuKey = ref<string | null>(getDefaultExpandedMenuKey())
 const slots = useSlots()
 const hasSecondaryNav = computed(() => Boolean(slots['secondary-nav']))
@@ -378,6 +413,36 @@ const isMobile = computed(() => display.mdAndDown.value)
 const mobileMainDrawer = ref(false)
 const mobileSecondaryDrawer = ref(false)
 const kumaConfigDialog = ref(false)
+const themeMode = ref<ThemeMode>(readStoredThemeMode())
+const systemPrefersDark = ref(getSystemPrefersDark())
+let mediaQuery: MediaQueryList | null = null
+
+const resolvedVuetifyTheme = computed<'nehex-dark' | 'nehex-light'>(() => {
+  const prefersDark = themeMode.value === 'system' ? systemPrefersDark.value : themeMode.value === 'dark'
+  return prefersDark ? 'nehex-dark' : 'nehex-light'
+})
+
+const isDarkTheme = computed(() => resolvedVuetifyTheme.value === 'nehex-dark')
+
+const themeModeIcon = computed(() => {
+  if (themeMode.value === 'dark') {
+    return 'mdi-weather-night'
+  }
+  if (themeMode.value === 'light') {
+    return 'mdi-white-balance-sunny'
+  }
+  return 'mdi-theme-light-dark'
+})
+
+const themeModeLabel = computed(() => {
+  if (themeMode.value === 'dark') {
+    return '夜间'
+  }
+  if (themeMode.value === 'light') {
+    return '日间'
+  }
+  return '随设备'
+})
 
 watch(
   () => route.fullPath,
@@ -390,6 +455,37 @@ watch(isMobile, (nextMobile) => {
   if (!nextMobile) {
     mobileMainDrawer.value = false
     mobileSecondaryDrawer.value = false
+  }
+})
+
+watch(
+  resolvedVuetifyTheme,
+  (nextTheme) => {
+    vuetifyTheme.global.name.value = nextTheme
+  },
+  { immediate: true },
+)
+
+watch(themeMode, (nextMode) => {
+  if (typeof window === 'undefined') {
+    return
+  }
+  window.localStorage.setItem(THEME_MODE_STORAGE_KEY, nextMode)
+})
+
+onMounted(() => {
+  if (typeof window === 'undefined') {
+    return
+  }
+  mediaQuery = window.matchMedia('(prefers-color-scheme: dark)')
+  systemPrefersDark.value = mediaQuery.matches
+  registerMediaQueryListener(mediaQuery)
+})
+
+onBeforeUnmount(() => {
+  if (mediaQuery) {
+    unregisterMediaQueryListener(mediaQuery)
+    mediaQuery = null
   }
 })
 
@@ -431,6 +527,12 @@ function toggleMainDrawer(): void {
 
 function toggleSecondaryDrawer(): void {
   mobileSecondaryDrawer.value = !mobileSecondaryDrawer.value
+}
+
+function cycleThemeMode(): void {
+  const currentIndex = THEME_MODES.indexOf(themeMode.value)
+  const nextIndex = (currentIndex + 1) % THEME_MODES.length
+  themeMode.value = THEME_MODES[nextIndex] ?? 'dark'
 }
 
 function isMenuItemActive(item: MenuItem): boolean {
@@ -542,14 +644,112 @@ function goToKumaConfig(): void {
   closeMobileDrawers()
   void router.push('/settings')
 }
+
+function readStoredThemeMode(): ThemeMode {
+  if (typeof window === 'undefined') {
+    return 'dark'
+  }
+  const storedMode = window.localStorage.getItem(THEME_MODE_STORAGE_KEY)
+  if (storedMode === 'dark' || storedMode === 'light' || storedMode === 'system') {
+    return storedMode
+  }
+  return 'dark'
+}
+
+function getSystemPrefersDark(): boolean {
+  if (typeof window === 'undefined') {
+    return true
+  }
+  return window.matchMedia('(prefers-color-scheme: dark)').matches
+}
+
+function handleSystemThemeChange(event: MediaQueryListEvent): void {
+  systemPrefersDark.value = event.matches
+}
+
+function registerMediaQueryListener(query: MediaQueryList): void {
+  query.addEventListener('change', handleSystemThemeChange)
+}
+
+function unregisterMediaQueryListener(query: MediaQueryList): void {
+  query.removeEventListener('change', handleSystemThemeChange)
+}
 </script>
 
 <style scoped>
 .admin-layout {
+  --layout-bg: #0d1118;
+  --panel-gradient-start: #161b24;
+  --panel-gradient-end: #131821;
+  --sub-panel-gradient-start: #141a24;
+  --sub-panel-gradient-end: #111722;
+  --border-color: rgba(255, 255, 255, 0.08);
+  --topbar-border-color: rgba(255, 255, 255, 0.08);
+  --brand-text: #f2f5ff;
+  --brand-muted: #aeb8cc;
+  --menu-text: #b8c0d4;
+  --menu-hover-text: #f4f7ff;
+  --menu-active-text: #ffffff;
+  --menu-hover-bg: linear-gradient(90deg, rgba(103, 121, 170, 0.16) 0%, rgba(112, 133, 186, 0.3) 100%);
+  --menu-active-bg: linear-gradient(90deg, rgba(103, 121, 170, 0.3) 0%, rgba(112, 133, 186, 0.48) 100%);
+  --menu-active-hover-bg: linear-gradient(90deg, rgba(103, 121, 170, 0.34) 0%, rgba(112, 133, 186, 0.52) 100%);
+  --submenu-text: #aab7d5;
+  --submenu-hover-text: #eef3ff;
+  --submenu-hover-bg: linear-gradient(90deg, rgba(90, 108, 151, 0.16) 0%, rgba(107, 128, 184, 0.24) 100%);
+  --submenu-active-bg: linear-gradient(90deg, rgba(103, 121, 170, 0.28) 0%, rgba(112, 133, 186, 0.44) 100%);
+  --divider-bg: linear-gradient(
+    90deg,
+    rgba(120, 138, 183, 0) 0%,
+    rgba(154, 176, 228, 0.38) 18%,
+    rgba(154, 176, 228, 0.38) 82%,
+    rgba(120, 138, 183, 0) 100%
+  );
+  --footer-border: rgba(255, 255, 255, 0.1);
+  --footer-bg: rgba(255, 255, 255, 0.03);
+  --dialog-bg: linear-gradient(180deg, rgba(24, 30, 41, 0.98), rgba(19, 24, 34, 0.98));
+  --dialog-text: #edf1ff;
+  --dialog-link: #8fb0ff;
+  --topbar-icon: #edf3ff;
+
   min-height: 100vh;
   display: grid;
   grid-template-columns: 244px minmax(0, 1fr);
-  background: #0d1118;
+  background: var(--layout-bg);
+}
+
+.admin-layout--light {
+  --layout-bg: #f8f4e9;
+  --panel-gradient-start: #ffffff;
+  --panel-gradient-end: #f7f1e4;
+  --sub-panel-gradient-start: #f9f4e8;
+  --sub-panel-gradient-end: #f2ebdc;
+  --border-color: rgba(74, 111, 165, 0.22);
+  --topbar-border-color: rgba(74, 111, 165, 0.22);
+  --brand-text: #223959;
+  --brand-muted: #647892;
+  --menu-text: #546b8a;
+  --menu-hover-text: #223959;
+  --menu-active-text: #1f3352;
+  --menu-hover-bg: linear-gradient(90deg, rgba(74, 111, 165, 0.08) 0%, rgba(74, 111, 165, 0.2) 100%);
+  --menu-active-bg: linear-gradient(90deg, rgba(74, 111, 165, 0.2) 0%, rgba(74, 111, 165, 0.34) 100%);
+  --menu-active-hover-bg: linear-gradient(90deg, rgba(74, 111, 165, 0.24) 0%, rgba(74, 111, 165, 0.38) 100%);
+  --submenu-text: #5f7696;
+  --submenu-hover-text: #223959;
+  --submenu-hover-bg: linear-gradient(90deg, rgba(74, 111, 165, 0.08) 0%, rgba(74, 111, 165, 0.16) 100%);
+  --submenu-active-bg: linear-gradient(90deg, rgba(74, 111, 165, 0.16) 0%, rgba(74, 111, 165, 0.3) 100%);
+  --divider-bg: linear-gradient(
+    90deg,
+    rgba(74, 111, 165, 0) 0%,
+    rgba(74, 111, 165, 0.28) 18%,
+    rgba(74, 111, 165, 0.28) 82%,
+    rgba(74, 111, 165, 0) 100%
+  );
+  --footer-border: rgba(74, 111, 165, 0.24);
+  --footer-bg: rgba(74, 111, 165, 0.07);
+  --dialog-bg: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(247, 241, 228, 0.98));
+  --dialog-text: #233a5b;
+  --dialog-link: #4a6fa5;
+  --topbar-icon: #2c4a76;
 }
 
 .admin-layout--with-subnav {
@@ -557,13 +757,14 @@ function goToKumaConfig(): void {
 }
 
 .mobile-topbar {
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  border-bottom: 1px solid var(--topbar-border-color);
+  background: var(--panel-gradient-start);
   backdrop-filter: blur(10px);
 }
 
 .mobile-topbar :deep(.v-btn),
 .mobile-topbar :deep(.v-btn .v-icon) {
-  color: #edf3ff;
+  color: var(--topbar-icon);
 }
 
 .mobile-topbar-title {
@@ -573,7 +774,7 @@ function goToKumaConfig(): void {
   font-size: 16px;
   font-weight: 700;
   letter-spacing: 0.3px;
-  color: #f2f5ff;
+  color: var(--brand-text);
 }
 
 .sidebar {
@@ -581,14 +782,14 @@ function goToKumaConfig(): void {
   flex-direction: column;
   gap: 12px;
   padding: 18px 14px 14px;
-  border-right: 1px solid rgba(255, 255, 255, 0.08);
-  background: linear-gradient(180deg, #161b24 0%, #131821 100%);
+  border-right: 1px solid var(--border-color);
+  background: linear-gradient(180deg, var(--panel-gradient-start) 0%, var(--panel-gradient-end) 100%);
 }
 
 .sub-sidebar {
   padding: 18px 14px 14px;
-  border-right: 1px solid rgba(255, 255, 255, 0.08);
-  background: linear-gradient(180deg, #141a24 0%, #111722 100%);
+  border-right: 1px solid var(--border-color);
+  background: linear-gradient(180deg, var(--sub-panel-gradient-start) 0%, var(--sub-panel-gradient-end) 100%);
 }
 
 .mobile-drawer-content,
@@ -599,19 +800,19 @@ function goToKumaConfig(): void {
   flex-direction: column;
   gap: 10px;
   padding: 16px 14px 14px;
-  background: linear-gradient(180deg, #161b24 0%, #131821 100%);
+  background: linear-gradient(180deg, var(--panel-gradient-start) 0%, var(--panel-gradient-end) 100%);
   overflow: hidden;
 }
 
 .mobile-secondary-nav {
-  background: linear-gradient(180deg, #141a24 0%, #111722 100%);
+  background: linear-gradient(180deg, var(--sub-panel-gradient-start) 0%, var(--sub-panel-gradient-end) 100%);
 }
 
 .mobile-secondary-title {
   padding: 4px 8px;
   font-size: 15px;
   font-weight: 700;
-  color: #f2f5ff;
+  color: var(--brand-text);
 }
 
 .sidebar-header {
@@ -630,7 +831,7 @@ function goToKumaConfig(): void {
   gap: 6px;
   font-size: 18px;
   font-weight: 700;
-  color: #f2f5ff;
+  color: var(--brand-text);
   letter-spacing: 0.4px;
 }
 
@@ -644,7 +845,7 @@ function goToKumaConfig(): void {
   font-size: 12px;
   font-weight: 600;
   letter-spacing: 0.2px;
-  color: #aeb8cc;
+  color: var(--brand-muted);
 }
 
 .mobile-secondary-head {
@@ -680,13 +881,7 @@ function goToKumaConfig(): void {
   border: 0;
   height: 1px;
   margin: 6px 8px 10px;
-  background: linear-gradient(
-    90deg,
-    rgba(120, 138, 183, 0) 0%,
-    rgba(154, 176, 228, 0.38) 18%,
-    rgba(154, 176, 228, 0.38) 82%,
-    rgba(120, 138, 183, 0) 100%
-  );
+  background: var(--divider-bg);
 }
 
 :deep(.menu-item .v-list-item-title) {
@@ -698,7 +893,7 @@ function goToKumaConfig(): void {
 :deep(.menu-item) {
   min-height: 44px;
   margin-bottom: 6px;
-  color: #b8c0d4;
+  color: var(--menu-text);
   border: 1px solid transparent;
   transition:
     background 0.22s ease,
@@ -706,17 +901,17 @@ function goToKumaConfig(): void {
 }
 
 :deep(.menu-item:hover) {
-  color: #f4f7ff;
-  background: linear-gradient(90deg, rgba(103, 121, 170, 0.16) 0%, rgba(112, 133, 186, 0.3) 100%);
+  color: var(--menu-hover-text);
+  background: var(--menu-hover-bg);
 }
 
 :deep(.menu-item.v-list-item--active) {
-  color: #ffffff;
-  background: linear-gradient(90deg, rgba(103, 121, 170, 0.3) 0%, rgba(112, 133, 186, 0.48) 100%);
+  color: var(--menu-active-text);
+  background: var(--menu-active-bg);
 }
 
 :deep(.menu-item.v-list-item--active:hover) {
-  background: linear-gradient(90deg, rgba(103, 121, 170, 0.34) 0%, rgba(112, 133, 186, 0.52) 100%);
+  background: var(--menu-active-hover-bg);
 }
 
 .submenu-wrap {
@@ -731,7 +926,7 @@ function goToKumaConfig(): void {
 :deep(.submenu-item) {
   min-height: 38px;
   margin: 0 0 4px 28px;
-  color: #aab7d5;
+  color: var(--submenu-text);
   border: 1px solid transparent;
   transition:
     background 0.22s ease,
@@ -739,25 +934,26 @@ function goToKumaConfig(): void {
 }
 
 :deep(.submenu-item:hover) {
-  color: #eef3ff;
-  background: linear-gradient(90deg, rgba(90, 108, 151, 0.16) 0%, rgba(107, 128, 184, 0.24) 100%);
+  color: var(--submenu-hover-text);
+  background: var(--submenu-hover-bg);
 }
 
 :deep(.submenu-item.v-list-item--active) {
-  color: #ffffff;
-  background: linear-gradient(90deg, rgba(103, 121, 170, 0.28) 0%, rgba(112, 133, 186, 0.44) 100%);
+  color: var(--menu-active-text);
+  background: var(--submenu-active-bg);
 }
 
 .sidebar-footer {
   margin-top: auto;
   padding: 10px 10px;
   display: flex;
+  flex-wrap: nowrap;
   align-items: center;
   justify-content: flex-end;
   gap: 8px;
   border-radius: 14px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--footer-border);
+  background: var(--footer-bg);
 }
 
 .sidebar-footer--mobile {
@@ -767,9 +963,25 @@ function goToKumaConfig(): void {
   flex-shrink: 0;
 }
 
+.theme-mode-btn {
+  flex: 0 0 auto;
+  margin-right: auto;
+  color: var(--menu-text);
+}
+
+.theme-mode-btn:hover {
+  color: var(--menu-hover-text);
+  background: var(--menu-hover-bg);
+}
+
+.theme-btn-mobile {
+  color: var(--menu-active-text);
+}
+
 .site-btn,
 .logout-btn {
-  flex-shrink: 0;
+  flex: 0 1 auto;
+  min-width: 0;
 }
 
 .content-wrap {
@@ -778,13 +990,13 @@ function goToKumaConfig(): void {
 }
 
 .dialog-card {
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  background: linear-gradient(180deg, rgba(24, 30, 41, 0.98), rgba(19, 24, 34, 0.98));
-  color: #edf1ff;
+  border: 1px solid var(--footer-border);
+  background: var(--dialog-bg);
+  color: var(--dialog-text);
 }
 
 .kuma-settings-link {
-  color: #8fb0ff;
+  color: var(--dialog-link);
   text-decoration: underline;
 }
 

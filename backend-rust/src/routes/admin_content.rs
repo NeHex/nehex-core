@@ -42,6 +42,8 @@ struct ArticleItem {
     title: String,
     #[serde(rename = "articleTopImage")]
     article_top_image: Option<String>,
+    #[serde(rename = "aiSummary")]
+    ai_summary: Option<String>,
     #[serde(rename = "class")]
     class_name: String,
     read: i64,
@@ -173,6 +175,8 @@ pub struct ArticlePayload {
     title: String,
     #[serde(rename = "articleTopImage")]
     article_top_image: Option<String>,
+    #[serde(rename = "aiSummary")]
+    ai_summary: Option<String>,
     #[serde(rename = "class")]
     class_name: String,
     read: i64,
@@ -267,6 +271,7 @@ pub async fn admin_list_articles(
                 id::bigint AS id,
                 title,
                 "articleTopImage" AS article_top_image,
+                ai_summary,
                 class AS class_name,
                 read::bigint AS read,
                 like_count::bigint AS like_count,
@@ -313,6 +318,7 @@ pub async fn admin_get_article(
             id::bigint AS id,
             title,
             "articleTopImage" AS article_top_image,
+            ai_summary,
             class AS class_name,
             read::bigint AS read,
             like_count::bigint AS like_count,
@@ -350,6 +356,7 @@ pub async fn admin_create_article(
         INSERT INTO article (
             title,
             "articleTopImage",
+            ai_summary,
             class,
             read,
             like_count,
@@ -358,11 +365,12 @@ pub async fn admin_create_article(
             status,
             content
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
         RETURNING
             id::bigint AS id,
             title,
             "articleTopImage" AS article_top_image,
+            ai_summary,
             class AS class_name,
             read::bigint AS read,
             like_count::bigint AS like_count,
@@ -376,6 +384,7 @@ pub async fn admin_create_article(
     )
     .bind(normalized.title)
     .bind(normalized.article_top_image)
+    .bind(normalized.ai_summary)
     .bind(normalized.class_name)
     .bind(normalized.read)
     .bind(normalized.like_count)
@@ -408,19 +417,21 @@ pub async fn admin_update_article(
         SET
             title = $2,
             "articleTopImage" = $3,
-            class = $4,
-            read = $5,
-            like_count = $6,
-            tag = $7,
-            top = $8,
-            status = $9,
-            content = $10,
+            ai_summary = $4,
+            class = $5,
+            read = $6,
+            like_count = $7,
+            tag = $8,
+            top = $9,
+            status = $10,
+            content = $11,
             "lastEditTime" = CURRENT_TIMESTAMP
         WHERE id = $1
         RETURNING
             id::bigint AS id,
             title,
             "articleTopImage" AS article_top_image,
+            ai_summary,
             class AS class_name,
             read::bigint AS read,
             like_count::bigint AS like_count,
@@ -435,6 +446,7 @@ pub async fn admin_update_article(
     .bind(article_id)
     .bind(normalized.title)
     .bind(normalized.article_top_image)
+    .bind(normalized.ai_summary)
     .bind(normalized.class_name)
     .bind(normalized.read)
     .bind(normalized.like_count)
@@ -1273,6 +1285,7 @@ fn normalize_article_payload(payload: ArticlePayload) -> AppResult<ArticlePayloa
     Ok(ArticlePayload {
         title: normalize_required_text(payload.title, "title")?,
         article_top_image: normalize_optional_text(payload.article_top_image),
+        ai_summary: normalize_optional_text(payload.ai_summary),
         class_name: normalize_required_text(payload.class_name, "class")?,
         read: payload.read.max(0),
         like_count: Some(payload.like_count.unwrap_or(0).max(0)),
